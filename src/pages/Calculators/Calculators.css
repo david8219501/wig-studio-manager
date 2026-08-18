@@ -1,0 +1,415 @@
+/* Calculators.css - Soft Lavender Theme */
+
+.calc-page {
+  direction: rtl;
+  font-family: "inter", "inter Fallback", system-ui, -apple-system, sans-serif;
+  color: #2d2638; /* טקסט כהה עם נגיעה סגולה עמוקה */
+  padding: 24px;
+  background: #f7f3f9; /* רקע סגלגל חלש, רך ויוקרתי לכל הדף */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+/* ---------- Header ---------- */
+.calc-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calc-page-title {
+  font-family: "interDisplay", sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  color: #3b2a54; /* סגול עמוק ואצילי */
+  margin: 0;
+}
+
+.calc-settings-btn {
+  font-family: "inter", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b4c9a;
+  background: #ffffff;
+  border: 1px solid #e5dbf0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(107, 76, 154, 0.04);
+  transition: all 150ms ease;
+}
+
+.calc-settings-btn:hover {
+  border-color: #9b69ff;
+  background: #f3ebfc;
+  color: #523185;
+}
+
+/* ---------- Global Settings Panel ---------- */
+.calc-global-settings {
+  background: #ffffff;
+  border: 1px solid #e9dfef;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  box-shadow: 0 4px 12px rgba(82, 49, 133, 0.03);
+}
+
+.calc-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.calc-setting-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #554868;
+}
+
+.calc-setting-input {
+  font-family: "JetBrains Mono", monospace;
+  width: 90px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5dbf0;
+  font-size: 13px;
+  text-align: center;
+  color: #3b2a54;
+  background: #fcfaff;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.calc-setting-input:focus {
+  border-color: #9b69ff;
+  background: #ffffff;
+}
+
+/* ---------- Grid Layout ---------- */
+.calc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 992px) {
+  .calc-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Card Styles ---------- */
+.calc-card {
+  background: #ffffff; /* כרטיסיה לבנה נקייה על גבי רקע סגלגל */
+  border-radius: 14px;
+  border: 1px solid #ebdff5;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(107, 76, 154, 0.05);
+  transition: all 150ms ease;
+}
+
+.calc-card:hover {
+  border-color: #d6bfed;
+  box-shadow: 0 6px 20px rgba(107, 76, 154, 0.08);
+}
+
+/* הדגשות עדינות לפי סוג כרטיס */
+.card-blue   { border-top: 4px solid #7094ee; }
+.card-green  { border-top: 4px solid #32c589; }
+.card-purple { border-top: 4px solid #9b69ff; }
+.card-orange { border-top: 4px solid #f2994a; }
+
+.calc-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f4edf8;
+}
+
+.calc-card-icon {
+  font-size: 20px;
+}
+
+.calc-card-title {
+  font-family: "interDisplay", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #3b2a54;
+}
+
+/* כפתור מצב תצוגה (מנהל vs לקוחה) בסגנון Lavender */
+.calc-toggle-btn {
+  background: #f8f3fa;
+  border: 1px solid #e1d4eb;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b4c9a;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.calc-toggle-btn:hover {
+  background: #f3ebfc;
+  border-color: #9b69ff;
+  color: #3b2a54;
+}
+
+/* ---------- Inputs & Rows ---------- */
+.calc-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.calc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 100px;
+  flex: 1;
+}
+
+.calc-field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #63537a;
+  text-align: right;
+}
+
+.calc-select, 
+.calc-input {
+  font-family: "inter", sans-serif;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5dbf0;
+  font-size: 13px;
+  color: #2d2638;
+  background: #fcfaff;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 150ms ease;
+}
+
+.calc-select:focus, 
+.calc-input:focus {
+  border-color: #9b69ff;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(155, 105, 255, 0.12);
+}
+
+.calc-select {
+  cursor: pointer;
+}
+
+.calc-input-error {
+  border-color: #eb5757;
+  background: #fff5f5;
+}
+
+.calc-hint {
+  font-size: 13px;
+  color: #8c7b9e;
+  text-align: center;
+  padding: 16px 0;
+  background: #f8f3fa;
+  border-radius: 8px;
+  border: 1px dashed #e1d4eb;
+}
+
+/* ---------- Results Section ---------- */
+.calc-result-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.calc-result-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: #f9f5fc;
+  border: 1px solid #f0e6f7;
+  border-radius: 8px;
+}
+
+.calc-result-label {
+  color: #63537a;
+  font-weight: 500;
+}
+
+.calc-result-val {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+  color: #3b2a54;
+}
+
+.calc-final-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #3b2a54; /* סגול כהה עמוק */
+  border-radius: 10px;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 14px;
+  margin-top: 6px;
+  box-shadow: 0 4px 12px rgba(59, 42, 84, 0.2);
+}
+
+.calc-final-num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 21px;
+  font-weight: 700;
+  color: #00e68a; /* ירוק רענן בולט */
+}
+
+/* ---------- Stages & Tables ---------- */
+.calc-stages-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calc-stages-title {
+  font-size: 12px;
+  color: #63537a;
+  text-align: right;
+  font-weight: 600;
+}
+
+.calc-stages-row {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.calc-stage-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  background: #f8f3fa;
+  border: 1px solid #ebdff5;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 56px;
+  flex: 1;
+}
+
+.calc-stage-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #834ccf;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.calc-stage-cell {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: #2d2638;
+}
+
+/* ---------- Statistics Legend ---------- */
+.calc-stats-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.calc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #63537a;
+  font-weight: 500;
+}
+
+.calc-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+/* ---------- Catalog Pricing Table ---------- */
+.catalog-card {
+  grid-column: span 1;
+}
+
+.catalog-sub-badge {
+  font-size: 11px;
+  color: #834ccf;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.catalog-table-wrapper {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #ebdff5;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.catalog-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: right;
+}
+
+.catalog-table th {
+  background: #f8f3fa;
+  color: #63537a;
+  padding: 10px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid #ebdff5;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.catalog-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f4edf8;
+  color: #2d2638;
+}
+
+.catalog-table tr:hover {
+  background: #fcfaff;
+}
+
+.catalog-price {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  color: #3b2a54;
+}
+
+.catalog-profit {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  color: #00b36b;
+}

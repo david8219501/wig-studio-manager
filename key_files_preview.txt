@@ -1,0 +1,357 @@
+import { useState } from 'react';
+import Sidebar from './components/Sidebar/Sidebar';
+import Dashboard from './pages/Dashboard/Dashboard';
+import Clients from './pages/Clients/Clients';
+import Calculators from './pages/Calculators/Calculators';
+import Sales from './pages/Sales/Sales';
+import Expenses from './pages/Expenses/Expenses';
+import Reports from './pages/Reports/Reports';
+import Settings from './pages/Settings/Settings';
+import './App.css';
+
+function App() {
+  // ניהול המצב של העמוד הנוכחי - ברירת המחדל היא לוח הבקרה
+  const [activePage, setActivePage] = useState('dashboard');
+
+  // פונקציה שמחזירה את הרכיב המתאים לפי ה-id שנבחר בסיידבר
+  const renderPage = () => {
+    switch (activePage) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'clients':
+        return <Clients />;
+      case 'calculators':
+        return <Calculators />;
+      case 'sales':
+        return <Sales />;
+      case 'expenses':
+        return <Expenses />;
+      case 'reports':
+        return <Reports />;
+      case 'settings':
+        return <Settings />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
+  return (
+    <div className="app-container">
+      {/* הסיידבר מקבל את העמוד הפעיל ואת פונקציית הניווט שמעדכנת את ה-State */}
+      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      
+      <main className="main-content">
+        <header className="top-bar">
+          <h1>מערכת ניהול - Esti Wigs</h1>
+        </header>
+        
+        <div className="content-area">
+          {/* כאן מוצג ה-Component של העמוד שנבחר בזמן אמת */}
+          {renderPage()}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default App;import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCweYlyAOuQrTNUnIJK6IWWvj6CRT3oQUo",
+  authDomain: "esti-wigs-portal.firebaseapp.com",
+  projectId: "esti-wigs-portal",
+  storageBucket: "esti-wigs-portal.firebasestorage.app",
+  messagingSenderId: "72620775587",
+  appId: "1:72620775587:web:d9ce348ff8b72e3c3f4716"
+  // הורדנו את measurementId כי אנחנו לא משתמשים ב-Analytics כרגע
+};
+
+// אתחול האפליקציה
+const app = initializeApp(firebaseConfig);
+
+// ייצוא בסיס הנתונים (Firestore) לשימוש בכל הפרויקט
+export const db = getFirestore(app);import React, { useEffect, useState } from "react";
+import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { db } from "../../services/firebase"; // או הנתיב המדויק שבו הקובץ שלך נמצאimport "./Clients.css";
+import "./Clients.css";
+import AddClientModal from "../../components/modals/AddClientModal";
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  measurements: string;
+  sales: string;
+  notes: string;
+  wigStatus: string;
+  paymentStatus: string;
+  price: number;
+  paid: number;
+}
+
+// ─── Badge helpers ─────────────────────────────────────────────────────────────
+
+const wigStatusClass = (status: string): string => {
+  switch (status) {
+    case "מוכנה":
+      return "badge badge--green";
+    case "בטיפול":
+      return "badge badge--orange";
+    case "חדשה":
+      return "badge badge--blue";
+    default:
+      return "badge badge--gray";
+  }
+};
+
+const paymentStatusClass = (status: string): string => {
+  switch (status) {
+    case "שולם":
+      return "badge badge--green";
+    case "מקדמה":
+      return "badge badge--orange";
+    case "לא שולם":
+      return "badge badge--red";
+    default:
+      return "badge badge--gray";
+  }
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+const Clients: React.FC = () => {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Fetch clients from Firestore
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "clients"));
+        const data: Client[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<Client, "id">),
+        }));
+        setClients(data);
+      } catch (err) {
+        console.error("Error fetching clients:", err);
+        setError("שגיאה בטעינת הנתונים. בדקי את החיבור ל-Firestore.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClients();
+  }, []);
+
+  // Delete a client
+  const handleDelete = async (clientId: string, clientName: string) => {
+    const confirmed = window.confirm(
+      `האם את בטוחה שברצונך למחוק את ${clientName}?`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "clients", clientId));
+      setClients((prev) => prev.filter((c) => c.id !== clientId));
+    } catch (err) {
+      console.error("Error deleting client:", err);
+      alert("שגיאה במחיקת הלקוחה. נסי שוב.");
+    }
+  };
+
+  // Row click handler (placeholder for Phase B)
+  const handleRowClick = (client: Client) => {
+    console.log("Row clicked:", client);
+    // TODO Phase B: navigate to /clients/:id
+  };
+
+  // Filtered list
+  const filtered = clients.filter((c) => {
+    const q = search.toLowerCase();
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.phone?.toLowerCase().includes(q) ||
+      c.email?.toLowerCase().includes(q)
+    );
+  });
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="clients-page">
+      {/* Page header */}
+      <div className="clients-page__header">
+        <h1 className="clients-page__title">רשימת לקוחות</h1>
+        <span className="clients-page__count">{clients.length} לקוחות</span>
+      </div>
+
+      {/* Search + actions bar */}
+      <div className="clients-page__toolbar">
+        <div className="clients-search">
+          <span className="clients-search__icon">🔍</span>
+          <input
+            className="clients-search__input"
+            type="text"
+            placeholder="חיפוש לפי שם, טלפון או אימייל..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            dir="rtl"
+          />
+        </div>
+
+        <button
+          className="btn btn--primary"
+          onClick={() => setIsModalOpen(true)}
+        >
+          + הוספי לקוחה חדשה
+        </button>
+      </div>
+
+      {/* States: loading / error / empty */}
+      {loading && (
+        <div className="clients-state">
+          <div className="clients-state__spinner" />
+          <p>טוענת נתונים...</p>
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="clients-state clients-state--error">
+          <span className="clients-state__icon">⚠️</span>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {!loading && !error && filtered.length === 0 && (
+        <div className="clients-state">
+          <span className="clients-state__icon">🔍</span>
+          <p>{search ? "לא נמצאו תוצאות לחיפוש זה." : "עדיין אין לקוחות במערכת."}</p>
+        </div>
+      )}
+
+      {/* Table */}
+      {!loading && !error && filtered.length > 0 && (
+        <div className="clients-table-wrapper">
+          <table className="clients-table" dir="rtl">
+            <thead>
+              <tr>
+                <th>שם לקוחה</th>
+                <th>טלפון</th>
+                <th>אימייל</th>
+                <th>מידות</th>
+                <th>מכירות</th>
+                <th>סטטוס פאה</th>
+                <th>סטטוס תשלום</th>
+                <th>הערות</th>
+                <th>פעולות</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((client) => (
+                <tr
+                  key={client.id}
+                  className="clients-table__row"
+                  onClick={() => handleRowClick(client)}
+                >
+                  <td className="clients-table__name">{client.name || "—"}</td>
+
+                  <td dir="ltr" className="clients-table__phone">
+                    {client.phone || "—"}
+                  </td>
+
+                  <td dir="ltr" className="clients-table__email">
+                    {client.email ? (
+                      <a
+                        href={`mailto:${client.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="clients-table__email-link"
+                      >
+                        {client.email}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+
+                  <td>{client.measurements || "—"}</td>
+
+                  <td>
+                    <div className="clients-table__sales">
+                      <span>{client.sales || "—"}</span>
+                      {client.price != null && (
+                        <span className="clients-table__price">
+                          ₪{client.price.toLocaleString("he-IL")}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  <td>
+                    {client.wigStatus ? (
+                      <span className={wigStatusClass(client.wigStatus)}>
+                        {client.wigStatus}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+
+                  <td>
+                    {client.paymentStatus ? (
+                      <span className={paymentStatusClass(client.paymentStatus)}>
+                        {client.paymentStatus}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+
+                  <td className="clients-table__notes">
+                    {client.notes || "—"}
+                  </td>
+
+                  <td>
+                    <button
+                      className="btn-icon btn-icon--danger"
+                      title={`מחקי את ${client.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation(); // don't trigger row click
+                        handleDelete(client.id, client.name);
+                      }}
+                      aria-label={`מחקי את ${client.name}`}
+                    >
+                      🗑️
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {/* Add Client Modal */}
+      <AddClientModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onClientAdded={async () => {
+          // Re-fetch the full list after a new client is added
+          const snapshot = await getDocs(collection(db, "clients"));
+          const data: Client[] = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<Client, "id">),
+          }));
+          setClients(data);
+        }}
+      />
+    </div>
+  );
+};
+
+export default Clients;
