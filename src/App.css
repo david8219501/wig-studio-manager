@@ -6,9 +6,9 @@
     flex-direction: row;
     min-height: 100vh;
     width: 100%;
-    background-color: var(--color-background);
+    background-color: var(--color-background, #f7f3f9);
   }
-  
+    
   /* ==========================================================================
      2. מבנה אזור התוכן המרכזי (Main Content Area)
      ========================================================================== */
@@ -16,43 +16,34 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background-color: var(--color-background);
+    background-color: var(--color-background, #f7f3f9);
     min-width: 0; /* מונע גלישה של טבלאות ורכיבים רחבים */
   }
-  
-  /* הפס העליון */
-  .top-bar {
-    background-color: var(--color-surface);
-    padding: 20px 30px;
-    border-bottom: 1px solid var(--color-border);
-    box-shadow: 0 2px 8px rgba(107, 76, 154, 0.03);
-  }
-  
-  .top-bar h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    text-align: right;
-    color: var(--color-primary);
-  }
-  
+    
   /* אזור גוף העמוד */
   .content-area {
-    padding: 30px;
-    background-color: var(--color-background);
+    /* הפדינג הוסר מכאן כדי לא ליצור "פדינג כפול". 
+       כל עמוד (דשבורד, יומן וכו') מנהל את המרווחים שלו בעצמו */
+    background-color: transparent;
     flex: 1;
+    display: flex;
+    flex-direction: column;
   }
   
+  /* ==========================================================================
+     3. רכיבים כלליים (General Components)
+     ========================================================================== */
   .placeholder-card {
-    background-color: var(--color-surface);
+    background-color: var(--color-surface, #ffffff);
     padding: 24px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: var(--shadow-card, 0 4px 16px rgba(107, 76, 154, 0.03));
+    border: 1px solid var(--color-border, #ebdff5);
     text-align: right;
-    transition: border-color var(--duration-fast) var(--easing), box-shadow var(--duration-fast) var(--easing);
+    transition: all 0.2s ease;
   }
-  
+    
   .placeholder-card:hover {
-    border-color: var(--color-accent-border);
-    box-shadow: var(--shadow-elevated);
+    border-color: var(--color-accent-border, #9b69ff);
+    box-shadow: var(--shadow-elevated, 0 8px 24px rgba(107, 76, 154, 0.06));
   }

@@ -1,12 +1,9 @@
-/* ─── AddClientModal.css ─────────────────────────────────────────────────── */
-
 /* ─── Backdrop ───────────────────────────────────────────────────────────── */
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(45, 41, 38, 0.45);
-  backdrop-filter: blur(2px);
+  background: rgba(45, 41, 38, 0.3); /* רקע כהה ועדין בלי טישטוש */
   z-index: 100;
   animation: backdropIn 0.18s ease;
 }

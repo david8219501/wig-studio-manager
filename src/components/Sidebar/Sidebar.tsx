@@ -9,6 +9,7 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { label: "לוח בקרה", icon: "🏠", id: "dashboard" },
   { label: "ניהול לקוחות", icon: "👥", id: "clients" },
+  { label: "יומן פגישות", icon: "📅", id: "calendar" },
   { label: "ניהול מלאי", icon: "📦", id: "inventory" },
   { label: "מחשבונים", icon: "🧮", id: "calculators" },
   { label: "מכירות", icon: "🛒", id: "sales" },

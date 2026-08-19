@@ -12,42 +12,8 @@ export interface Client {
   name: string;
   phone: string;
   email: string;
-  measurements: string;
-  sales: string;
   notes: string;
-  wigStatus: string;
-  paymentStatus: string;
-  price: number;
-  paid: number;
 }
-
-// ─── Badge helpers ─────────────────────────────────────────────────────────────
-
-const wigStatusClass = (status: string): string => {
-  switch (status) {
-    case "מוכנה":
-      return "badge badge--green";
-    case "בטיפול":
-      return "badge badge--orange";
-    case "חדשה":
-      return "badge badge--blue";
-    default:
-      return "badge badge--gray";
-  }
-};
-
-const paymentStatusClass = (status: string): string => {
-  switch (status) {
-    case "שולם":
-      return "badge badge--green";
-    case "מקדמה":
-      return "badge badge--orange";
-    case "לא שולם":
-      return "badge badge--red";
-    default:
-      return "badge badge--gray";
-  }
-};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -102,6 +68,13 @@ const Clients: React.FC = () => {
     }
   };
 
+  // Edit client handler
+  const handleEdit = (client: Client, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedClient(client);
+    setIsModalOpen(true);
+  };
+
   // Row click handler - פותח את כרטיס הלקוחה הנשלף
   const handleRowClick = (client: Client) => {
     setSelectedClient(client);
@@ -144,7 +117,10 @@ const Clients: React.FC = () => {
 
         <button
           className="btn btn--primary"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setSelectedClient(null);
+            setIsModalOpen(true);
+          }}
         >
           + הוספי לקוחה חדשה
         </button>
@@ -181,10 +157,6 @@ const Clients: React.FC = () => {
                 <th>שם לקוחה</th>
                 <th>טלפון</th>
                 <th>אימייל</th>
-                <th>מידות</th>
-                <th>מכירות</th>
-                <th>סטטוס פאה</th>
-                <th>סטטוס תשלום</th>
                 <th>הערות</th>
                 <th>פעולות</th>
               </tr>
@@ -216,55 +188,32 @@ const Clients: React.FC = () => {
                     )}
                   </td>
 
-                  <td>{client.measurements || "—"}</td>
-
-                  <td>
-                    <div className="clients-table__sales">
-                      <span>{client.sales || "—"}</span>
-                      {client.price != null && (
-                        <span className="clients-table__price">
-                          ₪{client.price.toLocaleString("he-IL")}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  <td>
-                    {client.wigStatus ? (
-                      <span className={wigStatusClass(client.wigStatus)}>
-                        {client.wigStatus}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-
-                  <td>
-                    {client.paymentStatus ? (
-                      <span className={paymentStatusClass(client.paymentStatus)}>
-                        {client.paymentStatus}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-
                   <td className="clients-table__notes">
                     {client.notes || "—"}
                   </td>
 
                   <td>
-                    <button
-                      className="btn-icon btn-icon--danger"
-                      title={`מחקי את ${client.name}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(client.id, client.name);
-                      }}
-                      aria-label={`מחקי את ${client.name}`}
-                    >
-                      🗑️
-                    </button>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        className="btn-icon"
+                        title={`ערוך את ${client.name}`}
+                        onClick={(e) => handleEdit(client, e)}
+                        aria-label={`ערוך את ${client.name}`}
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        className="btn-icon btn-icon--danger"
+                        title={`מחקי את ${client.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(client.id, client.name);
+                        }}
+                        aria-label={`מחקי את ${client.name}`}
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
