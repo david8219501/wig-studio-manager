@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { getApps } from 'firebase/app';
-import { auth, db } from './firebase';
+import { auth, db } from './services/firebase';
 import Login, { type RegisterData } from './pages/Login/Login';
 import Sidebar from './components/Sidebar/Sidebar';
 import Dashboard from './pages/Dashboard/Dashboard';
