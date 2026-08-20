@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
-import { db } from "../../services/firebase";
+import { collection, deleteDoc, doc, onSnapshot, query, where } from "firebase/firestore";
+import { db, auth } from "../../services/firebase";
 import ClientDrawer from "../../components/clients/ClientDrawer";
 import AddClientModal from "../../components/modals/AddClientModal";
 import "./Clients.css";
@@ -28,25 +28,33 @@ const Clients: React.FC = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Fetch clients from Firestore
-  const fetchClients = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, "clients"));
-      const data: Client[] = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<Client, "id">),
-      }));
-      setClients(data);
-    } catch (err) {
-      console.error("Error fetching clients:", err);
-      setError("שגיאה בטעינת הנתונים. בדקי את החיבור ל-Firestore.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // האזנה חיה ל-Firestore, מסוננת רק ללקוחות של העסק המחובר (businessId = uid)
   useEffect(() => {
-    fetchClients();
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) {
+      setLoading(false);
+      return;
+    }
+
+    const clientsQuery = query(collection(db, "clients"), where("businessId", "==", businessId));
+    const unsubscribe = onSnapshot(
+      clientsQuery,
+      (snapshot) => {
+        const data: Client[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<Client, "id">),
+        }));
+        setClients(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error fetching clients:", err);
+        setError("שגיאה בטעינת הנתונים. בדקי את החיבור ל-Firestore.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   // Delete a client
@@ -229,11 +237,15 @@ const Clients: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
       />
 
-      {/* Add Client Modal */}
+      {/* Add/Edit Client Modal */}
       <AddClientModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onClientAdded={fetchClients}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedClient(null);
+        }}
+        onClientAdded={() => {}}
+        editingClient={selectedClient}
       />
     </div>
   );

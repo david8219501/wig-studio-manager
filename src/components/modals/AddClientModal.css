@@ -1,6 +1,6 @@
 /* ─── Backdrop ───────────────────────────────────────────────────────────── */
 
-.modal-backdrop {
+.add-client-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(45, 41, 38, 0.3); /* רקע כהה ועדין בלי טישטוש */
@@ -164,6 +164,12 @@
 
 .field__input::placeholder {
   color: #bbb3aa;
+}
+
+.field__textarea {
+  resize: vertical;
+  font-family: inherit;
+  min-height: 60px;
 }
 
 .field--error .field__input {

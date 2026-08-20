@@ -5,7 +5,7 @@ import type { BulkItem } from '../../types';
 interface AddBulkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: BulkItem) => void;
+  onSave: (item: BulkItem) => Promise<void>;
 }
 
 const emptyForm = {
@@ -18,6 +18,8 @@ const emptyForm = {
 const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, onSave }) => {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -36,7 +38,7 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
 
     const newItem: BulkItem = {
@@ -47,9 +49,18 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
       unitCost: Number(form.unitCost),
     };
 
-    onSave(newItem);
-    setForm(emptyForm);
-    setErrors({});
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onSave(newItem);
+      setForm(emptyForm);
+      setErrors({});
+    } catch (err) {
+      console.error('Error saving bulk item:', err);
+      setSaveError('שגיאה בשמירת הפריט. בדקי את החיבור ונסי שוב.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -109,11 +120,12 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
         </div>
 
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose}>
+          {saveError && <span className="field-error">{saveError}</span>}
+          <button className="btn-secondary" onClick={onClose} disabled={saving}>
             ביטול
           </button>
-          <button className="btn-primary" onClick={handleSubmit}>
-            הוסף פריט
+          <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'שומר...' : 'הוסף פריט'}
           </button>
         </div>
       </div>

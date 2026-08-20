@@ -5,7 +5,7 @@ import type { HairItem } from '../../types';
 interface AddHairModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: HairItem) => void;
+  onSave: (item: HairItem) => Promise<void>;
   nextId: string; // ה-ID הבא שנוצר אוטומטית, למשל HAIR-1004
 }
 
@@ -26,6 +26,8 @@ const emptyForm = {
 const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, nextId }) => {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -45,7 +47,7 @@ const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, ne
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
 
     const newItem: HairItem = {
@@ -62,9 +64,18 @@ const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, ne
       createdAt: new Date().toISOString(),
     };
 
-    onSave(newItem);
-    setForm(emptyForm);
-    setErrors({});
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onSave(newItem);
+      setForm(emptyForm);
+      setErrors({});
+    } catch (err) {
+      console.error('Error saving hair item:', err);
+      setSaveError('שגיאה בשמירת הקוקו. בדקי את החיבור ונסי שוב.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -161,11 +172,12 @@ const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, ne
         </div>
 
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose}>
+          {saveError && <span className="field-error">{saveError}</span>}
+          <button className="btn-secondary" onClick={onClose} disabled={saving}>
             ביטול
           </button>
-          <button className="btn-primary" onClick={handleSubmit}>
-            שמור קוקו
+          <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'שומר...' : 'שמור קוקו'}
           </button>
         </div>
       </div>
