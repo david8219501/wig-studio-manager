@@ -13,6 +13,9 @@ export interface Client {
   phone: string;
   email: string;
   notes: string;
+  measurements?: string; // מידות ראש - ייערך בעתיד דרך טאב "מידות ומפרט" בכרטיס הלקוחה
+  price?: number; // כרגע לתצוגה בלבד בכרטיס הלקוחה, עד שנחבר את טאב התשלומים למקור אמיתי (orders)
+  paid?: number; // אותו דבר - יוחלף בחישוב אמיתי מתוך ה-orders של הלקוחה
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

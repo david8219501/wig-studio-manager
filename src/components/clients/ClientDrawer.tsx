@@ -270,9 +270,8 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
       <NewOrderWizard
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
-        onOrderCreated={(orderData) => {
-          console.log(`הזמנה חדשה נוצרה עבור ${client.name}:`, orderData);
-        }}
+        onOrderCreated={() => {}}
+        preselectedClient={{ id: client.id, name: client.name, phone: client.phone }}
       />
     </>
   );

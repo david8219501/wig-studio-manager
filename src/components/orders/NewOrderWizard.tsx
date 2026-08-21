@@ -1,20 +1,37 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
+import { db, auth } from "../../services/firebase";
 import "./NewOrderWizard.css";
+
+interface ClientOption {
+  id: string;
+  name: string;
+  phone: string;
+}
 
 interface NewOrderWizardProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderCreated: (orderData: any) => void;
+  preselectedClient?: ClientOption | null; // אם נפתח מתוך כרטיס לקוחה - הלקוחה כבר ידועה מראש
 }
 
-export default function NewOrderWizard({ isOpen, onClose, onOrderCreated }: NewOrderWizardProps) {
+const ORDER_TYPE_LABELS: Record<string, string> = {
+  new: "פאה חדשה",
+  inventory: "פאת מלאי",
+  repair: "תיקון / שירות",
+};
+
+export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, preselectedClient = null }: NewOrderWizardProps) {
   const [step, setStep] = useState(1);
 
   // Step 1: סוג הזמנה
   const [orderType, setOrderType] = useState<"new" | "inventory" | "repair" | "other">("new");
 
-  // Step 2: לקוחה
-  const [selectedClient, setSelectedClient] = useState("");
+  // Step 2: לקוחה - נטענת בפועל מ-Firestore
+  const [clients, setClients] = useState<ClientOption[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
 
   // Step 3: פרטי הפאה (Chips / Pills)
@@ -31,18 +48,99 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated }: NewO
   const [dueDate, setDueDate] = useState("");
   const [paymentsCount, setPaymentsCount] = useState(1);
 
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // בכל פתיחה מחדש של האשף: איפוס מצב + טעינת רשימת לקוחות אמיתית מ-Firestore
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setStep(1);
+    setOrderType("new");
+    setClientSearch("");
+    setSize("M");
+    setTexture("גלי");
+    setHandwork("רגיל");
+    setRepairs("לא");
+    setLength("");
+    setColor("");
+    setNotes("");
+    setPrice(0);
+    setDueDate("");
+    setPaymentsCount(1);
+    setSaveError(null);
+
+    if (preselectedClient) {
+      setSelectedClientId(preselectedClient.id);
+      setClients([preselectedClient]);
+      return;
+    }
+
+    setSelectedClientId("");
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    setLoadingClients(true);
+    getDocs(query(collection(db, "clients"), where("businessId", "==", businessId)))
+      .then((snapshot) => {
+        const list: ClientOption[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as { name?: string; phone?: string };
+          return { id: docSnap.id, name: data.name || "", phone: data.phone || "" };
+        });
+        setClients(list);
+      })
+      .catch((err) => console.error("Error loading clients for wizard:", err))
+      .finally(() => setLoadingClients(false));
+  }, [isOpen, preselectedClient]);
+
   if (!isOpen) return null;
 
-  const handleFinish = () => {
-    const orderData = {
-      orderType,
-      selectedClient,
-      specs: { size, texture, handwork, repairs, length, color, notes },
-      pricing: { price, dueDate, paymentsCount },
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    onOrderCreated(orderData);
-    onClose();
+  const handleFinish = async () => {
+    const businessId = auth.currentUser?.uid;
+    const client = clients.find((c) => c.id === selectedClientId);
+    if (!businessId || !client) {
+      setSaveError("יש לבחור לקוחה לפני יצירת ההזמנה.");
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+
+    const specsSummary = [
+      `מידה: ${size}`,
+      `תנועה: ${texture}`,
+      `עבודת יד: ${handwork}`,
+      repairs !== "לא" ? `תיקונים: ${repairs}` : null,
+      length ? `אורך: ${length}` : null,
+      color ? `צבע: ${color}` : null,
+      notes ? `הערות: ${notes}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    try {
+      await addDoc(collection(db, "orders"), {
+        businessId,
+        clientId: client.id,
+        clientName: client.name,
+        clientPhone: client.phone,
+        orderType: ORDER_TYPE_LABELS[orderType] || orderType,
+        status: "new",
+        totalPrice: Number(price) || 0,
+        paidAmount: 0,
+        dueDate: dueDate || null,
+        paymentsCount,
+        notes: specsSummary,
+        createdAt: new Date().toISOString().split("T")[0],
+      });
+      onOrderCreated({});
+      onClose();
+    } catch (err) {
+      console.error("Error creating order:", err);
+      setSaveError("שגיאה ביצירת ההזמנה. נסי שוב.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -91,26 +189,40 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated }: NewO
         {step === 2 && (
           <div className="wizard-step">
             <h3>בחירת לקוחה</h3>
-            <input
-              type="text"
-              className="wizard-input"
-              placeholder="חיפוש לפי שם או טלפון..."
-              value={clientSearch}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setClientSearch(e.target.value)}
-            />
-            <div className="client-list-preview">
-              {["שרה לוי (050-1234567)", "מירי כהן (052-9876543)", "רחלי פרידמן (054-1112233)"]
-                .filter((c) => c.includes(clientSearch))
-                .map((client, idx) => (
-                  <div
-                    key={idx}
-                    className={`client-item ${selectedClient === client ? "active" : ""}`}
-                    onClick={() => setSelectedClient(client)}
-                  >
-                    👤 {client}
-                  </div>
-                ))}
-            </div>
+            {preselectedClient ? (
+              <div className="client-item active">👤 {preselectedClient.name} ({preselectedClient.phone})</div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  className="wizard-input"
+                  placeholder="חיפוש לפי שם או טלפון..."
+                  value={clientSearch}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setClientSearch(e.target.value)}
+                />
+                <div className="client-list-preview">
+                  {loadingClients && <p>טוענת רשימת לקוחות...</p>}
+                  {!loadingClients && clients.length === 0 && (
+                    <p>אין עדיין לקוחות במערכת. יש להוסיף לקוחה בדף הלקוחות תחילה.</p>
+                  )}
+                  {!loadingClients &&
+                    clients
+                      .filter(
+                        (c) =>
+                          c.name.includes(clientSearch) || c.phone.includes(clientSearch)
+                      )
+                      .map((client) => (
+                        <div
+                          key={client.id}
+                          className={`client-item ${selectedClientId === client.id ? "active" : ""}`}
+                          onClick={() => setSelectedClientId(client.id)}
+                        >
+                          👤 {client.name} ({client.phone})
+                        </div>
+                      ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -246,23 +358,29 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated }: NewO
 
         {/* Footer Actions */}
         <div className="wizard-footer">
+          {saveError && <span className="field-error" style={{ marginInlineEnd: "auto" }}>{saveError}</span>}
           {step > 1 ? (
-            <button type="button" className="btn-secondary" onClick={() => setStep(step - 1)}>
+            <button type="button" className="btn-secondary" onClick={() => setStep(step - 1)} disabled={saving}>
               חזור
             </button>
           ) : (
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
               ביטול
             </button>
           )}
 
           {step < 4 ? (
-            <button type="button" className="btn-primary" onClick={() => setStep(step + 1)}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setStep(step + 1)}
+              disabled={step === 2 && !selectedClientId}
+            >
               הבא
             </button>
           ) : (
-            <button type="button" className="btn-primary" onClick={handleFinish}>
-              סיום ויצירת הזמנה 🚀
+            <button type="button" className="btn-primary" onClick={handleFinish} disabled={saving}>
+              {saving ? "יוצר הזמנה..." : "סיום ויצירת הזמנה 🚀"}
             </button>
           )}
         </div>
