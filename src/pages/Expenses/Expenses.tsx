@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { collection, addDoc, onSnapshot, query, where } from "firebase/firestore";
+import { db, auth } from "../../services/firebase";
 import "./Expenses.css";
 
 interface Expense {
@@ -12,64 +14,11 @@ interface Expense {
   status: "paid" | "pending";
 }
 
-const DEMO_EXPENSES: Expense[] = [
-  {
-    id: "EXP-501",
-    date: "2026-08-01",
-    supplier: "יבואן שיער אירופאי",
-    category: "inventory",
-    description: "רכישת 5 קוקוים שיער גולמי (מלאי)",
-    amount: 14500,
-    paymentMethod: "transfer",
-    status: "paid",
-  },
-  {
-    id: "EXP-502",
-    date: "2026-08-05",
-    supplier: "פייסבוק / אינסטגרם",
-    category: "marketing",
-    description: "קמפיין פרסום ממומן - קולקציית קיץ",
-    amount: 2200,
-    paymentMethod: "credit",
-    status: "paid",
-  },
-  {
-    id: "EXP-503",
-    date: "2026-08-10",
-    supplier: "חברת ניהול נכסים",
-    category: "rent",
-    description: "שכירות סלון - חודש אוגוסט",
-    amount: 8500,
-    paymentMethod: "transfer",
-    status: "paid",
-  },
-  {
-    id: "EXP-504",
-    date: "2026-08-12",
-    supplier: "ספק ציוד וסדקית",
-    category: "inventory",
-    description: "רשתות לייס, מחטי תפירה וסיכות",
-    amount: 1200,
-    paymentMethod: "credit",
-    status: "pending",
-  },
-  {
-    id: "EXP-401",
-    date: "2026-07-15",
-    supplier: "ספק רשתות",
-    category: "inventory",
-    description: "רכישת ציוד חודש יולי",
-    amount: 3400,
-    paymentMethod: "credit",
-    status: "paid",
-  },
-];
-
 export default function Expenses() {
-  const [expenses, setExpenses] = useState<Expense[]>(DEMO_EXPENSES);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  
+
   // 🆕 מצבי סינון זמן: "monthly" או "all"
   const [viewMode, setViewMode] = useState<"monthly" | "all">("monthly");
   const [selectedMonth, setSelectedMonth] = useState("2026-08"); // ברירת מחדל: אוגוסט 2026
@@ -82,6 +31,29 @@ export default function Expenses() {
   const [newDescription, setNewDescription] = useState("");
   const [newAmount, setNewAmount] = useState<number | "">("");
   const [newMethod, setNewMethod] = useState<Expense["paymentMethod"]>("credit");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // האזנה חיה ל-Firestore, מסוננת רק להוצאות של העסק המחובר (businessId = uid)
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    const expensesQuery = query(collection(db, "expenses"), where("businessId", "==", businessId));
+    const unsubscribe = onSnapshot(
+      expensesQuery,
+      (snapshot) => {
+        const data = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<Expense, "id">),
+        }));
+        setExpenses(data);
+      },
+      (err) => console.error("Error loading expenses:", err)
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   // 1. סינון לפי זמן (חודשי vs כללי)
   const timeFilteredExpenses = expenses.filter((e) => {
@@ -106,27 +78,37 @@ export default function Expenses() {
     .reduce((sum, e) => sum + e.amount, 0);
   const operationalExpenses = totalExpenses - inventoryExpenses;
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSupplier || !newAmount) return;
 
-    const newEntry: Expense = {
-      id: `EXP-${Math.floor(100 + Math.random() * 900)}`,
-      date: new Date().toISOString().split("T")[0],
-      supplier: newSupplier,
-      category: newCategory,
-      description: newDescription,
-      amount: Number(newAmount),
-      paymentMethod: newMethod,
-      status: "paid",
-    };
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
 
-    setExpenses([newEntry, ...expenses]);
-    setIsModalOpen(false);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await addDoc(collection(db, "expenses"), {
+        date: new Date().toISOString().split("T")[0],
+        supplier: newSupplier,
+        category: newCategory,
+        description: newDescription,
+        amount: Number(newAmount),
+        paymentMethod: newMethod,
+        status: "paid",
+        businessId,
+      });
 
-    setNewSupplier("");
-    setNewDescription("");
-    setNewAmount("");
+      setIsModalOpen(false);
+      setNewSupplier("");
+      setNewDescription("");
+      setNewAmount("");
+    } catch (err) {
+      console.error("Error adding expense:", err);
+      setSaveError("שגיאה בשמירת ההוצאה. בדקי את החיבור ונסי שוב.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -240,8 +222,8 @@ export default function Expenses() {
             ) : (
               filtered.map((e) => (
                 <tr key={e.id}>
-                  <td className="mono">{e.id}</td>
-                  <td className="mono">{e.date}</td>
+                  <td dir="ltr" title={e.id}>#{e.id.slice(-6)}</td>
+                  <td className="mono" dir="ltr">{e.date}</td>
                   <td className="font-bold">{e.supplier}</td>
                   <td>
                     <span className="category-tag">
@@ -338,11 +320,12 @@ export default function Expenses() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>
+                {saveError && <span className="field-error">{saveError}</span>}
+                <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)} disabled={saving}>
                   ביטול
                 </button>
-                <button type="submit" className="btn-primary">
-                  שמירת הוצאה
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? "שומר..." : "שמירת הוצאה"}
                 </button>
               </div>
             </form>

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { db, auth } from "../../services/firebase";
 import "./Sales.css";
 
 export interface Order {
@@ -13,56 +15,8 @@ export interface Order {
   notes?: string;
 }
 
-// נתוני דמו לוקאליים
-const DEMO_ORDERS: Order[] = [
-  {
-    id: "ORD-901",
-    clientName: "שרה לוי",
-    clientPhone: "050-1234567",
-    orderType: "פאה חדשה",
-    status: "ready",
-    totalPrice: 18000,
-    paidAmount: 12000,
-    createdAt: "2026-08-15",
-    notes: 'מידה S | גלי | עבודת יד גבוהה | 55 ס"מ',
-  },
-  {
-    id: "ORD-902",
-    clientName: "מירי כהן",
-    clientPhone: "052-9876543",
-    orderType: "פאה חדשה",
-    status: "in_progress",
-    totalPrice: 14500,
-    paidAmount: 14500,
-    createdAt: "2026-08-12",
-    notes: "דגש על נוחות בעורף, לייס שקוף",
-  },
-  {
-    id: "ORD-402",
-    clientName: "שרה לוי",
-    clientPhone: "050-1234567",
-    orderType: "תיקון וסירוק",
-    status: "delivered",
-    totalPrice: 450,
-    paidAmount: 450,
-    createdAt: "2026-08-01",
-    notes: "חפיפה, פן וחיזוק רשת",
-  },
-  {
-    id: "ORD-903",
-    clientName: "רחלי פרידמן",
-    clientPhone: "054-1112233",
-    orderType: "תוספת שיער וצבע",
-    status: "styling",
-    totalPrice: 2200,
-    paidAmount: 1000,
-    createdAt: "2026-07-20",
-    notes: "מילוי 50 גרם שיער + גוונים",
-  },
-];
-
 export default function Sales() {
-  const [orders, setOrders] = useState<Order[]>(DEMO_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -71,11 +25,35 @@ export default function Sales() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  // עדכון סטטוס לוקאלי
-  const handleStatusChange = (orderId: string, newStatus: Order["status"]) => {
-    setOrders((prev) =>
-      prev.map((ord) => (ord.id === orderId ? { ...ord, status: newStatus } : ord))
+  // האזנה חיה ל-Firestore, מסוננת רק להזמנות של העסק המחובר (businessId = uid)
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    const ordersQuery = query(collection(db, "orders"), where("businessId", "==", businessId));
+    const unsubscribe = onSnapshot(
+      ordersQuery,
+      (snapshot) => {
+        const data = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<Order, "id">),
+        }));
+        setOrders(data);
+      },
+      (err) => console.error("Error loading orders:", err)
     );
+
+    return () => unsubscribe();
+  }, []);
+
+  // עדכון סטטוס - נכתב ישירות ל-Firestore, onSnapshot למעלה יעדכן את המסך אוטומטית
+  const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+    } catch (err) {
+      console.error("Error updating order status:", err);
+      alert("שגיאה בעדכון הסטטוס. נסי שוב.");
+    }
   };
 
   // סינון דינמי
