@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from "react";
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { db, auth } from "../../services/firebase";
 import "./Calendar.css";
 
+// טיפוס הלקוחה תואם בדיוק למבנה האמיתי ב-collection "clients" (ראו Clients.tsx)
 interface Client {
   id: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   phone: string;
   email: string;
-  createdAt: string;
   notes: string;
-  ordersCount: number;
-  totalSpent: number;
 }
 
 interface Appointment {
@@ -24,73 +33,14 @@ interface Appointment {
   phone: string;
 }
 
-const INITIAL_CLIENTS: Client[] = [
-  {
-    id: "CL-101",
-    firstName: "שרה",
-    lastName: "לוי",
-    phone: "050-1234567",
-    email: "sarah.levy@gmail.com",
-    createdAt: "2026-01-15",
-    notes: "רגישה בקרקפת, מעדיפה לייס שקוף",
-    ordersCount: 3,
-    totalSpent: 18450,
-  },
-  {
-    id: "CL-102",
-    firstName: "מירי",
-    lastName: "כהן",
-    phone: "052-9876543",
-    email: "miri.cohen@yahoo.com",
-    createdAt: "2026-02-10",
-    notes: "אוספת תמיד בימי שישי",
-    ordersCount: 2,
-    totalSpent: 15700,
-  },
-  {
-    id: "CL-103",
-    firstName: "רחלי",
-    lastName: "פרידמן",
-    phone: "054-1112233",
-    email: "racheli.f@gmail.com",
-    createdAt: "2026-05-04",
-    notes: "לקוחה חדשה, הגיעה דרך המלצה",
-    ordersCount: 1,
-    totalSpent: 2200,
-  },
-];
-
-// יצירת רשימה של 30 פגישות לתאריך 19/08/2026 לבדיקת העומס
-const GENERATED_APPOINTMENTS: Appointment[] = Array.from({ length: 30 }, (_, index) => {
-  const hour = Math.floor(index / 2) + 8;
-  const minute = index % 2 === 0 ? "00" : "30";
-  const endHour = minute === "30" ? hour + 1 : hour;
-  const endMinute = minute === "30" ? "00" : "30";
-  
-  const startTime = `${String(hour).padStart(2, "0")}:${minute}`;
-  const endTime = `${String(endHour).padStart(2, "0")}:${endMinute}`;
-  
-  const clientNames = ["שרה לוי", "מירי כהן", "רחלי פרידמן", "לאה שוורץ", "תמר אברהם", "חנה קליין"];
-  const types = ["מדידת פאה חדשה", "תיקון רשת", "סירוק והחלקה", "מסירת פאה מוכנה"];
-  
-  return {
-    id: `APT-AUTO-${index + 1}`,
-    clientId: index % 2 === 0 ? "CL-101" : "CL-102",
-    clientName: clientNames[index % clientNames.length],
-    type: types[index % types.length],
-    date: "2026-08-19",
-    startTime,
-    endTime,
-    phone: index % 2 === 0 ? "050-1234567" : "052-9876543",
-  };
-});
-
 export default function Calendar() {
   const [viewMode, setViewMode] = useState<"weekly" | "daily">("weekly");
-  const [appointments, setAppointments] = useState<Appointment[]>(GENERATED_APPOINTMENTS);
-  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 7, 19));
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
@@ -101,7 +51,7 @@ export default function Calendar() {
   const [clientSearchText, setClientSearchText] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [aptType, setAptType] = useState("מדידת פאה חדשה");
-  const [aptDate, setAptDate] = useState("2026-08-19");
+  const [aptDate, setAptDate] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("11:00");
 
@@ -119,6 +69,37 @@ export default function Calendar() {
     const handleClickOutside = () => setActiveMenuId(null);
     window.addEventListener("click", handleClickOutside);
     return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  // האזנה חיה ל-Firestore: פגישות ולקוחות, מסוננות רק לעסק המחובר (businessId = uid)
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    const aptQuery = query(collection(db, "appointments"), where("businessId", "==", businessId));
+    const unsubApt = onSnapshot(
+      aptQuery,
+      (snapshot) => {
+        setAppointments(
+          snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Appointment, "id">) }))
+        );
+      },
+      (err) => console.error("Error loading appointments:", err)
+    );
+
+    const clientsQuery = query(collection(db, "clients"), where("businessId", "==", businessId));
+    const unsubClients = onSnapshot(
+      clientsQuery,
+      (snapshot) => {
+        setClients(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Client, "id">) })));
+      },
+      (err) => console.error("Error loading clients:", err)
+    );
+
+    return () => {
+      unsubApt();
+      unsubClients();
+    };
   }, []);
 
   const formatDateToIL = (dateStr: string) => {
@@ -172,9 +153,7 @@ export default function Calendar() {
   const currentDateIso = currentDate.toISOString().split("T")[0];
 
   const filteredClientsForSelect = clients.filter(
-    (c) =>
-      `${c.firstName} ${c.lastName}`.includes(clientSearchText) ||
-      c.phone.includes(clientSearchText)
+    (c) => c.name.includes(clientSearchText) || c.phone.includes(clientSearchText)
   );
 
   const handleOpenAddModal = () => {
@@ -199,13 +178,17 @@ export default function Calendar() {
     setIsAddAptModalOpen(true);
   };
 
-  const handleDeleteAppointment = (aptId: string) => {
-    if (window.confirm("האם את בטוחה שברצונך למחוק את הפגישה?")) {
-      setAppointments(appointments.filter((a) => a.id !== aptId));
+  const handleDeleteAppointment = async (aptId: string) => {
+    if (!window.confirm("האם את בטוחה שברצונך למחוק את הפגישה?")) return;
+    try {
+      await deleteDoc(doc(db, "appointments", aptId));
+    } catch (err) {
+      console.error("Error deleting appointment:", err);
+      alert("שגיאה במחיקת הפגישה. נסי שוב.");
     }
   };
 
-  const handleSaveAppointment = (e: React.FormEvent) => {
+  const handleSaveAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetClient = clients.find((c) => c.id === selectedClientId);
     if (!targetClient) {
@@ -213,75 +196,95 @@ export default function Calendar() {
       return;
     }
 
-    if (editingAptId) {
-      setAppointments(
-        appointments.map((a) =>
-          a.id === editingAptId
-            ? {
-                ...a,
-                clientId: targetClient.id,
-                clientName: `${targetClient.firstName} ${targetClient.lastName}`,
-                type: aptType,
-                date: aptDate,
-                startTime,
-                endTime,
-                phone: targetClient.phone,
-              }
-            : a
-        )
-      );
-    } else {
-      const newApt: Appointment = {
-        id: `APT-${Math.floor(100 + Math.random() * 900)}`,
-        clientId: targetClient.id,
-        clientName: `${targetClient.firstName} ${targetClient.lastName}`,
-        type: aptType,
-        date: aptDate,
-        startTime,
-        endTime,
-        phone: targetClient.phone,
-      };
-      setAppointments([newApt, ...appointments]);
-    }
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
 
-    setIsAddAptModalOpen(false);
-    setEditingAptId(null);
-    setSelectedClientId("");
-    setClientSearchText("");
+    setSaving(true);
+    try {
+      if (editingAptId) {
+        await updateDoc(doc(db, "appointments", editingAptId), {
+          clientId: targetClient.id,
+          clientName: targetClient.name,
+          type: aptType,
+          date: aptDate,
+          startTime,
+          endTime,
+          phone: targetClient.phone,
+        });
+      } else {
+        await addDoc(collection(db, "appointments"), {
+          businessId,
+          clientId: targetClient.id,
+          clientName: targetClient.name,
+          type: aptType,
+          date: aptDate,
+          startTime,
+          endTime,
+          phone: targetClient.phone,
+        });
+      }
+
+      setIsAddAptModalOpen(false);
+      setEditingAptId(null);
+      setSelectedClientId("");
+      setClientSearchText("");
+    } catch (err) {
+      console.error("Error saving appointment:", err);
+      alert("שגיאה בשמירת הפגישה. נסי שוב.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleAddClientFromModal = (e: React.FormEvent) => {
+  const handleAddClientFromModal = async (e: React.FormEvent) => {
     e.preventDefault();
     setClientError("");
 
-    const exists = clients.some((c) => c.phone.trim() === newPhone.trim());
-    if (exists) {
-      setClientError("⚠️ מספר טלפון זה כבר קיים במערכת!");
-      return;
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    setSaving(true);
+    try {
+      // בדיקת כפילות טלפון מול לקוחות קיימות של אותו עסק
+      const dupQuery = query(
+        collection(db, "clients"),
+        where("businessId", "==", businessId),
+        where("phone", "==", newPhone.trim())
+      );
+      const dupSnap = await getDocs(dupQuery);
+      if (!dupSnap.empty) {
+        setClientError("⚠️ מספר טלפון זה כבר קיים במערכת!");
+        setSaving(false);
+        return;
+      }
+
+      const fullName = `${newFirstName.trim()} ${newLastName.trim()}`.trim();
+      const docRef = await addDoc(collection(db, "clients"), {
+        businessId,
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+        name: fullName,
+        phone: newPhone.trim(),
+        email: newEmail.trim(),
+        notes: newNotes.trim(),
+        createdAt: new Date().toISOString(),
+      });
+
+      setSelectedClientId(docRef.id);
+      setClientSearchText(fullName);
+
+      setIsNewClientModalOpen(false);
+      setNewFirstName("");
+      setNewLastName("");
+      setNewPhone("");
+      setNewEmail("");
+      setNewNotes("");
+    } catch (err) {
+      console.error("Error adding client:", err);
+      setClientError("שגיאה בשמירת הלקוחה. נסי שוב.");
+    } finally {
+      setSaving(false);
     }
-
-    const newClient: Client = {
-      id: `CL-${Math.floor(100 + Math.random() * 900)}`,
-      firstName: newFirstName,
-      lastName: newLastName,
-      phone: newPhone,
-      email: newEmail || "—",
-      createdAt: new Date().toISOString().split("T")[0],
-      notes: newNotes || "אין הערות",
-      ordersCount: 0,
-      totalSpent: 0,
-    };
-
-    setClients([newClient, ...clients]);
-    setSelectedClientId(newClient.id);
-    setClientSearchText(`${newClient.firstName} ${newClient.lastName}`);
-    
-    setIsNewClientModalOpen(false);
-    setNewFirstName("");
-    setNewLastName("");
-    setNewPhone("");
-    setNewEmail("");
-    setNewNotes("");
   };
 
   const handleOpenClientPanel = (clientId: string) => {
@@ -483,11 +486,11 @@ export default function Calendar() {
                           className="dropdown-item"
                           onClick={() => {
                             setSelectedClientId(c.id);
-                            setClientSearchText(`${c.firstName} ${c.lastName}`);
+                            setClientSearchText(c.name);
                             setIsDropdownOpen(false);
                           }}
                         >
-                          {c.firstName} {c.lastName} ({c.phone})
+                          {c.name} ({c.phone})
                         </div>
                       ))
                     )}
@@ -540,7 +543,7 @@ export default function Calendar() {
               </div>
 
               <div className="modal-actions" style={{ marginTop: '15px' }}>
-                <button type="submit" className="btn-primary">שמור שינויים</button>
+                <button type="submit" className="btn-primary" disabled={saving}>{saving ? "שומר..." : "שמור שינויים"}</button>
                 <button type="button" className="btn-secondary" onClick={() => setIsAddAptModalOpen(false)}>ביטול</button>
               </div>
             </form>
@@ -618,7 +621,7 @@ export default function Calendar() {
               </div>
 
               <div className="modal-actions">
-                <button type="submit" className="btn-primary">שמור והשתמש בלקוחה</button>
+                <button type="submit" className="btn-primary" disabled={saving}>{saving ? "שומר..." : "שמור והשתמש בלקוחה"}</button>
                 <button type="button" className="btn-secondary" onClick={() => setIsNewClientModalOpen(false)}>ביטול</button>
               </div>
             </form>
@@ -631,21 +634,20 @@ export default function Calendar() {
         <div className="modal-backdrop" onClick={() => setSelectedClientForPanel(null)}>
           <div className="side-panel" onClick={(e) => e.stopPropagation()}>
             <div className="side-panel-header">
-              <h2>תיק לקוחה: {selectedClientForPanel.firstName} {selectedClientForPanel.lastName}</h2>
+              <h2>תיק לקוחה: {selectedClientForPanel.name}</h2>
               <button className="close-btn" onClick={() => setSelectedClientForPanel(null)}>✕</button>
             </div>
 
             <div className="side-panel-body">
               <div className="client-info-box">
                 <p><strong>טלפון:</strong> <span dir="ltr">{selectedClientForPanel.phone}</span></p>
-                <p><strong>אימייל:</strong> <span dir="ltr">{selectedClientForPanel.email}</span></p>
-                <p><strong>לקוחה החל מ-</strong> {formatDateToIL(selectedClientForPanel.createdAt)}</p>
-                <p><strong>הערות:</strong> {selectedClientForPanel.notes}</p>
+                <p><strong>אימייל:</strong> <span dir="ltr">{selectedClientForPanel.email || "—"}</span></p>
+                <p><strong>הערות:</strong> {selectedClientForPanel.notes || "אין הערות"}</p>
               </div>
 
               <h3>היסטוריית הזמנות ותשלומים</h3>
               <div className="client-history-placeholder">
-                <p className="text-muted">ללקוחה זו קיימות {selectedClientForPanel.ordersCount} הזמנות במאגר בסך מצטבר של ₪{selectedClientForPanel.totalSpent.toLocaleString()}.</p>
+                <p className="text-muted">היסטוריית ההזמנות של הלקוחה מוצגת בכרטיס הלקוחה המלא, בדף הלקוחות.</p>
               </div>
             </div>
 
