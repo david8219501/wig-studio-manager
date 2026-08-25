@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────
+// Firestore Security Rules — Wig Studio Manager
+//
+// עקרון: כל מסמך בכל אחת מהקולקציות העסקיות מתויג בשדה businessId = uid
+// של המנהלת שיצרה אותו. הכללים כאן אוכפים בצד השרת (לא רק בקוד הקליינט!)
+// שרק המשתמשת המחוברת עם uid תואם יכולה לקרוא/לכתוב למסמכים שלה.
+// בלי הקובץ הזה, כל משתמש רשום יכול היה לקרוא/לכתוב נתונים של עסקים אחרים.
+// ─────────────────────────────────────────────────────────────────────────
+
+function isSignedIn() {
+  return request.auth != null;
+}
+
+function isOwner(businessId) {
+  return isSignedIn() && request.auth.uid == businessId;
+}
+
+// לכתיבה חדשה: מוודאים שה-businessId שנשלח במסמך תואם למשתמש המחובר,
+// כדי שאי אפשר יהיה "לזייף" מסמך בשם עסק אחר.
+function isCreatingOwnDoc() {
+  return isSignedIn() && request.resource.data.businessId == request.auth.uid;
+}
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // מסמך הפרופיל האישי של כל משתמשת: users/{uid}
+    // אפשר לקרוא/לכתוב רק את המסמך של עצמך.
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // אוסף גנרי לכל הקולקציות העסקיות (clients, orders, hairItems,
+    // bulkItems, expenses, appointments, payments, וכו') - כולן עוקבות
+    // אותו דפוס הרשאה: מותר רק אם businessId שווה למשתמש המחובר.
+    match /{collection}/{docId} {
+      allow read: if isSignedIn() && resource.data.businessId == request.auth.uid;
+      allow create: if isCreatingOwnDoc();
+      allow update, delete: if isOwner(resource.data.businessId);
+    }
+  }
+}

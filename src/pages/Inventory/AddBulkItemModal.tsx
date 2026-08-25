@@ -1,0 +1,136 @@
+// src/pages/Inventory/AddBulkItemModal.tsx
+import React, { useState } from 'react';
+import type { BulkItem } from '../../types';
+
+interface AddBulkItemModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (item: BulkItem) => Promise<void>;
+}
+
+const emptyForm = {
+  name: '',
+  quantity: '',
+  minThreshold: '',
+  unitCost: '',
+};
+
+const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, onSave }) => {
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleChange = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!form.name.trim()) newErrors.name = 'שדה חובה';
+    if (form.quantity === '' || Number(form.quantity) < 0) newErrors.quantity = 'כמות לא תקינה';
+    if (form.minThreshold === '' || Number(form.minThreshold) < 0)
+      newErrors.minThreshold = 'סף לא תקין';
+    if (form.unitCost === '' || Number(form.unitCost) < 0) newErrors.unitCost = 'עלות לא תקינה';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
+
+    const newItem: BulkItem = {
+      id: `BULK-${Date.now()}`,
+      name: form.name.trim(),
+      quantity: Number(form.quantity),
+      minThreshold: Number(form.minThreshold),
+      unitCost: Number(form.unitCost),
+    };
+
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onSave(newItem);
+      setForm(emptyForm);
+      setErrors({});
+    } catch (err) {
+      console.error('Error saving bulk item:', err);
+      setSaveError('שגיאה בשמירת הפריט. בדקי את החיבור ונסי שוב.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>מוצר חדש למלאי הפשוט</h2>
+          <button className="modal-close-btn" onClick={onClose} aria-label="סגור">
+            ✕
+          </button>
+        </div>
+
+        <div className="modal-form-grid">
+          <div className="form-field form-field-full">
+            <label>שם הפריט *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              placeholder="לדוגמה: רשת סקין"
+            />
+            {errors.name && <span className="field-error">{errors.name}</span>}
+          </div>
+
+          <div className="form-field">
+            <label>כמות התחלתית *</label>
+            <input
+              type="number"
+              value={form.quantity}
+              onChange={(e) => handleChange('quantity', e.target.value)}
+              placeholder="20"
+            />
+            {errors.quantity && <span className="field-error">{errors.quantity}</span>}
+          </div>
+
+          <div className="form-field">
+            <label>סף מינימום להתראה *</label>
+            <input
+              type="number"
+              value={form.minThreshold}
+              onChange={(e) => handleChange('minThreshold', e.target.value)}
+              placeholder="10"
+            />
+            {errors.minThreshold && <span className="field-error">{errors.minThreshold}</span>}
+          </div>
+
+          <div className="form-field form-field-full">
+            <label>עלות ליחידה (₪) *</label>
+            <input
+              type="number"
+              value={form.unitCost}
+              onChange={(e) => handleChange('unitCost', e.target.value)}
+              placeholder="50"
+            />
+            {errors.unitCost && <span className="field-error">{errors.unitCost}</span>}
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          {saveError && <span className="field-error">{saveError}</span>}
+          <button className="btn-secondary" onClick={onClose} disabled={saving}>
+            ביטול
+          </button>
+          <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'שומר...' : 'הוסף פריט'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AddBulkItemModal;

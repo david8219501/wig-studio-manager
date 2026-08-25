@@ -1,0 +1,78 @@
+/* ==========================================================================
+   0. מסך טעינה בזמן בדיקת סשן התחברות קיים
+   ========================================================================== */
+.app-session-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--color-background, #f7f3f9);
+  color: #6b5b80;
+  font-weight: 600;
+}
+
+.app-session-loading .spinner-large {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #e5dbf0;
+  border-top-color: #9b69ff;
+  border-radius: 50%;
+  animation: app-session-spin 0.8s linear infinite;
+}
+
+@keyframes app-session-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   1. המכולה הראשית (Main App Container)
+   ========================================================================== */
+   .app-container {
+    display: flex;
+    flex-direction: row;
+    min-height: 100vh;
+    width: 100%;
+    background-color: var(--color-background, #f7f3f9);
+  }
+    
+  /* ==========================================================================
+     2. מבנה אזור התוכן המרכזי (Main Content Area)
+     ========================================================================== */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-background, #f7f3f9);
+    min-width: 0; /* מונע גלישה של טבלאות ורכיבים רחבים */
+  }
+    
+  /* אזור גוף העמוד */
+  .content-area {
+    /* הפדינג הוסר מכאן כדי לא ליצור "פדינג כפול". 
+       כל עמוד (דשבורד, יומן וכו') מנהל את המרווחים שלו בעצמו */
+    background-color: transparent;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* ==========================================================================
+     3. רכיבים כלליים (General Components)
+     ========================================================================== */
+  .placeholder-card {
+    background-color: var(--color-surface, #ffffff);
+    padding: 24px;
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: var(--shadow-card, 0 4px 16px rgba(107, 76, 154, 0.03));
+    border: 1px solid var(--color-border, #ebdff5);
+    text-align: right;
+    transition: all 0.2s ease;
+  }
+    
+  .placeholder-card:hover {
+    border-color: var(--color-accent-border, #9b69ff);
+    box-shadow: var(--shadow-elevated, 0 8px 24px rgba(107, 76, 154, 0.06));
+  }

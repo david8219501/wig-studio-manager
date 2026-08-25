@@ -1,0 +1,173 @@
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--color-background, #f7f3f9);
+  direction: rtl;
+  font-family: "inter", system-ui, -apple-system, sans-serif;
+  padding: 20px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.login-card {
+  background: #ffffff;
+  border: 1px solid #ebdff5;
+  border-radius: 20px;
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 10px 30px rgba(107, 76, 154, 0.08);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-header h1 {
+  font-size: 32px;
+  font-weight: 800;
+  color: #3b2a54;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+
+.login-header p {
+  font-size: 14px;
+  color: #63537a;
+  margin: 0;
+}
+
+/* הודעת שגיאה מעוצבת בסגנון האתר */
+.login-error {
+  background: #fff5f5;
+  color: #eb5757;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  border: 1px solid #fde8e8;
+  text-align: center;
+}
+
+/* הודעת הצלחה מעוצבת בסגנון האתר */
+.login-success {
+  background: #f0fdf4;
+  color: #16a34a;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  border: 1px solid #dcfce7;
+  text-align: center;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b2a54;
+}
+
+.form-group input {
+  padding: 12px 16px;
+  border: 1px solid #e5dbf0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background: #fcfaff;
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus {
+  border-color: #9b69ff;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(155, 105, 255, 0.12);
+}
+
+.login-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+.login-btn:disabled {
+  background-color: #c4b5fd !important;
+  color: #4c1d95 !important;
+  cursor: wait !important;
+  opacity: 0.85;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 24px;
+  border-top: 1px solid #f8f3fa;
+  padding-top: 16px;
+}
+
+.login-footer span {
+  font-size: 12px;
+  color: #8c7b9e;
+}
+
+/* === שכבת הטשטוש והטעינה המרכזית === */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.6);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner-box {
+  background: white;
+  padding: 28px 40px;
+  border-radius: 16px;
+  box-shadow: 0 15px 35px rgba(107, 76, 154, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #ebdff5;
+  color: #3b2a54;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.spinner-large {
+  width: 42px;
+  height: 42px;
+  border: 4px solid rgba(155, 105, 255, 0.2);
+  border-top-color: #9b69ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

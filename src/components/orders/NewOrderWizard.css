@@ -1,0 +1,216 @@
+/* NewOrderWizard.css - Clean Warm Palette */
+
+.wizard-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    direction: rtl;
+  }
+  
+  .wizard-card {
+    background: var(--color-surface);
+    border-radius: var(--radius-xl);
+    padding: 28px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: var(--shadow-elevated);
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .wizard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 12px;
+  }
+  
+  .wizard-header h2 {
+    font-size: 20px;
+    color: var(--color-primary);
+    margin: 0;
+  }
+  
+  .step-indicator {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-accent);
+    background: var(--color-accent-bg);
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+  }
+  
+  .wizard-step {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .wizard-step h3 {
+    font-size: 16px;
+    color: var(--color-primary);
+  }
+  
+  /* Type Cards Grid */
+  .type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  
+  .type-card {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 20px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--easing);
+  }
+  
+  .type-card:hover {
+    background: var(--color-surface-hover);
+  }
+  
+  .type-card.active {
+    border-color: var(--color-accent);
+    background: var(--color-accent-bg);
+  }
+  
+  .type-icon {
+    font-size: 24px;
+  }
+  
+  .type-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+  
+  /* Pills Selection */
+  .pill-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .pill-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+  
+  .pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .pill {
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--easing);
+  }
+  
+  .pill.active {
+    background: var(--color-accent);
+    color: var(--color-on-primary);
+    border-color: var(--color-accent);
+  }
+  
+  /* Form inputs */
+  .wizard-input,
+  .field input {
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+  }
+  
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+  
+  .client-list-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  
+  .client-item {
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .client-item.active {
+    background: var(--color-accent-bg);
+    border-color: var(--color-accent);
+    font-weight: 600;
+  }
+  
+  /* Footer Buttons */
+  .wizard-footer {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid var(--color-border);
+    padding-top: 14px;
+  }
+  
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-on-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 10px 20px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  
+  .btn-secondary {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    border-radius: var(--radius-md);
+    padding: 10px 20px;
+    cursor: pointer;
+  }
