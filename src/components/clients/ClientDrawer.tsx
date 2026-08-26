@@ -1,7 +1,18 @@
 import { useState, useEffect } from "react";
+import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
+import type { Order } from "../../pages/Sales/Sales";
 import NewOrderWizard from "../orders/NewOrderWizard";
 import "./ClientDrawer.css";
+
+const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
+  new: "חדשה",
+  in_progress: "בטיפול",
+  styling: "בסירוק",
+  ready: "מוכנה",
+  delivered: "נמסרה",
+};
 
 interface ClientDrawerProps {
   client: Client | null;
@@ -18,49 +29,69 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
   const [isEditingSpecs, setIsEditingSpecs] = useState(false);
   const [measurements, setMeasurements] = useState("");
   const [notes, setNotes] = useState("");
+  const [savingSpecs, setSavingSpecs] = useState(false);
+
+  // הזמנות אמיתיות של הלקוחה, נטענות בזמן אמת מ-Firestore
+  const [clientOrders, setClientOrders] = useState<Order[]>([]);
 
   // סנכרון הנתונים בטעינת הלקוחה
   useEffect(() => {
     if (client) {
-      setMeasurements(client.measurements || 'מידה M - היקף 54 ס"מ');
-      setNotes(client.notes || "מעדיפה לייס שקוף דק, רגישות קלה בעורף.");
+      setMeasurements(client.measurements || "");
+      setNotes(client.notes || "");
       setIsEditingSpecs(false);
     }
   }, [client]);
 
+  // האזנה חיה להזמנות של הלקוחה הנוכחית בלבד
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!client || !businessId) {
+      setClientOrders([]);
+      return;
+    }
+
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("businessId", "==", businessId),
+      where("clientId", "==", client.id)
+    );
+    const unsubscribe = onSnapshot(
+      ordersQuery,
+      (snapshot) => {
+        const data = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<Order, "id">),
+        }));
+        data.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+        setClientOrders(data);
+      },
+      (err) => console.error("Error loading client orders:", err)
+    );
+
+    return () => unsubscribe();
+  }, [client]);
+
   if (!isOpen || !client) return null;
 
-  const handleSaveSpecs = () => {
-    setIsEditingSpecs(false);
-    const updated = {
-      ...client,
-      measurements,
-      notes,
-    };
-    if (onUpdateClient) {
-      onUpdateClient(updated);
+  const totalPrice = clientOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+  const totalPaid = clientOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+
+  const handleSaveSpecs = async () => {
+    setSavingSpecs(true);
+    try {
+      await updateDoc(doc(db, "clients", client.id), { measurements, notes });
+      setIsEditingSpecs(false);
+      if (onUpdateClient) {
+        onUpdateClient({ ...client, measurements, notes });
+      }
+    } catch (err) {
+      console.error("Error saving client specs:", err);
+      alert("שגיאה בשמירת המפרט. נסי שוב.");
+    } finally {
+      setSavingSpecs(false);
     }
   };
-
-  // נתוני דמו להדגמת היסטוריית הזמנות ותשלומים של הלקוחה
-  const clientOrders = [
-    {
-      id: "ORD-901",
-      type: "פאה חדשה",
-      date: "2026-06-15",
-      status: "מוכנה",
-      price: client.price || 18000,
-      specs: 'מידה S | גלי | עבודת יד גבוהה | 55 ס"מ',
-    },
-    {
-      id: "ORD-402",
-      type: "תיקון וסירוק",
-      date: "2026-02-10",
-      status: "נמסרה",
-      price: 450,
-      specs: "חפיפה, פן וחיזוק רשת",
-    },
-  ];
 
   const handleSendWhatsApp = () => {
     const message = `היי ${client.name} היקרה 🌸\nשמחים להיות בקשר מ-Esti Wigs!`;
@@ -154,21 +185,25 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
           {activeTab === "orders" && (
             <div className="tab-content">
               <h3>היסטוריית הזמנות ({clientOrders.length})</h3>
-              <div className="orders-list">
-                {clientOrders.map((ord) => (
-                  <div key={ord.id} className="order-card">
-                    <div className="order-card-header">
-                      <span className="font-bold">{ord.type} ({ord.id})</span>
-                      <span className="badge badge-paid">{ord.status}</span>
+              {clientOrders.length === 0 ? (
+                <p className="order-specs">עדיין אין הזמנות ללקוחה זו.</p>
+              ) : (
+                <div className="orders-list">
+                  {clientOrders.map((ord) => (
+                    <div key={ord.id} className="order-card">
+                      <div className="order-card-header">
+                        <span className="font-bold">{ord.orderType}</span>
+                        <span className="badge badge-paid">{ORDER_STATUS_LABELS[ord.status] || ord.status}</span>
+                      </div>
+                      {ord.notes && <p className="order-specs">{ord.notes}</p>}
+                      <div className="order-card-footer">
+                        <span className="mono">תאריך: {ord.createdAt}</span>
+                        <span className="mono font-bold">₪{ord.totalPrice.toLocaleString()}</span>
+                      </div>
                     </div>
-                    <p className="order-specs">{ord.specs}</p>
-                    <div className="order-card-footer">
-                      <span className="mono">תאריך: {ord.date}</span>
-                      <span className="mono font-bold">₪{ord.price.toLocaleString()}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -179,16 +214,16 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
               <div className="financial-summary-grid">
                 <div className="fin-card">
                   <span>סה"כ עסקאות</span>
-                  <span className="mono font-bold">₪{(client.price || 18000).toLocaleString()}</span>
+                  <span className="mono font-bold">₪{totalPrice.toLocaleString()}</span>
                 </div>
                 <div className="fin-card">
                   <span>שולם בפועל</span>
-                  <span className="mono font-bold text-success">₪{(client.paid || 18000).toLocaleString()}</span>
+                  <span className="mono font-bold text-success">₪{totalPaid.toLocaleString()}</span>
                 </div>
                 <div className="fin-card">
                   <span>יתרת חוב</span>
                   <span className="mono font-bold text-danger">
-                    ₪{((client.price || 18000) - (client.paid || 18000)).toLocaleString()}
+                    ₪{(totalPrice - totalPaid).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -205,8 +240,8 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                     ✏️ עריכת מפרט
                   </button>
                 ) : (
-                  <button className="btn-save-specs" onClick={handleSaveSpecs}>
-                    💾 שמירת שינויים
+                  <button className="btn-save-specs" onClick={handleSaveSpecs} disabled={savingSpecs}>
+                    {savingSpecs ? "שומר..." : "💾 שמירת שינויים"}
                   </button>
                 )}
               </div>
@@ -215,12 +250,13 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                 <div className="spec-box">
                   <label className="spec-label">מידות היקף / ראש:</label>
                   {!isEditingSpecs ? (
-                    <p className="spec-value">{measurements}</p>
+                    <p className="spec-value">{measurements || "לא הוזנו מידות עדיין."}</p>
                   ) : (
                     <textarea
                       className="spec-input"
                       value={measurements}
                       onChange={(e) => setMeasurements(e.target.value)}
+                      placeholder='למשל: מידה M - היקף 54 ס"מ'
                       rows={3}
                     />
                   )}
@@ -229,12 +265,13 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                 <div className="spec-box">
                   <label className="spec-label">הערות ודגשים מיוחדים:</label>
                   {!isEditingSpecs ? (
-                    <p className="spec-value">{notes}</p>
+                    <p className="spec-value">{notes || "אין הערות."}</p>
                   ) : (
                     <textarea
                       className="spec-input"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
+                      placeholder="למשל: מעדיפה לייס שקוף דק, רגישות קלה בעורף"
                       rows={4}
                     />
                   )}
@@ -247,20 +284,9 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
           {activeTab === "docs" && (
             <div className="tab-content">
               <h3>מסמכים, קבלות וטפסים חתומים</h3>
-              <div className="docs-list">
-                <div className="doc-item">
-                  <span>📄 טופס הזמנה חתום - פאה חדשה.pdf</span>
-                  <button className="btn-download">
-                    הורדה 📥
-                  </button>
-                </div>
-                <div className="doc-item">
-                  <span>🧾 קבלה ואישור תשלום מקדמה.pdf</span>
-                  <button className="btn-download">
-                    הורדה 📥
-                  </button>
-                </div>
-              </div>
+              <p className="order-specs">
+                עדיין אין אפשרות להעלות מסמכים למערכת — הפיצ׳ר הזה יתווסף בהמשך.
+              </p>
             </div>
           )}
         </div>

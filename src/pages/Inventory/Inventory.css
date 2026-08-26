@@ -203,12 +203,12 @@
 
 .status-available {
   background: var(--color-success-bg);
-  color: #0a8a54;
+  color: var(--color-success);
 }
 
 .status-reserved {
-  background: rgba(155, 105, 255, 0.12);
-  color: #7a4fd6;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
 }
 
 .status-showroom {
@@ -307,7 +307,7 @@
   border-radius: var(--radius-md);
   padding: 10px 14px;
   font-size: 13px;
-  color: #0a8a54;
+  color: var(--color-success);
 }
 
 /* ---------- Modal ---------- */

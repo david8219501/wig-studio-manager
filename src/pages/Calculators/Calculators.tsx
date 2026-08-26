@@ -1,8 +1,6 @@
-import React, { useState, useMemo } from "react";
-import {
-  ComposedChart, Bar, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
+import { useEffect, useState, useMemo } from "react";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db, auth } from "../../services/firebase";
 import './Calculators.css';
 
 const DEFAULT_SETTINGS = {
@@ -330,43 +328,41 @@ function RepairsCalculator({ settings }: { settings: Settings }) {
   );
 }
 
-const statsData = [
-  {month:"ינו",quote:3,repair:1},{month:"פבר",quote:5,repair:2},
-  {month:"מרץ",quote:4,repair:3},{month:"אפר",quote:7,repair:2},
-  {month:"מאי",quote:6,repair:4},{month:"יוני",quote:9,repair:3},
-];
-
-function UsageStats() {
-  return (
-    <div className="calc-card card-orange">
-      <div className="calc-card-header">
-        <span className="calc-card-icon">📊</span>
-        <span className="calc-card-title">סטטיסטיקת שימוש במחשבונים</span>
-      </div>
-      <ResponsiveContainer width="100%" height={140}>
-        <ComposedChart data={statsData} margin={{top:10,right:10,left:-25,bottom:0}}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#eeeff1" vertical={false} />
-          <XAxis dataKey="month" tick={{fontSize:11, fill: '#525866'}} axisLine={false} tickLine={false} />
-          <YAxis tick={{fontSize:11, fill: '#525866'}} axisLine={false} tickLine={false} />
-          <Tooltip 
-            contentStyle={{ background: '#242629', borderRadius: '7px', color: '#fff', border: 'none', fontSize: '12px' }}
-            itemStyle={{ color: '#fff' }}
-          />
-          <Bar dataKey="quote" fill="#9b69ff" name="הצעת מחיר" radius={[4,4,0,0]} barSize={16} />
-          <Line type="monotone" dataKey="repair" stroke="#00d17e" strokeWidth={2} name="תיקונים" dot={{r:3, fill: '#00d17e'}} />
-        </ComposedChart>
-      </ResponsiveContainer>
-      <div className="calc-stats-legend">
-        <div className="calc-legend-item"><div className="calc-legend-dot" style={{background:"#9b69ff"}}/>הצעת מחיר</div>
-        <div className="calc-legend-item"><div className="calc-legend-dot" style={{background:"#00d17e", borderRadius:"50%"}}/>תיקונים</div>
-      </div>
-    </div>
-  );
-}
-
 export default function CalculatorsPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // טעינת ההגדרות הגלובליות של העסק מ-Firestore (ואם עדיין אין - שמירת ברירת המחדל)
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    const settingsRef = doc(db, "businessSettings", businessId);
+    getDoc(settingsRef)
+      .then((snap) => {
+        if (snap.exists()) {
+          setSettings((prev) => ({ ...prev, ...(snap.data() as Partial<Settings>) }));
+        } else {
+          setDoc(settingsRef, DEFAULT_SETTINGS, { merge: true }).catch((err) =>
+            console.error("Error seeding business settings:", err)
+          );
+        }
+      })
+      .catch((err) => console.error("Error loading business settings:", err))
+      .finally(() => setSettingsLoaded(true));
+  }, []);
+
+  // שמירת ההגדרות ל-Firestore בכל שינוי, כדי שלא יתאפסו ברענון
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    setDoc(doc(db, "businessSettings", businessId), settings, { merge: true }).catch((err) =>
+      console.error("Error saving business settings:", err)
+    );
+  }, [settings, settingsLoaded]);
 
   return (
     <div className="calc-page">
@@ -403,7 +399,6 @@ export default function CalculatorsPage() {
         <CatalogCard settings={settings} />
         <LengthPlanner />
         <RepairsCalculator settings={settings} />
-        <UsageStats />
       </div>
     </div>
   );

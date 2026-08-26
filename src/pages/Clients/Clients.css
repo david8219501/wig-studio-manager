@@ -200,7 +200,7 @@
 }
 
 .clients-table tbody tr:nth-child(odd) {
-  background: #fbf9fc;
+  background: var(--color-surface-hover);
 }
 
 .clients-table tbody tr:nth-child(even) {
