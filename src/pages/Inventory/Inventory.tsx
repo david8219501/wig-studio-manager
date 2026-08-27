@@ -82,12 +82,23 @@ const Inventory: React.FC = () => {
     };
   }, []);
 
+  // ה-hairItems כאן כבר מסונן ל-businessId הנוכחי בלבד (דרך ה-query ב-
+  // onSnapshot למעלה), כך שהמספור הסידורי (maxNum) תמיד עצמאי לעסק. אבל
+  // ה-collection 'hairItems' עצמו גלובלי (משותף לכל העסקים, לא subcollection
+  // לכל עסק) - אז שני עסקים שונים עדיין יכולים להגיע ל"מספר הבא" הזהה
+  // (למשל שני עסקים חדשים שכל אחד מתחיל מ-HAIR-1001). מזהה כזה שכבר קיים
+  // כמסמך בפועל (של עסק אחר) הופך את ה-setDoc ל"עדכון" מבחינת Firestore,
+  // וחוקי העדכון דוחים אותו כי ה-businessId הקיים לא תואם - permission-denied.
+  // כדי שהמזהה יהיה בטוח ייחודי גלובלית (ולא רק בתוך העסק), מוסיפים סיומת
+  // הנגזרת מה-uid של העסק המחובר.
   const nextHairId = useMemo(() => {
     const maxNum = hairItems.reduce((max, item) => {
-      const num = parseInt(item.id.replace('HAIR-', ''), 10);
+      const match = item.id.match(/^HAIR-(\d+)/);
+      const num = match ? parseInt(match[1], 10) : NaN;
       return Number.isNaN(num) ? max : Math.max(max, num);
     }, 1000);
-    return `HAIR-${maxNum + 1}`;
+    const businessSuffix = (auth.currentUser?.uid ?? '').slice(-4);
+    return `HAIR-${maxNum + 1}-${businessSuffix}`;
   }, [hairItems]);
 
   // קופסאות שאריות פעילות - יעדים אפשריים למיזוג שארית קוקו קטן
