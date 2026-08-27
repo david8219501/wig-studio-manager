@@ -6,7 +6,9 @@ interface RestockModalProps {
   isOpen: boolean;
   item: BulkItem | null; // הפריט שעליו לוחצים "הוספת מלאי"
   onClose: () => void;
-  onConfirm: (itemId: string, addedQuantity: number, newAverageUnitCost: number) => void;
+  // purchaseUnitCost = המחיר הגולמי ליחידה ששולם בקנייה הספציפית הזו (לא הממוצע המשוקלל) -
+  // נדרש בנפרד מ-newAverageUnitCost כדי שאפשר יהיה לרשום הוצאת רכישה אמיתית (כמות × מחיר בפועל).
+  onConfirm: (itemId: string, addedQuantity: number, purchaseUnitCost: number, newAverageUnitCost: number) => void;
 }
 
 const RestockModal: React.FC<RestockModalProps> = ({ isOpen, item, onClose, onConfirm }) => {
@@ -53,7 +55,7 @@ const RestockModal: React.FC<RestockModalProps> = ({ isOpen, item, onClose, onCo
       return;
     }
 
-    onConfirm(item.id, qty, weightedAverage ?? cost);
+    onConfirm(item.id, qty, cost, weightedAverage ?? cost);
     setAddedQuantity('');
     setPurchaseUnitCost('');
     setError('');

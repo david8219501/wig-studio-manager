@@ -1,17 +1,22 @@
 // src/pages/Inventory/Inventory.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot, setDoc, updateDoc, doc, query, where } from 'firebase/firestore';
+import { addDoc, collection, onSnapshot, setDoc, updateDoc, doc, query, where } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
-import type { BulkItem, HairItem } from '../../types';
+import type { BulkItem, HairItem, RemnantMergeLogEntry } from '../../types';
 import AddHairModal from './AddHairModal';
 import AddBulkItemModal from './AddBulkItemModal';
 import RestockModal from './RestockModal';
+import QuickRetailSaleModal from './QuickRetailSaleModal';
+import CreateRemnantBoxModal from './CreateRemnantBoxModal';
+import MergeRemnantModal from './MergeRemnantModal';
+import RemnantMergeLogModal from './RemnantMergeLogModal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import './Inventory.css';
 
 const STATUS_LABELS: Record<HairItem['status'], string> = {
   available: 'זמין',
-  reserved: 'משויך להזמנה',
   showroom: 'פאת תצוגה',
+  sold: 'נמכרה',
   depleted: 'נוצל',
 };
 
@@ -28,11 +33,16 @@ const Inventory: React.FC = () => {
   const [hairTypeFilter, setHairTypeFilter] = useState<string>('all'); // מרקם
   const [statusFilter, setStatusFilter] = useState<HairItem['status'] | 'all'>('all');
   const [lengthFilter, setLengthFilter] = useState<'all' | 'short' | 'medium' | 'long'>('all');
+  const [isRemnantBoxModalOpen, setIsRemnantBoxModalOpen] = useState(false);
+  const [mergeSourceItem, setMergeSourceItem] = useState<HairItem | null>(null);
+  const [mergeLogBoxId, setMergeLogBoxId] = useState<string | null>(null);
+  const [undoConfirm, setUndoConfirm] = useState<{ index: number; message: string } | null>(null);
 
   // --- מלאי פשוט ---
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
   const [isAddBulkModalOpen, setIsAddBulkModalOpen] = useState(false);
   const [restockTarget, setRestockTarget] = useState<BulkItem | null>(null);
+  const [quickSaleTarget, setQuickSaleTarget] = useState<BulkItem | null>(null);
 
   // --- האזנה חיה ל-Firestore, מסוננת רק לנתונים של העסק המחובר (businessId = uid) ---
   useEffect(() => {
@@ -80,6 +90,16 @@ const Inventory: React.FC = () => {
     return `HAIR-${maxNum + 1}`;
   }, [hairItems]);
 
+  // קופסאות שאריות פעילות - יעדים אפשריים למיזוג שארית קוקו קטן
+  const remnantBoxes = useMemo(
+    () => hairItems.filter((item) => item.isRemnantBox && item.status === 'available'),
+    [hairItems]
+  );
+
+  // נגזר מ-hairItems החי (לא state נפרד) - כדי שיומן המיזוגים במודל יתעדכן
+  // אוטומטית אחרי כל "בטל מיזוג", באותו דפוס כמו assigningOrder ב-Sales.tsx.
+  const mergeLogBox = hairItems.find((item) => item.id === mergeLogBoxId) || null;
+
   // אפשרויות הפילטר נגזרות מהנתונים בפועל, כדי שהרשימה תישאר מסונכרנת עם מה שבאמת קיים במלאי
   const textureOptions = useMemo(
     () => Array.from(new Set(hairItems.map((item) => item.texture))),
@@ -112,17 +132,158 @@ const Inventory: React.FC = () => {
     });
   }, [hairItems, searchTerm, textureFilter, hairTypeFilter, statusFilter, lengthFilter]);
 
+  // הוצאת רכישה אוטומטית לכל תנועת קניית/חידוש מלאי בפועל - זה הרגע הנכון
+  // לרשום אותה (בניגוד ל"שימוש" במלאי בהזמנה, שבוטל בכוונה כי הוא לא
+  // הוצאה חדשה, רק הקצאה פנימית ממלאי שכבר נרכש).
+  const createInventoryExpense = async (params: { description: string; amount: number; supplier: string }) => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    await addDoc(collection(db, 'expenses'), {
+      businessId,
+      date: new Date().toISOString().split('T')[0],
+      supplier: params.supplier,
+      category: 'inventory',
+      description: params.description,
+      amount: params.amount,
+      paymentMethod: 'cash',
+      status: 'paid',
+    });
+  };
+
   // שומרים ל-Firestore עם ה-ID הידידותי שכבר נוצר בטופס (HAIR-1004 וכו'),
   // ומתייגים ב-businessId כדי שהפריט ישויך לעסק המחובר בלבד.
   const handleSaveHairItem = async (item: HairItem) => {
     const { id, ...data } = item;
     await setDoc(doc(db, 'hairItems', id), { ...data, businessId: auth.currentUser!.uid });
+    await createInventoryExpense({
+      description: `רכישת קוקו - ${item.supplier} - ${item.color}, ${item.length}ס״מ`,
+      amount: item.costPrice,
+      supplier: item.supplier,
+    });
     setIsAddModalOpen(false);
+  };
+
+  // קופסת שאריות לא נרכשת - היא נוצרת ריקה ומתמלאת ממיזוג שאריות קוקוים
+  // שכבר נרכשו (ונרשמו כהוצאה) בעבר, אז אין כאן הוצאה נוספת ליצור.
+  const handleCreateRemnantBox = async (item: HairItem) => {
+    const { id, ...data } = item;
+    await setDoc(doc(db, 'hairItems', id), { ...data, businessId: auth.currentUser!.uid });
+    setIsRemnantBoxModalOpen(false);
+  };
+
+  // מיזוג שארית קוקו קטן לתוך קופסת שאריות: שווי השארית (costPrice יחסי
+  // למשקל שנשאר) עובר לקופסה, והקוקו המקורי מתאפס ומסומן כנוצל. נרשמת גם
+  // רשומת יומן (remnantMergeLog) - כדי שאפשר יהיה לבטל את המיזוג הזה בדיוק
+  // בהמשך (ראו handleUndoMerge), גם אחרי שהקופסה המשיכה להתמלא ממיזוגים נוספים.
+  const handleMergeIntoRemnantBox = async (boxId: string) => {
+    if (!mergeSourceItem) return;
+    const box = hairItems.find((h) => h.id === boxId);
+    if (!box) return;
+
+    const remainingValue = mergeSourceItem.costPrice * (mergeSourceItem.currentWeight / mergeSourceItem.initialWeight);
+    const logEntry: RemnantMergeLogEntry = {
+      sourceItemId: mergeSourceItem.id,
+      sourceItemLabel: `${mergeSourceItem.id} · ${mergeSourceItem.color} · ${mergeSourceItem.length} ס"מ`,
+      weightMerged: mergeSourceItem.currentWeight,
+      valueMerged: remainingValue,
+      mergedAt: new Date().toISOString(),
+    };
+
+    await updateDoc(doc(db, 'hairItems', box.id), {
+      currentWeight: box.currentWeight + mergeSourceItem.currentWeight,
+      remnantTotalValue: (box.remnantTotalValue ?? 0) + remainingValue,
+      remnantMergeLog: [...(box.remnantMergeLog ?? []), logEntry],
+    });
+
+    await updateDoc(doc(db, 'hairItems', mergeSourceItem.id), {
+      currentWeight: 0,
+      status: 'depleted',
+    });
+
+    setMergeSourceItem(null);
+  };
+
+  // מבצעת בפועל ביטול מיזוג בודד מיומן קופסת שאריות - מחזירה את הקוקו
+  // המקורי למצב שלפני המיזוג ומורידה את המשקל/השווי שהוא הוסיף לקופסה.
+  // קריאה ישירה (בלי אישור) כשאין סיכון; אחרי אישור ב-ConfirmDialog כשיש.
+  const performUndoMerge = async (index: number) => {
+    const box = mergeLogBox;
+    if (!box) return;
+    const log = box.remnantMergeLog ?? [];
+    const entry = log[index];
+    if (!entry) return;
+
+    const newLog = log.filter((_, i) => i !== index);
+
+    await updateDoc(doc(db, 'hairItems', box.id), {
+      currentWeight: box.currentWeight - entry.weightMerged,
+      remnantTotalValue: (box.remnantTotalValue ?? 0) - entry.valueMerged,
+      remnantMergeLog: newLog,
+    });
+
+    const sourceItem = hairItems.find((h) => h.id === entry.sourceItemId);
+    if (sourceItem) {
+      await updateDoc(doc(db, 'hairItems', sourceItem.id), {
+        currentWeight: entry.weightMerged,
+        status: 'available',
+      });
+    }
+  };
+
+  // בודקת אם ביטול המיזוג הזה מסוכן (עלול ליצור אי-דיוק בשווי הקופסה):
+  //
+  // השוואת סכומים בלבד (currentWeight/remnantTotalValue מול weightMerged/
+  // valueMerged) לא מספיקה: קופסה עם כמה מיזוגים ושימוש קטן יכולה עדיין
+  // "לצאת" אריתמטית מספיקה לביטול מיזוג ישן, למרות שהכסף כבר התערבב בין
+  // המיזוגים בפועל. במקום זה, שני תנאים חד-משמעיים שכל אחד מהם, אם לא
+  // מתקיים, הוא **אזהרה** (אפשר להמשיך במודע דרך ConfirmDialog) ולא חסימה:
+  // 1. זו הרשומה האחרונה בלוג - מיזוגים שקרו אחריה כבר "ישבו על" השווי
+  //    שהיא הוסיפה.
+  // 2. box.lastUsedAt (השיוך האחרון שנעשה מהקופסה בפועל, מתועד ב-
+  //    AssignHairModal) ריק או מוקדם מ-entry.mergedAt - כלומר שום שימוש
+  //    לא קרה מהקופסה מאז המיזוג הזה בזמן.
+  // אם אין שום סיכון - מבצעים ישר בלי לשאול כלום.
+  const handleUndoMerge = async (index: number) => {
+    const box = mergeLogBox;
+    if (!box) return;
+    const log = box.remnantMergeLog ?? [];
+    const entry = log[index];
+    if (!entry) return;
+
+    const usedSince = !!box.lastUsedAt && box.lastUsedAt > entry.mergedAt;
+    const notLastEntry = index !== log.length - 1;
+
+    if (!usedSince && !notLastEntry) {
+      await performUndoMerge(index);
+      return;
+    }
+
+    const warnings = [
+      usedSince &&
+        'שימי לב: כבר נעשה שימוש מהקופסה אחרי המיזוג הזה. אם את לא בטוחה שהשיער הספציפי הזה לא נכלל באותו שימוש, הביטול עלול ליצור אי-דיוק קטן בשווי הקופסה.',
+      notLastEntry && 'שימי לב: בוצעו מיזוגים נוספים אחרי זה. ביטול לא-לפי-סדר עלול ליצור אי-דיוק.',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    setUndoConfirm({ index, message: `${warnings}\n\nלהמשיך בכל זאת?` });
+  };
+
+  const handleConfirmUndoMerge = async () => {
+    if (undoConfirm) {
+      await performUndoMerge(undoConfirm.index);
+    }
+    setUndoConfirm(null);
   };
 
   const handleAddBulkItem = async (item: BulkItem) => {
     const { id, ...data } = item;
     await setDoc(doc(db, 'bulkItems', id), { ...data, businessId: auth.currentUser!.uid });
+    await createInventoryExpense({
+      description: `רכישת פריט חדש למלאי - ${item.name}`,
+      amount: item.quantity * item.unitCost,
+      supplier: item.name,
+    });
     setIsAddBulkModalOpen(false);
   };
 
@@ -135,13 +296,25 @@ const Inventory: React.FC = () => {
     });
   };
 
-  // קנייה חדשה - מעדכן גם כמות וגם עלות ממוצעת משוקללת
-  const handleConfirmRestock = async (itemId: string, addedQuantity: number, newAverageUnitCost: number) => {
+  // קנייה חדשה - מעדכן גם כמות וגם עלות ממוצעת משוקללת. הוצאת הרכישה
+  // מחושבת מ-purchaseUnitCost (המחיר הגולמי של הקנייה הזו בלבד), לא
+  // מ-newAverageUnitCost (ממוצע משוקלל שכולל גם את המלאי הישן).
+  const handleConfirmRestock = async (
+    itemId: string,
+    addedQuantity: number,
+    purchaseUnitCost: number,
+    newAverageUnitCost: number
+  ) => {
     const item = bulkItems.find((b) => b.id === itemId);
     if (!item) return;
     await updateDoc(doc(db, 'bulkItems', itemId), {
       quantity: item.quantity + addedQuantity,
       unitCost: newAverageUnitCost,
+    });
+    await createInventoryExpense({
+      description: `חידוש מלאי - ${item.name}`,
+      amount: addedQuantity * purchaseUnitCost,
+      supplier: item.name,
     });
     setRestockTarget(null);
   };
@@ -222,6 +395,9 @@ const Inventory: React.FC = () => {
             <button className="btn-primary add-hair-btn" onClick={() => setIsAddModalOpen(true)}>
               + קליטת קוקו חדש
             </button>
+            <button className="btn-secondary add-hair-btn" onClick={() => setIsRemnantBoxModalOpen(true)}>
+              + צור קופסת שאריות
+            </button>
           </div>
 
           <div className="table-wrapper">
@@ -238,37 +414,60 @@ const Inventory: React.FC = () => {
                   <th>סוג שיער</th>
                   <th>עלות רכישה</th>
                   <th>סטטוס</th>
+                  <th>פעולות</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredHairItems.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="empty-state">
+                    <td colSpan={11} className="empty-state">
                       לא נמצאו קוקוים התואמים לסינון
                     </td>
                   </tr>
                 ) : (
-                  filteredHairItems.map((item) => (
-                    <tr key={item.id}>
-                      <td className="mono">{item.id}</td>
-                      <td>{item.supplier}</td>
-                      <td>{item.length} ס"מ</td>
-                      <td>{item.initialWeight} גרם</td>
-                      <td>{item.currentWeight} גרם</td>
-                      <td>{item.color}</td>
-                      <td>{item.hairType}</td>
-                      <td>{item.texture}</td>
-                      <td>₪{item.costPrice.toLocaleString()}</td>
-                      <td>
-                        <span className={statusBadgeClass(item.status)}>
-                          {STATUS_LABELS[item.status]}
-                        </span>
-                        {item.status === 'reserved' && item.assignedOrderId && (
-                          <span className="order-ref">#{item.assignedOrderId}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  filteredHairItems.map((item) => {
+                    const isRemnant = item.isRemnantBox === true;
+                    const canMerge = !isRemnant && item.currentWeight > 0;
+                    const avgPricePerGram = isRemnant && item.currentWeight > 0
+                      ? (item.remnantTotalValue ?? 0) / item.currentWeight
+                      : 0;
+                    return (
+                      <tr key={item.id}>
+                        <td className="mono">{item.id}</td>
+                        <td>{isRemnant && '📦 '}{item.supplier}</td>
+                        <td>{isRemnant ? '—' : `${item.length} ס"מ`}</td>
+                        <td>{isRemnant ? '—' : `${item.initialWeight} גרם`}</td>
+                        <td>{item.currentWeight} גרם</td>
+                        <td>{item.color}</td>
+                        <td>{isRemnant ? '—' : item.hairType}</td>
+                        <td>{isRemnant ? '—' : item.texture}</td>
+                        <td>{isRemnant ? `מחיר ממוצע לגרם: ₪${avgPricePerGram.toFixed(2)}` : `₪${item.costPrice.toLocaleString()}`}</td>
+                        <td>
+                          <span className={statusBadgeClass(item.status)}>
+                            {STATUS_LABELS[item.status]}
+                          </span>
+                        </td>
+                        <td>
+                          {canMerge && (
+                            <button
+                              className="btn-secondary merge-remnant-btn"
+                              onClick={() => setMergeSourceItem(item)}
+                            >
+                              📦 מזג לשאריות
+                            </button>
+                          )}
+                          {isRemnant && (
+                            <button
+                              className="btn-secondary merge-log-btn"
+                              onClick={() => setMergeLogBoxId(item.id)}
+                            >
+                              📋 יומן מיזוגים{item.remnantMergeLog?.length ? ` (${item.remnantMergeLog.length})` : ''}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -325,6 +524,14 @@ const Inventory: React.FC = () => {
                           >
                             + הוספת מלאי
                           </button>
+                          {item.retailPrice != null && (
+                            <button
+                              className="btn-secondary retail-sale-btn"
+                              onClick={() => setQuickSaleTarget(item)}
+                            >
+                              💰 מכירה
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -354,6 +561,43 @@ const Inventory: React.FC = () => {
         item={restockTarget}
         onClose={() => setRestockTarget(null)}
         onConfirm={handleConfirmRestock}
+      />
+
+      <QuickRetailSaleModal
+        isOpen={quickSaleTarget !== null}
+        item={quickSaleTarget}
+        onClose={() => setQuickSaleTarget(null)}
+      />
+
+      <CreateRemnantBoxModal
+        isOpen={isRemnantBoxModalOpen}
+        onClose={() => setIsRemnantBoxModalOpen(false)}
+        onSave={handleCreateRemnantBox}
+        nextId={nextHairId}
+      />
+
+      <MergeRemnantModal
+        isOpen={mergeSourceItem !== null}
+        sourceItem={mergeSourceItem}
+        remnantBoxes={remnantBoxes}
+        onClose={() => setMergeSourceItem(null)}
+        onConfirm={handleMergeIntoRemnantBox}
+      />
+
+      <RemnantMergeLogModal
+        isOpen={mergeLogBoxId !== null}
+        box={mergeLogBox}
+        onClose={() => setMergeLogBoxId(null)}
+        onUndo={handleUndoMerge}
+      />
+
+      <ConfirmDialog
+        isOpen={undoConfirm !== null}
+        title="ביטול מיזוג - אזהרה"
+        message={undoConfirm?.message ?? ''}
+        variant="warning"
+        onConfirm={handleConfirmUndoMerge}
+        onCancel={() => setUndoConfirm(null)}
       />
     </div>
   );

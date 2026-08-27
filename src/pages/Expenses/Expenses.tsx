@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, addDoc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, addDoc, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import "./Expenses.css";
 
@@ -7,11 +7,12 @@ interface Expense {
   id: string;
   date: string; // YYYY-MM-DD
   supplier: string;
-  category: "inventory" | "rent" | "marketing" | "salaries" | "other";
+  category: "inventory" | "rent" | "marketing" | "salaries" | "production" | "other";
   description: string;
   amount: number;
   paymentMethod: "credit" | "transfer" | "cash" | "check";
   status: "paid" | "pending";
+  relatedOrderId?: string; // אם קיים - ההוצאה נוצרה אוטומטית מהזמנה (src/utils/orderCreation.ts) ומתעדכנת יחד איתה
 }
 
 export default function Expenses() {
@@ -33,6 +34,10 @@ export default function Expenses() {
   const [newMethod, setNewMethod] = useState<Expense["paymentMethod"]>("credit");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // עריכה ידנית של סכום הוצאה בטבלה (כולל הוצאות מקושרות להזמנה - הקישור לא נועל את הסכום)
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
+  const [editingAmountValue, setEditingAmountValue] = useState<number | "">("");
 
   // האזנה חיה ל-Firestore, מסוננת רק להוצאות של העסק המחובר (businessId = uid)
   useEffect(() => {
@@ -108,6 +113,26 @@ export default function Expenses() {
       setSaveError("שגיאה בשמירת ההוצאה. בדקי את החיבור ונסי שוב.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEditAmount = (expense: Expense) => {
+    setEditingAmountId(expense.id);
+    setEditingAmountValue(expense.amount);
+  };
+
+  const saveEditAmount = async (id: string) => {
+    if (editingAmountValue === "") {
+      setEditingAmountId(null);
+      return;
+    }
+    const value = Number(editingAmountValue);
+    setEditingAmountId(null);
+    try {
+      await updateDoc(doc(db, "expenses", id), { amount: value });
+    } catch (err) {
+      console.error("Error updating expense amount:", err);
+      alert("שגיאה בעדכון הסכום. נסי שוב.");
     }
   };
 
@@ -193,6 +218,7 @@ export default function Expenses() {
           <option value="rent">🏢 שכירות ומבנה</option>
           <option value="marketing">📣 שיווק ופרסום</option>
           <option value="salaries">👥 שכר עובדות</option>
+          <option value="production">🧵 ייצור הזמנות</option>
           <option value="other">🛠️ שונות</option>
         </select>
       </div>
@@ -231,11 +257,38 @@ export default function Expenses() {
                       {e.category === "rent" && "🏢 שכירות"}
                       {e.category === "marketing" && "📣 שיווק"}
                       {e.category === "salaries" && "👥 שכר"}
+                      {e.category === "production" && "🧵 ייצור"}
                       {e.category === "other" && "🛠️ שונות"}
                     </span>
                   </td>
-                  <td>{e.description || "—"}</td>
-                  <td className="mono text-danger font-bold">₪{e.amount.toLocaleString()}</td>
+                  <td>
+                    {e.description || "—"}
+                    {e.relatedOrderId && (
+                      <span className="linked-order-badge" title={`מקושרת להזמנה #${e.relatedOrderId}`}>
+                        🔗 מקושר להזמנה
+                      </span>
+                    )}
+                  </td>
+                  <td className="mono text-danger font-bold">
+                    {editingAmountId === e.id ? (
+                      <input
+                        type="number"
+                        autoFocus
+                        className="amount-edit-input"
+                        value={editingAmountValue}
+                        onChange={(ev) => setEditingAmountValue(ev.target.value === "" ? "" : Number(ev.target.value))}
+                        onBlur={() => saveEditAmount(e.id)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter") saveEditAmount(e.id);
+                          if (ev.key === "Escape") setEditingAmountId(null);
+                        }}
+                      />
+                    ) : (
+                      <span className="editable-amount" title="לחצי לעריכת הסכום" onClick={() => startEditAmount(e)}>
+                        ₪{e.amount.toLocaleString()}
+                      </span>
+                    )}
+                  </td>
                   <td>
                     {e.paymentMethod === "credit" && "💳 אשראי"}
                     {e.paymentMethod === "transfer" && "🏦 העברה"}
@@ -281,6 +334,7 @@ export default function Expenses() {
                   <option value="rent">🏢 שכירות ומבנה</option>
                   <option value="marketing">📣 שיווק ופרסום</option>
                   <option value="salaries">👥 שכר עובדות</option>
+                  <option value="production">🧵 ייצור הזמנות</option>
                   <option value="other">🛠️ שונות</option>
                 </select>
               </div>

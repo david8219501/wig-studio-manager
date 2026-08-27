@@ -1,0 +1,135 @@
+/* RepairOrderForm.css - עצמאי לחלוטין, לא תלוי ב-CSS של מודלים אחרים */
+
+.repair-order-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  direction: rtl;
+}
+
+.repair-order-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  box-shadow: var(--shadow-elevated);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+
+.repair-order-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+}
+
+.repair-order-header h2 {
+  font-size: 20px;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.repair-order-subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.repair-order-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.repair-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.repair-order-card .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.repair-order-card .field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.repair-order-card .field input,
+.repair-order-card .field textarea {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.repair-hint {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.hair-cost-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.repair-order-error {
+  font-size: 13px;
+  color: var(--color-danger, #d33);
+}
+
+.repair-order-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+}
+
+.repair-order-card .btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.repair-order-card .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.repair-order-card .btn-secondary {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  cursor: pointer;
+}

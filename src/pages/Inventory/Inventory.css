@@ -206,11 +206,6 @@
   color: var(--color-success);
 }
 
-.status-reserved {
-  background: var(--color-accent-bg);
-  color: var(--color-accent);
-}
-
 .status-showroom {
   background: rgba(36, 38, 41, 0.08);
   color: var(--color-primary);
@@ -221,12 +216,9 @@
   color: var(--color-danger);
 }
 
-.order-ref {
-  display: block;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
+.status-sold {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 /* ---------- Bulk items ---------- */
@@ -279,6 +271,74 @@
   padding: 7px 12px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.retail-sale-btn {
+  padding: 7px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border-color: transparent;
+}
+
+.merge-remnant-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: transparent;
+}
+
+.merge-log-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-inline-start: 6px;
+}
+
+.merge-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.merge-log-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+}
+
+.merge-log-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.merge-log-info .font-bold {
+  font-weight: 700;
+}
+
+.merge-log-date {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.undo-merge-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .restock-card {
@@ -375,13 +435,13 @@
 .modal-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 20px 16px;
 }
 
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .form-field-full {
@@ -394,12 +454,46 @@
   color: var(--color-text-muted);
 }
 
+.form-field-hint {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* הפרדה חזותית בין קבוצות שדות שונות מהותית בטופס (למשל "פרטי מלאי"
+   מול "מחיר ומכירה") - קו עדין + כותרת קטנה מעל הקבוצה השנייה. */
+.form-section-divider {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.form-section-divider h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.hair-cost-hint {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
 .form-field input,
 .form-field select,
 .form-field textarea {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 9px 12px;
+  padding: 11px 14px;
   font-size: 14px;
   background: var(--color-surface);
   color: var(--color-text);

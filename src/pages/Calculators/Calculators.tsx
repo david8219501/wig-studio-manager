@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
+import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost } from "../../utils/hairCost";
 import './Calculators.css';
 
 const DEFAULT_SETTINGS = {
@@ -29,22 +30,6 @@ const CATALOG_SPECS = {
   topPrice: 700,
   netPrice: 40,
 };
-
-const BASE_WEIGHTS: Record<number, number> = {
-  5:110, 10:140, 15:170, 20:200, 25:230,
-  30:260, 35:290, 40:320, 45:350, 50:380,
-  55:410, 60:440, 65:470, 70:500, 75:530,
-};
-
-const STRUCTURE_MOD: Record<string, number> = { טופ:-50, סקין:-40, קלאסי:0, סרט:0 };
-const FULLNESS_MOD: Record<string, number>  = { דליל:-30, קלאסי:0, מלא:30 };
-
-function lookupWeight(len: number) {
-  const keys = Object.keys(BASE_WEIGHTS).map(Number).sort((a,b)=>a-b);
-  let match = keys[0];
-  for (const k of keys) { if (k <= len) match = k; else break; }
-  return BASE_WEIGHTS[match];
-}
 
 interface Settings {
   pricePerKgUsd: number;
@@ -121,10 +106,10 @@ function PriceCalculator({ settings }: { settings: Settings }) {
 
   const calc = useMemo(() => {
     if (missing) return null;
-    const base     = lookupWeight(Number(length));
-    const netGrams = base + (STRUCTURE_MOD[structure] || 0) + (FULLNESS_MOD[fullness] || 0);
-    const waste    = netGrams * 0.3;
-    const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * (netGrams + waste) / 1000;
+    const { netGrams, waste, hairCost } = calculateHairCost(
+      { length: Number(length), structure, fullness },
+      settings
+    );
     const mfgCost  = hairCost + Number(skinTop || 0) + Number(net || 0) + Number(extra || 0);
     const profit   = mfgCost * (settings.profitMargin / 100);
     const final    = mfgCost + profit;
@@ -149,11 +134,11 @@ function PriceCalculator({ settings }: { settings: Settings }) {
 
       <div className="calc-row">
         <MiniSelect label="אורך עורף" value={length} onChange={setLength}
-          options={[5,10,15,20,25,30,35,40,45,50,55,60,65,70,75].map(v=>({v: String(v), l:`${v} ס״מ`}))} />
+          options={HAIR_LENGTH_OPTIONS.map(v=>({v: String(v), l:`${v} ס״מ`}))} />
         <MiniSelect label="מבנה" value={structure} onChange={setStructure}
-          options={["טופ","סקין","קלאסי","סרט"].map(v=>({v,l:v}))} />
+          options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
         <MiniSelect label="מלאות" value={fullness} onChange={setFullness}
-          options={["דליל","קלאסי","מלא"].map(v=>({v,l:v}))} />
+          options={FULLNESS_OPTIONS.map(v=>({v,l:v}))} />
       </div>
 
       <div className="calc-row">

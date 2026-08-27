@@ -1,0 +1,102 @@
+/* ConfirmDialog.css - עצמאי לחלוטין, לא תלוי ב-CSS של קבצים אחרים */
+
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  direction: rtl;
+  animation: confirmDialogFadeIn 0.15s ease-out;
+}
+
+.confirm-dialog-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-elevated);
+  border: 1px solid var(--color-border);
+  text-align: center;
+  animation: confirmDialogPopIn 0.18s ease-out;
+}
+
+@keyframes confirmDialogFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirmDialogPopIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.confirm-dialog-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  margin: 0 auto 14px;
+}
+
+.confirm-dialog-warning .confirm-dialog-icon {
+  background: var(--color-warning-bg);
+}
+
+.confirm-dialog-danger .confirm-dialog-icon {
+  background: var(--color-danger-bg);
+}
+
+.confirm-dialog-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 10px;
+}
+
+.confirm-dialog-message {
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.6;
+  white-space: pre-line;
+  margin: 0 0 24px;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.confirm-dialog-card .btn-secondary {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirm-dialog-confirm-btn {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-on-primary);
+}
+
+.confirm-dialog-warning .confirm-dialog-confirm-btn {
+  background: var(--color-warning);
+}
+
+.confirm-dialog-danger .confirm-dialog-confirm-btn {
+  background: var(--color-danger);
+}

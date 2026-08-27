@@ -1,5 +1,5 @@
 // src/pages/Inventory/AddBulkItemModal.tsx
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { BulkItem } from '../../types';
 
 interface AddBulkItemModalProps {
@@ -13,6 +13,7 @@ const emptyForm = {
   quantity: '',
   minThreshold: '',
   unitCost: '',
+  retailPrice: '',
 };
 
 const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, onSave }) => {
@@ -20,6 +21,18 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // רווח ליחידה חי - רק כשגם עלות וגם מחיר מכירה מלאים ותקינים, אותה
+  // שפה עיצובית כמו "עלות שיער משוערת" באשף ההזמנה (hair-cost-hint).
+  const profitPreview = useMemo(() => {
+    if (form.unitCost === '' || form.retailPrice.trim() === '') return null;
+    const cost = Number(form.unitCost);
+    const retail = Number(form.retailPrice);
+    if (cost <= 0 || retail <= 0) return null;
+    const profit = retail - cost;
+    const marginPct = (profit / cost) * 100;
+    return { profit, marginPct };
+  }, [form.unitCost, form.retailPrice]);
 
   if (!isOpen) return null;
 
@@ -34,6 +47,7 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
     if (form.minThreshold === '' || Number(form.minThreshold) < 0)
       newErrors.minThreshold = 'סף לא תקין';
     if (form.unitCost === '' || Number(form.unitCost) < 0) newErrors.unitCost = 'עלות לא תקינה';
+    if (form.retailPrice !== '' && Number(form.retailPrice) < 0) newErrors.retailPrice = 'מחיר לא תקין';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -47,6 +61,9 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
       quantity: Number(form.quantity),
       minThreshold: Number(form.minThreshold),
       unitCost: Number(form.unitCost),
+      // רק אם הוזן בפועל - שדה אופציונלי; פריט בלי retailPrice הוא חומר
+      // ייצור רגיל ולא מקבל כפתור "מכירה מהירה" במלאי.
+      ...(form.retailPrice.trim() !== '' ? { retailPrice: Number(form.retailPrice) } : {}),
     };
 
     setSaving(true);
@@ -107,7 +124,11 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
             {errors.minThreshold && <span className="field-error">{errors.minThreshold}</span>}
           </div>
 
-          <div className="form-field form-field-full">
+          <div className="form-section-divider">
+            <h3>מחיר ומכירה</h3>
+          </div>
+
+          <div className="form-field">
             <label>עלות ליחידה (₪) *</label>
             <input
               type="number"
@@ -117,6 +138,24 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
             />
             {errors.unitCost && <span className="field-error">{errors.unitCost}</span>}
           </div>
+
+          <div className="form-field">
+            <label>מחיר מכירה (קמעונאי)</label>
+            <input
+              type="number"
+              value={form.retailPrice}
+              onChange={(e) => handleChange('retailPrice', e.target.value)}
+              placeholder="לדוגמה: 89"
+            />
+            <span className="form-field-hint">השאירי ריק אם זה חומר ייצור, לא מוצר למכירה ישירה ללקוחות</span>
+            {errors.retailPrice && <span className="field-error">{errors.retailPrice}</span>}
+          </div>
+
+          {profitPreview && (
+            <div className="hair-cost-hint">
+              רווח ליחידה: ₪{profitPreview.profit.toFixed(0)} ({profitPreview.marginPct.toFixed(0)}%)
+            </div>
+          )}
         </div>
 
         <div className="modal-actions">

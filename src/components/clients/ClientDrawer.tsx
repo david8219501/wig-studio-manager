@@ -3,7 +3,8 @@ import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/f
 import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
 import type { Order } from "../../pages/Sales/Sales";
-import NewOrderWizard from "../orders/NewOrderWizard";
+import NewOrderWizard, { type ClientOption } from "../orders/NewOrderWizard";
+import RepairOrderForm from "../orders/RepairOrderForm";
 import "./ClientDrawer.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -24,6 +25,7 @@ interface ClientDrawerProps {
 export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }: ClientDrawerProps) {
   const [activeTab, setActiveTab] = useState<"orders" | "payments" | "specs" | "docs">("orders");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [repairFormClient, setRepairFormClient] = useState<ClientOption | null>(null);
 
   // State עבור מצב עריכת מידות ומפרט
   const [isEditingSpecs, setIsEditingSpecs] = useState(false);
@@ -298,6 +300,15 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
         onClose={() => setIsWizardOpen(false)}
         onOrderCreated={() => {}}
         preselectedClient={{ id: client.id, name: client.name, phone: client.phone }}
+        onOpenRepairForm={(repairClient) => setRepairFormClient(repairClient)}
+      />
+
+      {/* טופס תיקונים/שירות נפרד ופשוט - נפתח מתוך בחירת "תיקון / שירות" באשף */}
+      <RepairOrderForm
+        isOpen={repairFormClient !== null}
+        client={repairFormClient}
+        onClose={() => setRepairFormClient(null)}
+        onCreated={() => {}}
       />
     </>
   );

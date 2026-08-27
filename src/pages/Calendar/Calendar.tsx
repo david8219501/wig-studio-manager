@@ -38,7 +38,6 @@ export default function Calendar() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 

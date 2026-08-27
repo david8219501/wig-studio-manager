@@ -31,7 +31,7 @@
   /* Cards */
   .financial-cards-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
     margin-bottom: 28px;
   }
@@ -61,6 +61,7 @@
 
   .text-success, td.text-success { color: var(--color-success) !important; }
   .text-danger, td.text-danger { color: var(--color-danger) !important; }
+  .text-profit, td.text-profit { color: var(--color-accent) !important; }
 
   /* Toolbars */
   .sales-toolbar-container {
@@ -190,9 +191,14 @@
   .sales-table {
     display: table !important; /* דריסת Flexbox גלובלי */
     width: 100% !important;
-    min-width: 950px;
+    min-width: 650px;
     table-layout: fixed !important;
     border-collapse: collapse !important;
+  }
+
+  /* כל שורה פותחת את פאנל פרטי ההזמנה בלחיצה (חוץ מבחירת הסטטוס - יש לה stopPropagation) */
+  .sales-row {
+    cursor: pointer;
   }
 
   .sales-table thead { display: table-header-group !important; }
@@ -226,14 +232,23 @@
   }
 
   /* הגדרות עמודות מדויקות פיקסל-לפיקסל */
-  .cell-id { width: 12%; }
-  .cell-client { width: 15%; }
-  .cell-type { width: 17%; }
-  .cell-date { width: 12%; }
-  .cell-price { width: 11%; }
-  .cell-paid { width: 11%; }
-  .cell-debt { width: 10%; }
-  .cell-status { width: 12%; text-align: center !important; }
+  .cell-client { width: 26%; }
+  .cell-type { width: 24%; }
+  .cell-status { width: 24%; text-align: center !important; }
+  .cell-price { width: 13%; }
+  .cell-profit { width: 13%; }
+
+  .profit-estimated-badge {
+    display: inline-block;
+    margin-inline-start: 4px;
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: middle;
+  }
 
   /* Status Select Button */
   .status-select {

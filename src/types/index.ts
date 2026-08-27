@@ -10,10 +10,24 @@ export interface HairItem {
     hairType: string; // חלק / גלי / מתולתל
     texture: string; // רוסי / אירופאי וכו'
     color: string; // גוון / צבע
-    costPrice: number; // עלות רכישה בש"ח
-    status: 'available' | 'reserved' | 'showroom' | 'depleted'; // סטטוס הקוקו
-    assignedOrderId?: string; // מזהה הזמנה אם הקוקו משויך
+    costPrice: number; // עלות רכישה בש"ח - לא רלוונטי לקופסת שאריות (isRemnantBox), שם המחיר לגרם תמיד remnantTotalValue/currentWeight
+    status: 'available' | 'showroom' | 'sold' | 'depleted'; // סטטוס הקוקו - 'sold' = פאת תצוגה שנמכרה ללקוחה
+    isRemnantBox?: boolean; // true = "קופסת שאריות" - מיזוג של כמה קוקוים קטנים לברקוד אחד, עם מחיר ממוצע משוקלל דינמי
+    remnantTotalValue?: number; // שווי כולל בש"ח של השארית שבקופסה כרגע (רלוונטי רק כש-isRemnantBox)
+    remnantMergeLog?: RemnantMergeLogEntry[]; // יומן מיזוגים לקופסת שאריות - מאפשר "בטל מיזוג" (רלוונטי רק כש-isRemnantBox)
+    lastUsedAt?: string; // ISO timestamp - מתי לאחרונה שויכו גרמים מהפריט הזה להזמנה (AssignHairModal). משמש לוולידציה של "בטל מיזוג" בקופסת שאריות
     createdAt: string;
+  }
+
+  // רשומת מיזוג בודדת ביומן של קופסת שאריות - נשמרת כתמונת מצב של המיזוג
+  // (משקל/שווי שהועברו), כדי שאפשר יהיה לבטל אותה בדיוק גם אחרי שהקופסה
+  // המשיכה להתמלא ממיזוגים נוספים.
+  export interface RemnantMergeLogEntry {
+    sourceItemId: string;
+    sourceItemLabel: string;
+    weightMerged: number;
+    valueMerged: number;
+    mergedAt: string;
   }
   
   export interface BulkItem {
@@ -22,6 +36,7 @@ export interface HairItem {
     quantity: number; // כמות במלאי
     minThreshold: number; // סף מינימום להתראה
     unitCost: number; // עלות ליחידה בש"ח
+    retailPrice?: number; // מחיר מכירה ללקוחה - אם קיים, זה מוצר קמעונאי (לא רק חומר ייצור) ומקבל כפתור "מכירה מהירה" במלאי
   }
   
   // 2. תשלומים ומסמכים
@@ -46,17 +61,47 @@ export interface HairItem {
   }
   
   // 3. הזמנת פאה
+
+  // פריט מלאי פשוט (רשת, ראש פאה, קופסת מתנה וכו') שצורף להזמנה ספציפית.
+  // unitCostAtTime נשמר כתמונת מצב של העלות בזמן השימוש - לא משתנה רטרואקטיבית
+  // גם אם עלות הפריט במלאי משתנה מאוחר יותר (למשל אחרי חידוש מלאי במחיר חדש).
+  export interface UsedBulkItem {
+    itemId: string;
+    itemName: string;
+    quantity: number;
+    unitCostAtTime: number;
+  }
+
+  // שיוך קוקו ספציפי (או חלק ממנו) להזמנה, בפועל (לא אומדן).
+  // הזמנה יכולה להחזיק כמה שיוכים כאלה (למשל שני קוקוים שונים לאותה פאה),
+  // וכל שיוך שומר costAtTime כתמונת מצב - לא משתנה רטרואקטיבית.
+  export interface UsedHairItem {
+    hairItemId: string;
+    hairItemLabel: string;
+    gramsUsed: number;
+    costAtTime: number;
+  }
+
+  // תשלום בודד שנגבה על חשבון הזמנה - חלק ממערך payments על ה-order עצמו
+  // (לא collection נפרד). שונה מהממשק Payment למעלה (ששייך למודל קבלות/
+  // מסמכים עתידי בכרטיס לקוחה, clientId-scoped, ולא בשימוש כרגע בקוד).
+  export interface OrderPayment {
+    amount: number;
+    method: 'cash' | 'credit' | 'transfer' | 'check';
+    date: string;
+    note?: string;
+  }
+
   export interface WigOrder {
     id: string;
     clientId?: string; // אם ריק - מדובר בפאת תצוגה!
     isShowroom: boolean;
     status: 'in_production' | 'ready' | 'delivered';
-    hairItemId?: string; // ID של הקוקו שנבחר
-    hairCost: number; // עלות השיער בפועל
-    netCost: number; // עלות רשת
-    skinTopCost: number; // עלות סקין/טופ
-    extraCosts: number; // הוצאות נוספות
+    usedBulkItems: UsedBulkItem[]; // פריטי מלאי פשוט שצורפו להזמנה (רשת, ראש פאה וכו')
+    usedHairItems: UsedHairItem[]; // קוקוים שמשויכים בפועל להזמנה (יכול להיות יותר מאחד)
+    hairCostEstimated: number; // אומדן עלות גולמי, מחושב אוטומטית ביצירת ההזמנה
     totalPrice: number; // מחיר סופי ללקוחה
+    payments: OrderPayment[]; // היסטוריית תשלומים מלאה; paidAmount הוא הסכום המתוחזק שלהם
     notes?: string;
     createdAt: string;
   }

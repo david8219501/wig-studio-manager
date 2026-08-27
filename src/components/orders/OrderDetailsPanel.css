@@ -1,0 +1,371 @@
+/* OrderDetailsPanel.css - פאנל נשלף מהצד, באותו דפוס עיצובי כמו
+   ClientDrawer.css (overlay + פאנל קבוע), אך עצמאי לחלוטין (מחלקות
+   משלו) כי Sales.tsx לא טוען CSS של קבצים אחרים. */
+
+.order-details-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 900;
+  animation: orderDetailsFadeIn 0.2s ease-out;
+}
+
+.order-details-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 720px;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  direction: rtl;
+  animation: orderDetailsSlideIn var(--duration-base) var(--easing);
+}
+
+@keyframes orderDetailsSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes orderDetailsFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.order-details-header {
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: var(--color-background);
+  gap: 20px;
+}
+
+.order-details-header-right h2 {
+  font-size: 20px;
+  color: var(--color-primary);
+  margin: 0 0 2px;
+}
+
+.order-details-header-right p {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.order-details-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-status-badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.order-status-badge.status-new { background: var(--color-info-bg); color: var(--color-info); }
+.order-status-badge.status-in_progress { background: var(--color-warning-bg); color: var(--color-warning); }
+.order-status-badge.status-styling { background: var(--color-accent-bg); color: var(--color-accent); }
+.order-status-badge.status-ready { background: var(--color-success-bg); color: var(--color-success); }
+.order-status-badge.status-delivered { background: var(--color-surface-hover); color: var(--color-text-muted); }
+
+.order-details-panel .btn-close {
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--color-primary);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--easing);
+  flex-shrink: 0;
+}
+
+.order-details-panel .btn-close:hover {
+  background: var(--color-border);
+}
+
+.order-details-body {
+  flex: 1;
+  padding: 28px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* כל אזור ("פרטי הזמנה"/"שיוך שיער"/"תשלומים") עטוף ככרטיס נפרד עם רקע
+   מנוגד לרקע הפאנל (surface לבן) - כדי שהעין תזהה מיד את הגבול בין
+   האזורים, בדיוק כמו .spec-box/.order-card ב-ClientDrawer.css. */
+.order-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.order-details-section h3 {
+  font-size: 16px;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.order-details-section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.order-details-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.order-detail-box {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-detail-box label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.order-detail-box p {
+  font-size: 14px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.order-details-empty {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.order-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.order-details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 13px;
+}
+
+.order-details-error {
+  font-size: 13px;
+  color: var(--color-danger, #d33);
+}
+
+.order-details-remove-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.order-details-remove-btn:hover {
+  color: var(--color-danger);
+}
+
+/* אזור "הוסף עוד" (פריט מלאי / בעתיד סוגי שיוך נוספים) - אותו דפוס בדיוק
+   כמו .assign-hair-add-section ב-AssignHairModal.css */
+.order-details-add-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.order-details-add-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.order-details-add-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+}
+
+.order-details-add-row select,
+.order-details-add-row input {
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.order-details-add-row input {
+  width: 70px;
+}
+
+.add-payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.add-payment-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.add-payment-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.add-payment-row input,
+.add-payment-row select,
+.add-payment-note {
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* רכיבים גנריים - עצמאיים לקובץ הזה, כדי לא להסתמך על CSS של קבצים אחרים */
+.order-details-panel .font-bold {
+  font-weight: 700;
+}
+
+.order-details-panel .text-success {
+  color: var(--color-success);
+}
+
+.order-details-panel .text-danger {
+  color: var(--color-danger);
+}
+
+.order-details-panel .badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.order-details-panel .btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.order-details-panel .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.order-details-panel .btn-secondary {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* כפתור פעולה בולט (לא .btn-secondary הרגיל, שבתוך כרטיס עם רקע
+   --color-background נראה שקוף/כמו טקסט) - למשל "ניהול שיוך שיער". */
+.order-details-panel .btn-accent {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--easing);
+}
+
+.order-details-panel .btn-accent:hover {
+  opacity: 0.88;
+}
+
+@media (max-width: 700px) {
+  .order-details-panel {
+    max-width: 100%;
+  }
+
+  .add-payment-row {
+    grid-template-columns: 1fr;
+  }
+
+  .order-details-add-row {
+    grid-template-columns: 1fr;
+  }
+
+  .order-details-add-row input {
+    width: 100%;
+  }
+}

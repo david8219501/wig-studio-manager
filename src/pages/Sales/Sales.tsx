@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
+import type { UsedBulkItem, UsedHairItem, OrderPayment } from "../../types";
+import AssignHairModal from "../../components/orders/AssignHairModal";
+import OrderDetailsPanel from "../../components/orders/OrderDetailsPanel";
+import { calculateOrderProfit } from "../../utils/orderProfit";
 import "./Sales.css";
 
 export interface Order {
@@ -11,14 +15,20 @@ export interface Order {
   status: "new" | "in_progress" | "styling" | "ready" | "delivered";
   totalPrice: number;
   paidAmount: number;
+  payments?: OrderPayment[];
   createdAt: string; // YYYY-MM-DD
   notes?: string;
+  usedBulkItems?: UsedBulkItem[];
+  usedHairItems?: UsedHairItem[];
+  hairCostEstimated?: number;
 }
 
 export default function Sales() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   // סינון לפי תאריכים
   const [timeRange, setTimeRange] = useState<"all" | "today" | "week" | "month" | "custom">("all");
@@ -90,6 +100,9 @@ export default function Sales() {
   const totalRevenue = filteredOrders.reduce((sum, ord) => sum + (ord.totalPrice || 0), 0);
   const totalPaid = filteredOrders.reduce((sum, ord) => sum + (ord.paidAmount || 0), 0);
   const openDebt = totalRevenue - totalPaid;
+  const totalProfit = filteredOrders.reduce((sum, ord) => sum + calculateOrderProfit(ord), 0);
+  const assigningOrder = orders.find((ord) => ord.id === assigningOrderId) || null;
+  const selectedOrder = orders.find((ord) => ord.id === selectedOrderId) || null;
 
   return (
     <div className="sales-page">
@@ -112,6 +125,10 @@ export default function Sales() {
         <div className="fin-card text-danger">
           <span className="fin-title">יתרת חובות פתוחים</span>
           <span className="fin-value mono">₪{openDebt.toLocaleString()}</span>
+        </div>
+        <div className="fin-card text-profit">
+          <span className="fin-title">רווח בפועל (משוער)</span>
+          <span className="fin-value mono">₪{totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
 
@@ -162,29 +179,26 @@ export default function Sales() {
           <table className="sales-table">
             <thead>
               <tr>
-                <th className="cell-id">מס' הזמנה</th>
                 <th className="cell-client">שם הלקוחה</th>
                 <th className="cell-type">סוג עבודה</th>
-                <th className="cell-date">תאריך</th>
-                <th className="cell-price">סה"כ מחיר</th>
-                <th className="cell-paid">שולם</th>
-                <th className="cell-debt">יתרה</th>
                 <th className="cell-status">סטטוס ביצוע</th>
+                <th className="cell-price">מחיר כולל</th>
+                <th className="cell-profit">רווח</th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.map((ord) => {
-                const debt = (ord.totalPrice || 0) - (ord.paidAmount || 0);
+                const profit = calculateOrderProfit(ord);
+                // "משוער" רק כשיש בכלל רכיב שיער תלוי-הערכה (hairCostEstimated > 0)
+                // ועדיין לא שויך קוקו בפועל - לא בכל הזמנה בלי usedHairItems (מוצר
+                // קמעונאי/פאת תצוגה נשלחים עם hairCostEstimated: 0, העלות שלהם מדויקת מהרגע הראשון).
+                const isEstimatedProfit =
+                  (ord.hairCostEstimated ?? 0) > 0 && (!ord.usedHairItems || ord.usedHairItems.length === 0);
                 return (
-                  <tr key={ord.id}>
-                    <td className="cell-id mono font-bold">{ord.id}</td>
+                  <tr key={ord.id} className="sales-row" onClick={() => setSelectedOrderId(ord.id)}>
                     <td className="cell-client font-bold">{ord.clientName}</td>
                     <td className="cell-type">{ord.orderType || "פאה חדשה"}</td>
-                    <td className="cell-date mono">{ord.createdAt || "—"}</td>
-                    <td className="cell-price mono font-bold">₪{(ord.totalPrice || 0).toLocaleString()}</td>
-                    <td className="cell-paid mono text-success">₪{(ord.paidAmount || 0).toLocaleString()}</td>
-                    <td className="cell-debt mono text-danger">₪{debt.toLocaleString()}</td>
-                    <td className="cell-status">
+                    <td className="cell-status" onClick={(e) => e.stopPropagation()}>
                       <select
                         className={`status-select status-${ord.status}`}
                         value={ord.status}
@@ -199,6 +213,11 @@ export default function Sales() {
                         <option value="delivered">נמסרה ✅</option>
                       </select>
                     </td>
+                    <td className="cell-price mono font-bold">₪{(ord.totalPrice || 0).toLocaleString()}</td>
+                    <td className="cell-profit mono text-profit">
+                      ₪{profit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {isEstimatedProfit && <span className="profit-estimated-badge">משוער</span>}
+                    </td>
                   </tr>
                 );
               })}
@@ -206,6 +225,19 @@ export default function Sales() {
           </table>
         )}
       </div>
+
+      <OrderDetailsPanel
+        isOpen={selectedOrderId !== null}
+        order={selectedOrder}
+        onClose={() => setSelectedOrderId(null)}
+        onOpenAssignHair={(orderId) => setAssigningOrderId(orderId)}
+      />
+
+      <AssignHairModal
+        isOpen={assigningOrderId !== null}
+        order={assigningOrder}
+        onClose={() => setAssigningOrderId(null)}
+      />
     </div>
   );
 }

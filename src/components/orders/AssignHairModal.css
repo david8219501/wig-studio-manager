@@ -1,0 +1,232 @@
+/* AssignHairModal.css */
+
+.assign-hair-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  direction: rtl;
+}
+
+.assign-hair-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow-elevated);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.assign-hair-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+}
+
+.assign-hair-header h2 {
+  font-size: 20px;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.assign-hair-subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.assign-hair-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.assign-hair-search {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.assign-hair-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.assign-hair-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.assign-hair-item.active {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.assign-hair-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.assign-hair-error {
+  font-size: 13px;
+  color: var(--color-danger, #d33);
+}
+
+.assign-hair-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+}
+
+.assign-hair-add-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.assign-hair-add-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.assign-hair-add-btn {
+  align-self: flex-start;
+}
+
+/* רכיבים גנריים - עצמאיים לקובץ הזה, כדי לא להסתמך על CSS של מודלים אחרים */
+.assign-hair-card .bulk-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assign-hair-card .bulk-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 13px;
+}
+
+.assign-hair-card .bulk-item-remove-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
+.assign-hair-card .bulk-item-remove-btn:hover {
+  color: var(--color-danger, #d33);
+}
+
+.assign-hair-card .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assign-hair-card .field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.assign-hair-card .field input {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.assign-hair-card .font-bold {
+  font-weight: 700;
+}
+
+.assign-hair-card .hair-cost-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.assign-hair-card .btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assign-hair-card .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.assign-hair-card .btn-secondary {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  cursor: pointer;
+}
