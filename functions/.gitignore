@@ -1,0 +1,15 @@
+# Compiled JS output from tsc
+lib/
+
+# Dependency directory
+node_modules/
+
+# Local env / secrets - never commit real client secrets
+.env
+.env.*
+!.env.example
+
+# Firebase emulator/debug files
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log

@@ -1,0 +1,22 @@
+הכלל הזה לא נפרס אוטומטית - יש למזג אותו ידנית בקונסולת Firebase
+(Firestore Database -> Rules), בתוך ה-`service cloud.firestore { match
+/databases/{database}/documents { ... } }` הקיים. לא נגעתי ב-rules
+הקיימים ב-production כי אין להם עותק בריפו הזה, ופריסה של קובץ rules
+מנוחש-מההתחלה הייתה מוחקת/דורסת את כל מה שכבר מוגדר לשאר ה-collections.
+
+מטרת הכלל: לוודא במפורש שאף לקוח (SPA בדפדפן) לא יכול לקרוא או לכתוב
+ל-users/{uid}/private/** - ה-refresh_token של Google Calendar נגיש רק
+ל-Admin SDK (Cloud Functions), שממילא עוקף rules לגמרי. גם בלי הכלל הזה
+ה-path כנראה כבר חסום כברירת מחדל (Firestore חוסם הכל שלא הותר במפורש) -
+אלא אם כן קיים כבר rule רחב כמו `match /users/{uid}/{document=**}` שמתיר
+גישה גורפת. הכלל הבא הוא deny מפורש, כדי שלא להסתמך על ההנחה הזו:
+
+match /users/{userId}/private/{document=**} {
+  allow read, write: if false;
+}
+
+לפני שמוסיפים - חשוב לוודא שאין כבר rule קיים תחת `/users/{userId}/...`
+שמתיר גישה רחבה יותר ויתנגש/יוסתר על ידי ה-deny הזה (או להפך - סדר
+הכללים ב-Firestore Rules לא "המנצח האחרון", כל match מוערך בנפרד; deny
+מפורש כזה תמיד גובר על any allow אחר שחל על אותו path, כי Firestore
+Rules הם deny-by-default ו-allow חייב להתקיים בכל match רלוונטי).
