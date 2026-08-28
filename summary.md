@@ -1,44 +1,50 @@
-# סיכום: תשתית סנכרון Google Calendar
+# סיכום: תשתית סנכרון Google Calendar - פרוסה ועובדת! ✅
 
-## כתובת ה-OAuth callback - פרוסה בפועל ומאומתת! ✅
+## כתובת ה-OAuth callback (להדביק ב-Google Cloud Console)
 
 ```
 https://us-central1-esti-wigs-system.cloudfunctions.net/googleCalendarOAuthCallback
 ```
 
-זו הכתובת שצריך להוסיף תחת **Authorized redirect URIs** ב-OAuth Client
-ID שלך ב-Google Cloud Console. **הפעם זה אמיתי** - אימתתי בעצמי עם
-`curl`: בלי פרמטרים מחזירה `400` עם הודעת השגיאה העברית מהקוד; עם
-code/state מזויפים מחזירה `302` redirect ל-`.../?googleCalendar=error&reason=exchange_failed`
-- בדיוק ההתנהגות שהקוד אמור לתת. זו לא רק רשומה ב-`functions:list`,
-זו התנהגות אמיתית של הפונקציה.
+**זו הכתובת הסופית והמאומתת.** תוודאי שהיא מופיעה תחת **Authorized
+redirect URIs** ב-OAuth Client ID שלך ב-Google Cloud Console (אם עוד
+לא הוספת אותה).
 
-## סטטוס: החלק החשוב ביותר עובד, שלושת טריגרי הסנכרון עדיין לא
+## סטטוס: כל 4 הפונקציות פרוסות, ACTIVE, ומאומתות
 
-- ✅ **`googleCalendarOAuthCallback` פרוסה, ציבורית, ועובדת.** תקלה
-  קטנה בדרך (גרסה ראשונה בסבב הזה יצאה `403` כי זו הייתה "עדכון" של
-  רשומה שבורה ולא "יצירה" אמיתית) - פתרתי בעצמי (מחיקה ופריסה מחדש
-  כ-CREATE אמיתי), ווידאתי שוב עם curl.
-- ⏳ **`onAppointmentCreated`/`Updated`/`Deleted` עדיין לא פרוסות.**
-  התגלתה בעיה אמיתית ושונה: מסד ה-Firestore של הפרויקט הוא multi-region
-  (`nam5`), ו-Cloud Functions מדור 1 (1st gen) לא תומכות בטריגר Firestore
-  על קונפיגורציה כזו. **תיקנתי את הקוד** - העברתי את שלוש הפונקציות האלה
-  ל-2nd gen (שכן תומך ב-nam5), בקובץ `functions/src/googleCalendarSync.ts`.
-  אבל הפריסה שלהן עדיין נכשלת - הפעם על **בעיית IAM שלישית ושונה**
-  (Eventarc Service Agent חסר הרשאה), מפורטת עם פתרון מדויק ב-`progress.md`.
-- **חשוב:** מחקתי את 3 הפונקציות הישנות (1st gen, שהיו שבורות ולא עבדו
-  בכל מקרה) כדי לפנות מקום לגרסה המתוקנת - כרגע הן **לא קיימות בפרויקט
-  בכלל**. זה בטוח (שום דבר אמיתי עוד לא תלוי בהן), אבל חשוב שתדעי.
+- ✅ `googleCalendarOAuthCallback` (1st gen) - ציבורית, מגיבה נכון
+  (בדקתי עם `curl`).
+- ✅ `onAppointmentCreated`/`onAppointmentUpdated`/`onAppointmentDeleted`
+  (2nd gen - הומרו מ-1st gen כי מסד ה-Firestore הוא `nam5` multi-region
+  שלא נתמך ב-1st gen Firestore triggers) - כולן `ACTIVE`, וה-Eventarc
+  trigger של כל אחת הושלם בהצלחה (מאומת מתגובת ה-API של הפריסה עצמה,
+  לא רק מרשימת הפונקציות).
+
+בדרך היו עוד כמה בעיות IAM/תשתית של GCP (לא קוד) שנפתרו בהדרגה - כל
+ההיסטוריה המלאה, כולל מה בדיוק תיקנת בקונסולה בכל שלב, מתועדת
+ב-`progress.md`.
+
+## מה עוד נשאר (לא בליבת 6 השלבים, אבל צריך לפני שהתכונה "חיה" באמת)
+
+1. **ליצור `.env` בשורש הריפו** (ראו `.env.example`) עם
+   `VITE_GOOGLE_CLIENT_ID=<Client ID שלך>` - בלעדיו הכפתור בהגדרות
+   מושבת.
+2. **למזג ידנית** את הכלל מ-`firestore-rules-google-calendar-addition.txt`
+   בקונסולת Firebase Rules.
+3. **לבדוק בפועל**: ללחוץ על "התחבר ל-Google Calendar" בהגדרות, לאשר
+   בגוגל, ולוודא ש-refresh_token נשמר; ואז ליצור/לעדכן/למחוק תור אמיתי
+   ולוודא שהוא מופיע/מתעדכן/נמחק ב-Google Calendar בפועל. זה החלק היחיד
+   שעדיין לא נבדק קצה-לקצה (הכל אומת עד רמת "הפונקציות פעילות ומגיבות
+   נכון", אבל לא עם Google Calendar אמיתי מקצה לקצה).
 
 ## git
 
-בוצע commit+push: קוד (מיגרציה ל-2nd gen לטריגרי הסנכרון) + תיעוד
-מעודכן (`progress.md`, `summary.md`).
+בוצע commit+push לכל השינויים (קוד + תיעוד).
 
-## ⚠️ עדיין פתוח, לא קשור למשימה הזו
+## ⚠️ שני דברים ישנים, עדיין פתוחים, לא קשורים למשימה הזו
 
-ה-working tree חזר בשלב מסוים להיות זהה ל-commit ישן יותר - השינויים
-מהשיחות הקודמות (אייקוני lucide-react, תיקון ID של hairItems, הסרת
-לוגי דיבאג) נעלמו מהקוד. גם `progress.md`/`summary.md` עצמם התרוקנו
-לבד כמה פעמים הלילה בלי שנגעתי בהם - דפוס חוזר שכדאי לחקור. פירוט
-ב-`progress.md`.
+1. ה-working tree חזר בשלב מסוים להיות זהה ל-commit ישן יותר -
+   השינויים מהשיחות הקודמות (אייקוני lucide-react, תיקון ID של
+   hairItems, הסרת לוגי דיבאג) נעלמו מהקוד. עדיין לא טופל.
+2. `progress.md`/`summary.md` התרוקנו לבד כמה פעמים הלילה בלי שנגעתי
+   בהם - דפוס חוזר, לא קרה בסבב האחרון. פירוט ב-`progress.md`.
