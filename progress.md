@@ -11,62 +11,63 @@
 3. ✅ **HTTP function ל-OAuth callback** — `functions/src/googleCalendarAuth.ts`
    (`googleCalendarOAuthCallback`), 1st gen בכוונה (כתובת https קבועה
    מראש). כלל ה-Firestore Rules המבוקש לא פורסם אוטומטית - נשאר כטקסט
-   מוצע ב-`firestore-rules-google-calendar-addition.txt` למיזוג ידני
-   (ראו הסבר בשלב 6 הישן/גרסה קודמת של הקובץ הזה, עדיין תקף).
+   מוצע ב-`firestore-rules-google-calendar-addition.txt` למיזוג ידני.
 4. ✅ **Firestore Triggers על appointments** — `functions/src/googleCalendarSync.ts`.
 5. ✅ **כפתור "התחבר ל-Google Calendar"** — בדף ההגדרות (`Settings.tsx`).
-6. ❌ **firebase deploy --only functions - נכשל, לא מבאג בקוד.**
+6. ❌ **firebase deploy --only functions - עדיין נכשל, אבל התקדם צעד -
+   בעיית IAM חדשה ושונה, לא מבאג בקוד.**
 
-## מה קרה הלילה (הרצה שנייה, אחרי ש-login ו-secrets הוגדרו)
+## היסטוריית הניסיונות (3 ניסיונות עד כה)
 
-- ✅ `firebase login` עובד (`esti-wigs-system` מסומן current ב-`firebase projects:list`).
-- ✅ שני ה-Secrets **נקבעו בהצלחה** (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) -
-  וידאתי עם `firebase functions:secrets:access` ששניהם קיימים עם ערך.
-- ❌ **`firebase deploy --only functions` נכשל** על כל 4 הפונקציות (אף
-  אחת לא נוצרה בפועל - `firebase functions:list` מחזיר "No functions
-  found"). השגיאה המדויקת מ-Google Cloud (מתוך `--debug`):
+**ניסיון 1** (לפני login/secrets) - נכשל: login לא בוצע, secrets לא
+קיימים.
 
-  ```
-  Failed to create 1st Gen function .../googleCalendarOAuthCallback:
-  Default service account '395404001906-compute@developer.gserviceaccount.com'
-  doesn't exist. Please recreate this account or specify a different account.
-  ```
+**ניסיון 2** (אחרי login+secrets) - נכשל על:
+```
+Failed to create 1st Gen function .../googleCalendarOAuthCallback:
+Default service account '395404001906-compute@developer.gserviceaccount.com'
+doesn't exist.
+```
+תוקן ע"י המשתמשת: אימתה שהחשבון הזה כן קיים ומסומן Enabled בקונסולה.
 
-  **זו לא בעיה בקוד שכתבתי, וגם לא קשורה לסודות/login** - זו בעיית
-  תשתית ברמת הפרויקט ב-Google Cloud: חשבון השירות המובנה של Compute
-  Engine (`<PROJECT_NUMBER>-compute@developer.gserviceaccount.com`),
-  שפריסת Cloud Functions מ-Gen 1 מסתמכת עליו כברירת מחדל, לא קיים
-  בפרויקט `esti-wigs-system` (נמחק בעבר, או שמדיניות ארגונית מנעה
-  ממנו להיווצר מלכתחילה). זה משהו שרק אפשר לתקן דרך Google Cloud
-  Console/IAM - לא דרך שינוי קוד, ולא ניסיתי לעקוף את זה (למשל דרך
-  קריאות API ישירות עם טוקן שחילצתי מ-firebase-tools) כי זה נוגע
-  להרשאות IAM ברמת הפרויקט כולו, מעבר להיקף שהוסמכתי לבצע בעצמי.
+**ניסיון 3** (אחרי אישור שהחשבון קיים) - **התקדם צעד אמיתי** (יצירת
+הפונקציה עצמה כבר לא נכשלת על "אין service account"), **אבל נכשל בשלב
+הבא - ה-Build עצמו**, על כל 4 הפונקציות, עם שגיאה חדשה:
 
-## מה נדרש ממך כדי להמשיך
+```
+Build failed: Access to bucket gcf-sources-395404001906-us-central1
+denied. You must grant Storage Object Viewer permission to
+395404001906-compute@developer.gserviceaccount.com.
+```
 
-**אפשרות א' (הכי מהירה, לנסות קודם):** בקונסולת Google Cloud (הפרויקט
-`esti-wigs-system`) → IAM & Admin → Service Accounts:
-- לחפש `395404001906-compute@developer.gserviceaccount.com`.
-- אם הוא מופיע אבל **מושבת** - ללחוץ Enable.
-- אם הוא **לא מופיע בכלל** (נמחק) - לסמן "Show deleted service accounts"
-  (אם קיים בממשק) ולנסות Restore. אפשר גם דרך `gcloud`, אם יש לך אותו
-  מוגדר עם הרשאות מתאימות על הפרויקט:
-  ```
-  gcloud iam service-accounts undelete 395404001906-compute@developer.gserviceaccount.com --project=esti-wigs-system
-  ```
-  (ייתכן שתידרש שם/מזהה מדויק יותר מהקונסולה אם הפקודה לא מזהה לפי המייל).
+**חשוב להבין:** `firebase functions:list` בפועל **מציג את כל 4 הפונקציות
+כאילו הן קיימות** - אבל זה מטעה. בדקתי בפועל עם `curl` על כתובת ה-callback
+וקיבלתי `404` - כלומר שום דבר לא באמת רץ/מוגש. ל-Cloud Functions יש נטייה
+ליצור "רשומת משאב" גם כשה-build נכשל, אז ההופעה ב-`functions:list` לא
+מוכיחה שהפונקציה עובדת.
 
-**אפשרות ב' (אם א' לא אפשרי - למשל אם מדיניות ארגונית חוסמת default
-service accounts לגמרי):** ליצור service account ייעודי חדש ל-functions
-האלה (IAM & Admin → Service Accounts → Create Service Account), להעניק
-לו את התפקידים `Cloud Datastore User` (גישת Firestore ל-Admin SDK)
-ו-`Secret Manager Secret Accessor` על שני ה-secrets, ולתת לי את כתובת
-המייל שלו - אעדכן את `runWith({...})` בכל אחת מ-4 הפונקציות כך שישתמשו
-בו במפורש (`serviceAccount: "..."`) במקום בברירת המחדל השבורה, ואז ננסה
-לפרוס שוב.
+**האבחנה:** זה בדיוק התסמין הצפוי כשמשחזרים/מפעילים מחדש service account
+שנמחק בעבר - שחזור/הפעלה של החשבון עצמו לא משחזר אוטומטית את כל הרשאות
+ה-IAM שהיו לו במקור (כמו גישה ל-buckets שנוצרו אוטומטית עבור builds). זו
+עדיין **לא** בעיה בקוד.
 
-אחרי שאחת מהאפשרויות מיושמת - פשוט בקשי ממני "תריץ deploy שוב" ואמשיך
-משם (כולל עדכון הכתובת בפועל ב-`summary.md` ו-git commit/push).
+## מה נדרש ממך כדי להמשיך (הפעם)
+
+**הפתרון הכי פשוט וחסין** (עדיף על תיקון per-bucket אחד-אחד, כי סביר
+שיצוצו עוד בעיות IAM דומות בהמשך לאותה סיבה): בקונסולת Google Cloud
+(פרויקט `esti-wigs-system`) → **IAM & Admin → IAM** (לא "Service
+Accounts" - דף אחר) → למצוא את `395404001906-compute@developer.gserviceaccount.com`
+ברשימת ה-principals → Edit (עיפרון) → Add another role → לבחור **Editor**
+→ Save. זה בדיוק התפקיד שגוגל נהגה להעניק אוטומטית ל-default compute
+service account בפרויקטים חדשים - ומכסה גם את ה-bucket הספציפי הזה וגם
+כל הרשאה דומה אחרת (Artifact Registry וכו') שעלולה לצוץ באותה סיבה.
+
+אם מדיניות ארגונית לא מאפשרת Editor רחב כל כך, אפשר גם במדויק, באותו
+דף IAM: להוסיף שני roles ל-service account הזה: **Storage Object Viewer**
+ו-**Artifact Registry Reader** (עלול להידרש בהמשך הבנייה, כי
+ה-functions מוגדרות עם `dockerRegistry: ARTIFACT_REGISTRY`).
+
+אחרי שהתפקיד נוסף - בקשי ממני "תריץ deploy שוב".
 
 ## ⚠️ ממצא מהריצה הקודמת, עדיין לא טופל - חשוב
 
