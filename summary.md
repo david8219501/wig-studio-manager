@@ -1,50 +1,47 @@
-# סיכום: תשתית סנכרון Google Calendar - פרוסה ועובדת! ✅
+# סיכום: תשתית סנכרון Google Calendar + סנכרון היסטורי אוטומטי
 
-## כתובת ה-OAuth callback (להדביק ב-Google Cloud Console)
+## כתובת ה-OAuth callback
 
 ```
 https://us-central1-esti-wigs-system.cloudfunctions.net/googleCalendarOAuthCallback
 ```
 
-**זו הכתובת הסופית והמאומתת.** תוודאי שהיא מופיעה תחת **Authorized
-redirect URIs** ב-OAuth Client ID שלך ב-Google Cloud Console (אם עוד
-לא הוספת אותה).
+(ללא שינוי - עדיין הכתובת הנכונה, כבר מוגדרת אצלך ב-Google Cloud Console.)
 
-## סטטוס: כל 4 הפונקציות פרוסות, ACTIVE, ומאומתות
+## מה חדש: syncExistingAppointments
 
-- ✅ `googleCalendarOAuthCallback` (1st gen) - ציבורית, מגיבה נכון
-  (בדקתי עם `curl`).
-- ✅ `onAppointmentCreated`/`onAppointmentUpdated`/`onAppointmentDeleted`
-  (2nd gen - הומרו מ-1st gen כי מסד ה-Firestore הוא `nam5` multi-region
-  שלא נתמך ב-1st gen Firestore triggers) - כולן `ACTIVE`, וה-Eventarc
-  trigger של כל אחת הושלם בהצלחה (מאומת מתגובת ה-API של הפריסה עצמה,
-  לא רק מרשימת הפונקציות).
+נוספה ופרוסה פונקציה חמישית - `syncExistingAppointments` (callable,
+2nd gen). מיד אחרי חיבור ראשוני מוצלח ל-Google Calendar, הממשק
+(`Settings.tsx`) קורא לה אוטומטית - **בלי כפתור נפרד** - והיא מעבירה
+את כל הפגישות הקיימות (בלי `googleCalendarEventId`) ליומן, ומדווחת
+"הועברו N פגישות" (או "אין פגישות ישנות להעביר").
 
-בדרך היו עוד כמה בעיות IAM/תשתית של GCP (לא קוד) שנפתרו בהדרגה - כל
-ההיסטוריה המלאה, כולל מה בדיוק תיקנת בקונסולה בכל שלב, מתועדת
-ב-`progress.md`.
+- **אין נוסחה כפולה**: היא משתמשת באותה פונקציית עזר בדיוק
+  (`createCalendarEventForAppointment`, ב-`googleCalendarSync.ts`)
+  שהטריגר `onAppointmentCreated` כבר משתמש בה - חילצתי אותה החוצה
+  כפונקציה משותפת מיוצאת בשביל זה.
+- **בטוחה מהרצה כפולה**: מסננת רק פגישות בלי `googleCalendarEventId` -
+  חיבור חוזר בטעות לא יוצר כפילות ביומן.
+- **פרוסה ומאומתת**: `firebase deploy --only functions:syncExistingAppointments`
+  הצליח (`ACTIVE`, 0 שגיאות). אימתתי עם `curl` (קריאה לא-מאומתת) -
+  קיבלתי בחזרה בדיוק את הודעת השגיאה העברית מהקוד שלי
+  ("יש להתחבר למערכת כדי לסנכרן פגישות") - הוכחה שהיא באמת רצה, לא
+  רק קיימת.
+- `npm run build` (שורש + functions/) עובר נקי.
 
-## מה עוד נשאר (לא בליבת 6 השלבים, אבל צריך לפני שהתכונה "חיה" באמת)
+## מה עדיין לא נבדק
 
-1. **ליצור `.env` בשורש הריפו** (ראו `.env.example`) עם
-   `VITE_GOOGLE_CLIENT_ID=<Client ID שלך>` - בלעדיו הכפתור בהגדרות
-   מושבת.
-2. **למזג ידנית** את הכלל מ-`firestore-rules-google-calendar-addition.txt`
-   בקונסולת Firebase Rules.
-3. **לבדוק בפועל**: ללחוץ על "התחבר ל-Google Calendar" בהגדרות, לאשר
-   בגוגל, ולוודא ש-refresh_token נשמר; ואז ליצור/לעדכן/למחוק תור אמיתי
-   ולוודא שהוא מופיע/מתעדכן/נמחק ב-Google Calendar בפועל. זה החלק היחיד
-   שעדיין לא נבדק קצה-לקצה (הכל אומת עד רמת "הפונקציות פעילות ומגיבות
-   נכון", אבל לא עם Google Calendar אמיתי מקצה לקצה).
+בדיקת קצה-לקצה אמיתית מול Google עוד לא בוצעה: לחיצה על הכפתור →
+אישור בגוגל → סנכרון אוטומטי → אימות בפועל שהפגישות הופיעו ב-Google
+Calendar. פירוט מלא ב-`progress.md`.
 
 ## git
 
-בוצע commit+push לכל השינויים (קוד + תיעוד).
+בוצע commit+push: קוד (הפונקציה החדשה + הרפקטור של googleCalendarSync.ts
++ עדכון Settings.tsx/firebase.ts) + תיעוד.
 
-## ⚠️ שני דברים ישנים, עדיין פתוחים, לא קשורים למשימה הזו
+## ⚠️ עדיין פתוח, לא קשור למשימה הזו
 
-1. ה-working tree חזר בשלב מסוים להיות זהה ל-commit ישן יותר -
-   השינויים מהשיחות הקודמות (אייקוני lucide-react, תיקון ID של
-   hairItems, הסרת לוגי דיבאג) נעלמו מהקוד. עדיין לא טופל.
-2. `progress.md`/`summary.md` התרוקנו לבד כמה פעמים הלילה בלי שנגעתי
-   בהם - דפוס חוזר, לא קרה בסבב האחרון. פירוט ב-`progress.md`.
+ה-working tree חזר בשלב מסוים להיות זהה ל-commit ישן יותר - שינויים
+מהשיחות הקודמות (אייקוני lucide-react, תיקון ID של hairItems, הסרת
+לוגי דיבאג) נעלמו מהקוד. עדיין לא טופל - פירוט ב-`progress.md`.

@@ -28,6 +28,11 @@
   color: var(--color-danger);
 }
 
+.google-calendar-status--info {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
 .btn-google-calendar {
   background: var(--color-accent);
   color: var(--color-on-primary);

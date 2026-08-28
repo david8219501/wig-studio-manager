@@ -12,3 +12,4 @@ export {
   onAppointmentUpdated,
   onAppointmentDeleted,
 } from "./googleCalendarSync";
+export { syncExistingAppointments } from "./syncExistingAppointments";

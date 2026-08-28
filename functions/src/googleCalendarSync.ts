@@ -16,10 +16,10 @@
 // endpoint שנקרא מבחוץ - אז אין סיבה להישאר ב-1st gen כאן.
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { calendar_v3 } from "googleapis";
-import { getCalendarClientForBusiness } from "./googleClient";
+import { getCalendarClientForBusiness, type BusinessCalendarClient } from "./googleClient";
 import { APPOINTMENTS_TIMEZONE } from "./config";
 
-interface AppointmentDoc {
+export interface AppointmentDoc {
   businessId?: string;
   clientName?: string;
   type?: string;
@@ -75,6 +75,29 @@ function isGoneError(err: unknown): boolean {
   return code === 404 || code === 410;
 }
 
+// פונקציית העזר המשותפת ליצירת אירוע ב-Google Calendar עבור פגישה -
+// משמשת גם את הטריגר onAppointmentCreated למטה, גם את הנתיב החוזר
+// ב-onAppointmentUpdated (כשאין עדיין googleCalendarEventId), וגם
+// syncExistingAppointments.ts (סנכרון היסטורי חד-פעמי אחרי חיבור
+// ראשוני) - כדי שלא תהיה נוסחה כפולה בשלושה מקומות.
+export async function createCalendarEventForAppointment(
+  client: BusinessCalendarClient,
+  docRef: FirebaseFirestore.DocumentReference,
+  apt: AppointmentDoc
+): Promise<boolean> {
+  const eventBody = buildEventBody(apt);
+  if (!eventBody) return false;
+
+  const { data } = await client.calendar.events.insert({
+    calendarId: "primary",
+    requestBody: eventBody,
+  });
+  if (!data.id) return false;
+
+  await docRef.update({ googleCalendarEventId: data.id });
+  return true;
+}
+
 export const onAppointmentCreated = onDocumentCreated(
   { document: DOCUMENT_PATH, region: REGION, secrets: SECRETS },
   async (event) => {
@@ -86,17 +109,8 @@ export const onAppointmentCreated = onDocumentCreated(
     const client = await getCalendarClientForBusiness(apt.businessId);
     if (!client) return; // העסק לא חיבר Google Calendar
 
-    const eventBody = buildEventBody(apt);
-    if (!eventBody) return;
-
     try {
-      const { data } = await client.calendar.events.insert({
-        calendarId: "primary",
-        requestBody: eventBody,
-      });
-      if (data.id) {
-        await snap.ref.update({ googleCalendarEventId: data.id });
-      }
+      await createCalendarEventForAppointment(client, snap.ref, apt);
     } catch (err) {
       console.error(
         `שגיאה ביצירת אירוע ב-Google Calendar עבור appointment ${event.params.appointmentId}:`,
@@ -144,13 +158,7 @@ export const onAppointmentUpdated = onDocumentUpdated(
 
       // אין עדיין googleCalendarEventId (או שהאירוע הישן נעלם אצל גוגל) -
       // זה קורה גם לתורים שנוצרו לפני שהעסק חיבר את Google Calendar.
-      const { data } = await client.calendar.events.insert({
-        calendarId: "primary",
-        requestBody: eventBody,
-      });
-      if (data.id) {
-        await change.after.ref.update({ googleCalendarEventId: data.id });
-      }
+      await createCalendarEventForAppointment(client, change.after.ref, after);
     } catch (err) {
       console.error(
         `שגיאה בעדכון אירוע ב-Google Calendar עבור appointment ${event.params.appointmentId}:`,

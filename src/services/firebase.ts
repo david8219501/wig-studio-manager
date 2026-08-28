@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDsrTF5A49g1w6JR8pJjtlu0a49Gn2xMJY",
@@ -18,3 +19,6 @@ const app = !getApps().length
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+// us-central1 - חייב להתאים לאזור שבו נפרסות ה-Cloud Functions (ראו
+// functions/src/config.ts, REGION).
+export const functions = getFunctions(app, "us-central1");

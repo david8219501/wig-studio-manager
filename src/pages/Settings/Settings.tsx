@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { auth } from "../../services/firebase";
+import { httpsCallable } from "firebase/functions";
+import { auth, functions } from "../../services/firebase";
 import "./Settings.css";
 
 // חייבים להיות זהים בדיוק לערכים ב-functions/src/config.ts (project קבוע,
@@ -13,13 +14,18 @@ const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
 type ConnectionStatus = "unknown" | "connected" | "error";
+type SyncStatus = "idle" | "syncing" | "done" | "error";
 
 export default function Settings() {
   const [status, setStatus] = useState<ConnectionStatus>("unknown");
   const [errorReason, setErrorReason] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncedCount, setSyncedCount] = useState<number | null>(null);
 
   // אחרי חזרה מ-Google (ה-callback מפנה בחזרה עם ?googleCalendar=...) -
   // מציגים הודעת הצלחה/כישלון ומנקים את זה מה-URL כדי שרענון לא יציג שוב.
+  // בחיבור מוצלח - מפעילים מיד (בלי כפתור נפרד) סנכרון חד-פעמי של כל
+  // הפגישות הקיימות שנוצרו לפני החיבור (syncExistingAppointments).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const result = params.get("googleCalendar");
@@ -27,6 +33,20 @@ export default function Settings() {
 
     if (result === "connected") {
       setStatus("connected");
+      setSyncStatus("syncing");
+      const syncExistingAppointments = httpsCallable<void, { syncedCount: number }>(
+        functions,
+        "syncExistingAppointments"
+      );
+      syncExistingAppointments()
+        .then((res) => {
+          setSyncedCount(res.data.syncedCount);
+          setSyncStatus("done");
+        })
+        .catch((err) => {
+          console.error("שגיאה בסנכרון פגישות קיימות ל-Google Calendar:", err);
+          setSyncStatus("error");
+        });
     } else if (result === "error") {
       setStatus("error");
       setErrorReason(params.get("reason"));
@@ -77,6 +97,23 @@ export default function Settings() {
         {status === "connected" && (
           <div className="google-calendar-status google-calendar-status--success">
             החיבור ל-Google Calendar הצליח! תורים חדשים יסונכרנו אוטומטית מעכשיו.
+          </div>
+        )}
+        {syncStatus === "syncing" && (
+          <div className="google-calendar-status google-calendar-status--info">
+            מסנכרן פגישות קיימות...
+          </div>
+        )}
+        {syncStatus === "done" && (
+          <div className="google-calendar-status google-calendar-status--success">
+            {syncedCount && syncedCount > 0
+              ? `הועברו ${syncedCount} פגישות ליומן.`
+              : "אין פגישות ישנות להעביר."}
+          </div>
+        )}
+        {syncStatus === "error" && (
+          <div className="google-calendar-status google-calendar-status--error">
+            הסנכרון של הפגישות הקיימות נכשל. תורים חדשים עדיין יסונכרנו אוטומטית - אפשר לפנות לתמיכה לגבי הפגישות הישנות.
           </div>
         )}
         {status === "error" && (
