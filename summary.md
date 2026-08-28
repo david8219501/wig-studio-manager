@@ -8,35 +8,32 @@ https://us-central1-esti-wigs-system.cloudfunctions.net/googleCalendarOAuthCallb
 
 זו הכתובת המדויקת שצריך להוסיף תחת **Authorized redirect URIs** ב-OAuth
 Client ID שלך ב-Google Cloud Console. הכתובת הזו קבועה ונגזרת מ-project
-(`esti-wigs-system`) + region (`us-central1`) + שם הפונקציה - היא נכונה
-גם לפני שהפונקציה בפועל נפרסת (ולא נפרסה עדיין - ראו למטה).
+(`esti-wigs-system`) + region (`us-central1`) + שם הפונקציה - נכונה
+גם עכשיו, אף שהפריסה בפועל עוד לא הצליחה (ראו למטה) - היא לא תשתנה
+כשהיא כן תצליח.
 
-## סטטוס: 4 מתוך 6 שלבים הושלמו, 2 חסומים
+## סטטוס: login + secrets הוגדרו בהצלחה, אבל הפריסה עצמה נכשלה - לא בגלל הקוד
 
-הכל תועד בפירוט ב-`progress.md` (כולל סיבות מדויקות והחלטות שקיבלתי
-לבד). בקצרה:
-
-- ✅ תשתית functions (TypeScript), חבילות, קוד ה-OAuth callback, טריגרי
-  ה-Firestore על appointments, וכפתור "התחבר ל-Google Calendar" בדף
-  ההגדרות - **כולם כתובים, בנויים (`tsc` עובר נקי), ומוכנים**.
-- ❌ **הפריסה בפועל (`firebase deploy --only functions`) חסומה** - משתי
-  סיבות: (1) `firebase login` לא פעיל בסביבה הזו כרגע, (2) ה-Client
-  ID/Secret של Google לא התקבלו בפועל (ההודעה המקורית הכילה placeholder
-  מילולי `[תדביק כאן]` ולא ערכים אמיתיים) - לא ניחשתי/זייפתי ערכים.
-
-כל הפעולות הידניות שנשארות לך (login, יצירת secrets, `.env`, מיזוג כלל
-Firestore Rules, והרצת הפריסה עצמה) מפורטות בסדר מומלץ ב-`progress.md`.
+- ✅ `firebase login` עובד.
+- ✅ `GOOGLE_CLIENT_ID` ו-`GOOGLE_CLIENT_SECRET` נקבעו בהצלחה כ-Secrets.
+- ❌ `firebase deploy --only functions` **נכשל על כל 4 הפונקציות** -
+  שום פונקציה לא נוצרה בפועל. הסיבה **אינה** קשורה לקוד/לסודות/ל-login:
+  Google Cloud מחזירה שגיאה כי חשבון השירות המובנה של Compute Engine
+  (`395404001906-compute@developer.gserviceaccount.com`), שפריסת Cloud
+  Functions Gen 1 דורשת כברירת מחדל, **לא קיים** בפרויקט `esti-wigs-system`.
+  זו בעיית IAM/תשתית ברמת הפרויקט ב-Google Cloud Console - לא משהו
+  שניתן לתקן בקוד. פירוט מלא + שתי אפשרויות לפתרון (שחזור החשבון החסר,
+  או service account ייעודי חדש) ב-`progress.md`.
 
 ## git
 
-בוצע commit+push לכל מה שנבנה הלילה (קוד תקין, `tsc` עובר נקי, אין
-בו שום סוד אמיתי - `.env`/`functions/.env` נשארים מקומיים ומוחרגים
-ב-`.gitignore`). זה לא כולל פריסה בפועל (`firebase deploy`), רק את
-הקוד המוכן לפריסה.
+בוצע commit+push לתיעוד המעודכן (`progress.md`, `summary.md`). הקוד
+עצמו (מהריצה הקודמת) כבר ב-git; לא היה שינוי קוד הלילה - רק ניסיון
+פריסה שנכשל, ותיעוד המצב.
 
-## ⚠️ משהו שגיליתי בדרך, לא קשור למשימה הזו
+## ⚠️ עדיין פתוח מהריצה הקודמת, לא קשור למשימה הזו
 
-ה-working tree חזר להיות זהה ל-commit האחרון בתחילת ההרצה - כל מה
-שתוקן בשיחות הקודמות (מעבר לאייקוני lucide-react, תיקון התנגשות ה-ID
-של hairItems בין עסקים, הסרת לוגי הדיבאג) נעלם מהקוד בפועל. לא נגעתי
-בזה - פירוט מלא ב-`progress.md` תחת "ממצא נוסף".
+ה-working tree חזר בשלב מסוים להיות זהה ל-commit ישן יותר - השינויים
+מהשיחות הקודמות (מעבר לאייקוני lucide-react, תיקון התנגשות ה-ID של
+hairItems, הסרת לוגי דיבאג) נעלמו מהקוד. עדיין לא טופל - פירוט
+ב-`progress.md`.
