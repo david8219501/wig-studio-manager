@@ -3,7 +3,18 @@
 // ליומן Google Calendar של העסק הרלוונטי, אם ואך ורק אם העסק חיבר את
 // היומן שלו (יש לו refresh_token שמור - ראו googleClient.ts). עסק שלא
 // חיבר יומן פשוט לא מסונכרן בשקט, זו לא שגיאה.
-import * as functionsV1 from "firebase-functions/v1";
+//
+// 2nd gen (firebase-functions/v2/firestore) בכוונה, בניגוד ל-OAuth
+// callback שנשאר 1st gen: מסד ה-Firestore של הפרויקט הזה הוא נam5
+// (multi-region ארה"ב), וניסיון ראשון לפרוס טריגרים 1st gen נכשל בפועל
+// בפריסה עם השגיאה "Resource .../appointments/{appointmentId} is in
+// region nam5-us-central1 which is not supported" - מגבלה ידועה של
+// Firestore triggers מ-1st gen מול Firestore multi-region. טריגרים
+// 2nd gen (דרך Eventarc) כן תומכים בשילוב הזה כשהפונקציה נפרסת ב-
+// us-central1 (חלק מה-nam5 bundle). אין כאן צורך בכתובת https קבועה
+// (בניגוד ל-OAuth callback) כי אלה טריגרים על אירועי Firestore, לא
+// endpoint שנקרא מבחוץ - אז אין סיבה להישאר ב-1st gen כאן.
+import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { calendar_v3 } from "googleapis";
 import { getCalendarClientForBusiness } from "./googleClient";
 import { APPOINTMENTS_TIMEZONE } from "./config";
@@ -20,6 +31,8 @@ interface AppointmentDoc {
 }
 
 const SECRETS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
+const REGION = "us-central1";
+const DOCUMENT_PATH = "appointments/{appointmentId}";
 
 // שם המזהה של האירוע ב-Google Calendar נשמר בחזרה על מסמך התור עצמו
 // (googleCalendarEventId), כדי שעדכון/מחיקה עתידיים ידעו על איזה אירוע
@@ -62,10 +75,11 @@ function isGoneError(err: unknown): boolean {
   return code === 404 || code === 410;
 }
 
-export const onAppointmentCreated = functionsV1
-  .runWith({ secrets: SECRETS })
-  .firestore.document("appointments/{appointmentId}")
-  .onCreate(async (snap, context) => {
+export const onAppointmentCreated = onDocumentCreated(
+  { document: DOCUMENT_PATH, region: REGION, secrets: SECRETS },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
     const apt = snap.data() as AppointmentDoc;
     if (!apt.businessId) return;
 
@@ -85,16 +99,18 @@ export const onAppointmentCreated = functionsV1
       }
     } catch (err) {
       console.error(
-        `שגיאה ביצירת אירוע ב-Google Calendar עבור appointment ${context.params.appointmentId}:`,
+        `שגיאה ביצירת אירוע ב-Google Calendar עבור appointment ${event.params.appointmentId}:`,
         err
       );
     }
-  });
+  }
+);
 
-export const onAppointmentUpdated = functionsV1
-  .runWith({ secrets: SECRETS })
-  .firestore.document("appointments/{appointmentId}")
-  .onUpdate(async (change, context) => {
+export const onAppointmentUpdated = onDocumentUpdated(
+  { document: DOCUMENT_PATH, region: REGION, secrets: SECRETS },
+  async (event) => {
+    const change = event.data;
+    if (!change) return;
     const before = change.before.data() as AppointmentDoc;
     const after = change.after.data() as AppointmentDoc;
     if (!after.businessId) return;
@@ -137,16 +153,18 @@ export const onAppointmentUpdated = functionsV1
       }
     } catch (err) {
       console.error(
-        `שגיאה בעדכון אירוע ב-Google Calendar עבור appointment ${context.params.appointmentId}:`,
+        `שגיאה בעדכון אירוע ב-Google Calendar עבור appointment ${event.params.appointmentId}:`,
         err
       );
     }
-  });
+  }
+);
 
-export const onAppointmentDeleted = functionsV1
-  .runWith({ secrets: SECRETS })
-  .firestore.document("appointments/{appointmentId}")
-  .onDelete(async (snap, context) => {
+export const onAppointmentDeleted = onDocumentDeleted(
+  { document: DOCUMENT_PATH, region: REGION, secrets: SECRETS },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
     const apt = snap.data() as AppointmentDoc;
     if (!apt.businessId || !apt.googleCalendarEventId) return;
 
@@ -161,8 +179,9 @@ export const onAppointmentDeleted = functionsV1
     } catch (err) {
       if (isGoneError(err)) return; // כבר לא קיים אצל גוגל - אין מה לעשות
       console.error(
-        `שגיאה במחיקת אירוע מ-Google Calendar עבור appointment ${context.params.appointmentId}:`,
+        `שגיאה במחיקת אירוע מ-Google Calendar עבור appointment ${event.params.appointmentId}:`,
         err
       );
     }
-  });
+  }
+);
