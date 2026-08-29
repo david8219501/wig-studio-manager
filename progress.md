@@ -51,21 +51,50 @@ https://5173-firebase-estiwigsportal-1781016477573.cluster-2nmnojxdmnfh2vwda4kd7
 בוצע והצליח (`0 Functions Errored`). אימתתי עם `curl` - ה-redirect
 כרגע מצביע נכון על כתובת ה-workspace.
 
-## מה עדיין לא נבדק (הצעד הבא)
+## 🔴→✅ תוקן: syncedCount היה 0 כי Google Calendar API עצמו לא היה מופעל בפרויקט
 
-**ה-5 פגישות הקיימות עדיין לא סונכרנו** (אין להן `googleCalendarEventId`).
-כדי לתקן את זה בלי לעבור שוב על כל זרימת ה-OAuth (ה-refreshToken כבר
-קיים) - שתי אפשרויות:
-1. להיכנס לאפליקציה (בכתובת ה-workspace למעלה) ולהוסיף ידנית
-   `?googleCalendar=connected` ל-URL, לרענן - זה יפעיל את אותו קוד
-   קליינט שהיה אמור לרוץ בסוף ההתחברות, ויקרא ל-`syncExistingAppointments`.
-2. או לעבור שוב על זרימת ההתחברות המלאה עכשיו שה-redirect תוקן.
+המשתמשת ניסתה את הטריק (`?googleCalendar=connected`) - הפונקציה **כן
+רצה הפעם** (בניגוד לפעם הקודמת), אבל הממשק הציג "אין פגישות ישנות
+להעביר" למרות שיש 9 מסמכי appointments (המספר גדל מ-5 ל-9 בינתיים -
+המשתמשת הוסיפה עוד לבדיקות), אף אחד בלי `googleCalendarEventId`.
 
-אחרי זה - לבדוק בפועל ב-Google Calendar שה-5 פגישות (חיילי קלאר,
-ריקי קלאר, הילה הדס) אכן מופיעות. וגם: ליצור/לעדכן/למחוק תור **חדש**
-ולוודא שהטריגרים (`onAppointmentCreated/Updated/Deleted`) עובדים
-בפועל מול Google Calendar אמיתי - זה עוד לא נבדק כלל, רק "הפונקציות
-פעילות בלי שגיאה".
+בדקתי ישירות: (1) שאילתת Firestore אישרה 9 מסמכים, כולם בלי השדה -
+לא "בעיה בשאילתה" כמו שנחשד, הפילטור עצמו תקין. (2) `firebase
+functions:log --only syncExistingAppointments` הראה **קריאות אמיתיות
+ל-Calendar API** (`POST .../calendar/v3/calendars/primary/events` עם
+תוכן אמיתי כמו "תיקון רשת - ריקי קלאר") - כלומר הפונקציה רצה, מצאה את
+כל 9 הפגישות הממתינות, וניסתה ליצור אירוע לכל אחת - **אבל כל ניסיון
+נכשל** עם:
+
+```
+GaxiosError: Google Calendar API has not been used in project
+395404001906 before or it is disabled.
+```
+
+**הסיבה**: Google Calendar API עצמו (בניגוד ל-OAuth שכבר עובד) מעולם
+לא הופעל בפרויקט - נדרשת הפעלה מפורשת בנפרד מ-OAuth credentials.
+הקוד ב-`syncExistingAppointments` בולע שגיאות per-appointment בשקט
+(try/catch לכל פגישה בנפרד, לא מדווח למשתמשת) - זו הסיבה שהתקבל "0
+הועברו" בלי שום הודעת שגיאה, במקום שגיאה ברורה.
+
+**התיקון**: הפעלתי את ה-API ישירות (`serviceusage.googleapis.com`
+`:enable` על `calendar-json.googleapis.com`, עם ה-access token של
+ה-CLI המחובר - אותו מנגנון בדיוק ש-`firebase deploy` כבר משתמש בו
+אוטומטית להפעלת APIs אחרים). אימתתי: `state: "ENABLED"`.
+
+### מה עדיין לא נבדק (הצעד הבא)
+
+**עוד לא בדקתי אם ה-9 פגישות סונכרנו בפועל אחרי הפעלת ה-API** - יש
+לנסות שוב את `?googleCalendar=connected` (או ללחוץ שוב בהגדרות אם
+יש שם כפתור/דרך לרוץ שוב), ואז לבדוק ב-Firestore/בלוגים. ייתכן
+שנדרשות דקות ספורות עד שהפעלת ה-API מופצת (ראינו את זה כמה פעמים
+הלילה עם IAM - סביר שדומה גם כאן ל-API enablement).
+
+לאחר אימות שהסנכרון ההיסטורי עבד: לבדוק גם בפועל ב-Google Calendar
+שהפגישות מופיעות, וליצור/לעדכן/למחוק תור **חדש** לוודא שהטריגרים
+(`onAppointmentCreated/Updated/Deleted`) עובדים - גם הם היו נכשלים
+עד עכשיו מאותה סיבה (Calendar API disabled), אז שווה לבדוק אותם
+מחדש גם.
 
 ## היסטוריית התקלות (לתיעוד, לא לפעולה - כולן נפתרו)
 
@@ -85,6 +114,8 @@ https://5173-firebase-estiwigsportal-1781016477573.cluster-2nmnojxdmnfh2vwda4kd7
    (App Engine default SA) - **חשבון שונה** מה-Compute default SA
    שכל התיקונים הקודמים הלכו אליו. נוסף Editor ל-SA הנכון.
 8. `syncExistingAppointments` לא רץ → `APP_BASE_URL` שגוי (סעיף למעלה) → תוקן.
+9. `syncedCount: 0` למרות פגישות ממתינות → Google Calendar API עצמו
+   לא הופעל בפרויקט → הופעל ישירות דרך Service Usage API.
 
 ## ⚠️ שני ממצאים ישנים, עדיין לא טופלו - לא קשורים למשימה הזו
 

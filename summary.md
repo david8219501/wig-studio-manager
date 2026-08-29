@@ -1,4 +1,4 @@
-# סיכום: תשתית סנכרון Google Calendar - החיבור עובד, סנכרון היסטורי בהמתנה לצעד ידני אחד
+# סיכום: תשתית סנכרון Google Calendar - החיבור עובד, Google Calendar API הופעל
 
 ## כתובת ה-OAuth callback
 
@@ -26,17 +26,29 @@ https://us-central1-esti-wigs-system.cloudfunctions.net/googleCalendarOAuthCallb
 Firebase Studio, `googleCalendarOAuthCallback` נפרס מחדש בהצלחה,
 ואומת עם `curl` שה-redirect כרגע מצביע נכון.
 
+## 🔴→✅ תוקן: syncedCount=0 כי Google Calendar API עצמו לא הופעל בפרויקט
+
+המשתמשת ניסתה את הטריק (`?googleCalendar=connected`) - הפעם הפונקציה
+**כן רצה**, אבל התוצאה עדיין הייתה "0 סונכרנו". בדקתי בלוגים: הפונקציה
+כן ניסתה ליצור אירועים אמיתיים (קריאות POST אמיתיות ל-Calendar API עם
+תוכן אמיתי), אבל **כל ניסיון נכשל** כי Google Calendar API עצמו (לא
+OAuth - זה עובד) מעולם לא הופעל בפרויקט. הקוד בלע את השגיאות האלה
+בשקט per-appointment, לכן לא הוצגה שגיאה - רק "0".
+
+**הפעלתי את ה-API ישירות** (Service Usage API, אותו מנגנון ש-`firebase
+deploy` כבר משתמש בו אוטומטית) - מאומת: `state: ENABLED`.
+
 ## הצעד הבא (ידני, לא דורש עוד קוד)
 
-ה-5 פגישות הקיימות עדיין לא סונכרנו. הכי מהיר: להיכנס לאפליקציה
-ולהוסיף `?googleCalendar=connected` ל-URL ידנית (מפעיל את הסנכרון
-בלי לעבור שוב על כל אישור גוגל, כי ה-refreshToken כבר קיים). אחרי
-זה - לבדוק בפועל ב-Google Calendar שהפגישות מופיעות, וגם לבדוק תור
-**חדש** מול הטריגרים החיים.
+לנסות שוב `?googleCalendar=connected` (ה-9 פגישות עדיין בלי
+`googleCalendarEventId`) - הפעם אמורות להצליח באמת. אחרי זה - לבדוק
+בפועל ב-Google Calendar שהפגישות מופיעות, וגם תור **חדש** מול
+הטריגרים החיים (גם הם היו נכשלים מאותה סיבה עד עכשיו).
 
 ## git
 
 בוצע commit+push: `functions/src/config.ts` (APP_BASE_URL) + תיעוד.
+(הפעלת ה-API עצמה היא הגדרת GCP, לא שינוי קוד - אין מה לתעד ב-git.)
 
 ## ⚠️ עדיין פתוח, לא קשור למשימה הזו
 
