@@ -176,6 +176,32 @@
   margin-top: 30px;
 }
 
+/* כפתור "הוסף פגישה" ברור ביום ספציפי - יושב בתוך הקובייה שמציגה את
+   רשימת הפגישות של אותו יום (בתחתית הרשימה), גם בתצוגה השבועית וגם
+   בתצוגה היומית - לא איקון זעיר בכותרת. */
+.day-add-appointment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 10px;
+  border: 1px dashed var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--easing), color var(--duration-fast) var(--easing);
+}
+
+.day-add-appointment-btn:hover {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  border-color: var(--color-accent);
+}
+
 /* Mini Appointment Card inside day column */
 .appointment-card-mini {
   background: var(--color-surface);
@@ -363,14 +389,17 @@
 }
 
 /* Modal & Side Panel */
+/* בלי backdrop-filter בכוונה: filter/backdrop-filter על אב יוצר
+   containing block חדש שגורם בחלק מהדפדפנים (בעיקר בתוך iframe של
+   תצוגה מקדימה) לתפריטי select ולבורר תאריך מובנה (showPicker) להיפתח
+   בעוגן שגוי - למשל בראש הדף במקום צמוד לשדה עצמו בתוך המודל. */
 .modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -443,7 +472,8 @@
 }
 
 .form-group input, .form-group select {
-  padding: 11px 14px;
+  height: 40px;
+  padding: 0 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   font-size: 13px;

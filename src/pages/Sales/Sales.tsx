@@ -5,6 +5,7 @@ import type { UsedBulkItem, UsedHairItem, OrderPayment } from "../../types";
 import AssignHairModal from "../../components/orders/AssignHairModal";
 import OrderDetailsPanel from "../../components/orders/OrderDetailsPanel";
 import { calculateOrderProfit } from "../../utils/orderProfit";
+import DateInput from "../../components/common/DateInput";
 import "./Sales.css";
 
 export interface Order {
@@ -145,8 +146,8 @@ export default function Sales() {
 
           {timeRange === "custom" && (
             <div className="custom-date-picker">
-              <label>מתאריך: <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-              <label>עד תאריך: <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+              <label>מתאריך: <DateInput value={startDate} onChange={setStartDate} /></label>
+              <label>עד תאריך: <DateInput value={endDate} onChange={setEndDate} /></label>
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@ import { collection, doc, getDocs, query, updateDoc, where } from "firebase/fire
 import { db, auth } from "../../services/firebase";
 import type { BulkItem, OrderPayment, UsedBulkItem } from "../../types";
 import type { Order } from "../../pages/Sales/Sales";
+import DateInput from "../common/DateInput";
 import "./OrderDetailsPanel.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -350,7 +351,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
                   <option value="transfer">🏦 העברה</option>
                   <option value="check">📜 צ'ק</option>
                 </select>
-                <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+                <DateInput value={payDate} onChange={setPayDate} />
               </div>
               <input
                 type="text"

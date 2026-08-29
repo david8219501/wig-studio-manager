@@ -1,0 +1,75 @@
+.date-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  width: 100%;
+}
+
+.date-input-text {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.date-input-text:focus {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px var(--color-accent-bg);
+}
+
+.date-input-invalid {
+  border-color: var(--color-danger);
+}
+
+.date-input-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.date-input-picker-btn:hover:not(:disabled) {
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+
+.date-input-picker-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ה-input הנסתר הזה קיים רק כדי להפעיל את בורר התאריך הגרפי המובנה
+   של הדפדפן (showPicker()) - הוא חייב לתפוס בדיוק את שטח ה-wrapper
+   (לא 1x1px, ולא inset:0 ביחד עם width/height מפורש - שני הכללים
+   האלה סותרים, ובחלק מהדפדפנים זה גורם לבורר להיפתח בעוגן שגוי,
+   למשל בראש הדף במקום צמוד לשדה) כדי שהדפדפן יעגן את הבורר במקום
+   הנכון על המסך - צמוד לשדה הגלוי, לא בפינת המסך.
+   pointer-events: none מונע ממנו לחסום לחיצות/הקלדה על שדה הטקסט
+   הגלוי שמעליו. */
+.date-input-native-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+}

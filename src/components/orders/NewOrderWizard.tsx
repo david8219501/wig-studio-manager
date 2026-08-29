@@ -4,6 +4,7 @@ import { db, auth } from "../../services/firebase";
 import type { BulkItem, HairItem, UsedBulkItem, UsedHairItem } from "../../types";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, type HairCostSettings } from "../../utils/hairCost";
 import { createOrderWithProductionExpense } from "../../utils/orderCreation";
+import DateInput from "../common/DateInput";
 import "./NewOrderWizard.css";
 
 export interface ClientOption {
@@ -592,11 +593,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 </div>
                 <div className="field">
                   <label>תאריך יעד מוכן</label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDueDate(e.target.value)}
-                  />
+                  <DateInput value={dueDate} onChange={setDueDate} />
                 </div>
               </div>
 

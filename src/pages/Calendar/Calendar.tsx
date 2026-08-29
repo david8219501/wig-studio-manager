@@ -10,7 +10,10 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+import { Plus } from "lucide-react";
 import { db, auth } from "../../services/firebase";
+import DateInput from "../../components/common/DateInput";
+import TimeInput from "../../components/common/TimeInput";
 import "./Calendar.css";
 
 // טיפוס הלקוחה תואם בדיוק למבנה האמיתי ב-collection "clients" (ראו Clients.tsx)
@@ -161,6 +164,19 @@ export default function Calendar() {
     setClientSearchText("");
     setAptType("מדידת פאה חדשה");
     setAptDate(currentDateIso);
+    setStartTime("10:00");
+    setEndTime("11:00");
+    setIsAddAptModalOpen(true);
+  };
+
+  // נפתחת מכפתור ה-"+" על תא יום ספציפי בתצוגת השבוע - אותה טופס
+  // הוספה, רק עם שדה התאריך ממולא מראש ליום שנלחץ.
+  const handleOpenAddModalForDate = (dateIso: string) => {
+    setEditingAptId(null);
+    setSelectedClientId("");
+    setClientSearchText("");
+    setAptType("מדידת פאה חדשה");
+    setAptDate(dateIso);
     setStartTime("10:00");
     setEndTime("11:00");
     setIsAddAptModalOpen(true);
@@ -387,6 +403,13 @@ export default function Calendar() {
                         </div>
                       ))
                     )}
+                    <button
+                      type="button"
+                      className="day-add-appointment-btn"
+                      onClick={() => handleOpenAddModalForDate(dayObj.dateIso)}
+                    >
+                      <Plus size={14} /> הוסף פגישה
+                    </button>
                   </div>
                 </div>
               );
@@ -438,6 +461,13 @@ export default function Calendar() {
                   </div>
                 ))
             )}
+            <button
+              type="button"
+              className="day-add-appointment-btn"
+              onClick={() => handleOpenAddModalForDate(currentDateIso)}
+            >
+              <Plus size={14} /> הוסף פגישה
+            </button>
           </div>
         )}
       </div>
@@ -509,35 +539,18 @@ export default function Calendar() {
                 </div>
                 <div className="form-group">
                   <label>תאריך הפגישה *</label>
-                  <input 
-                    type="date" 
-                    required 
-                    value={aptDate} 
-                    onChange={(e) => setAptDate(e.target.value)} 
-                  />
+                  <DateInput required value={aptDate} onChange={setAptDate} />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label>משעה *</label>
-                  <input 
-                    type="time" 
-                    required 
-                    dir="ltr"
-                    value={startTime} 
-                    onChange={(e) => setStartTime(e.target.value)} 
-                  />
+                  <TimeInput required value={startTime} onChange={setStartTime} />
                 </div>
                 <div className="form-group">
                   <label>עד שעה *</label>
-                  <input 
-                    type="time" 
-                    required 
-                    dir="ltr"
-                    value={endTime} 
-                    onChange={(e) => setEndTime(e.target.value)} 
-                  />
+                  <TimeInput required value={endTime} onChange={setEndTime} />
                 </div>
               </div>
 
