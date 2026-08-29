@@ -14,7 +14,15 @@ import { Plus } from "lucide-react";
 import { db, auth } from "../../services/firebase";
 import DateInput from "../../components/common/DateInput";
 import TimeInput from "../../components/common/TimeInput";
+import CustomSelect from "../../components/common/CustomSelect";
 import "./Calendar.css";
+
+const APPOINTMENT_TYPE_OPTIONS = [
+  { value: "מדידת פאה חדשה", label: "מדידת פאה חדשה" },
+  { value: "תיקון רשת", label: "תיקון רשת" },
+  { value: "סירוק והחלקה", label: "סירוק והחלקה" },
+  { value: "מסירת פאה מוכנה", label: "מסירת פאה מוכנה" },
+];
 
 // טיפוס הלקוחה תואם בדיוק למבנה האמיתי ב-collection "clients" (ראו Clients.tsx)
 interface Client {
@@ -529,13 +537,8 @@ export default function Calendar() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>סיבת ההגעה / מטרת הפגישה *</label>
-                  <select value={aptType} onChange={(e) => setAptType(e.target.value)}>
-                    <option value="מדידת פאה חדשה">מדידת פאה חדשה</option>
-                    <option value="תיקון רשת">תיקון רשת</option>
-                    <option value="סירוק והחלקה">סירוק והחלקה</option>
-                    <option value="מסירת פאה מוכנה">מסירת פאה מוכנה</option>
-                  </select>
+                  <label>מטרת הפגישה *</label>
+                  <CustomSelect value={aptType} onChange={setAptType} options={APPOINTMENT_TYPE_OPTIONS} />
                 </div>
                 <div className="form-group">
                   <label>תאריך הפגישה *</label>

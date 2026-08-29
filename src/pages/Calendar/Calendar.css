@@ -469,6 +469,12 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--color-primary);
+  /* min-height + יישור לתחתית - הגנה כדי ששני שדות באותה שורה תמיד
+     יתחילו מאותו קו אופקי, גם אם התווית של אחד מהם ארוכה מספיק
+     להישבר לשתי שורות בעוד השנייה נשארת בשורה אחת. */
+  display: flex;
+  align-items: flex-end;
+  min-height: 32px;
 }
 
 .form-group input, .form-group select {

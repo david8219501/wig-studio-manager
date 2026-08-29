@@ -53,23 +53,97 @@
   opacity: 0.5;
 }
 
-/* ה-input הנסתר הזה קיים רק כדי להפעיל את בורר התאריך הגרפי המובנה
-   של הדפדפן (showPicker()) - הוא חייב לתפוס בדיוק את שטח ה-wrapper
-   (לא 1x1px, ולא inset:0 ביחד עם width/height מפורש - שני הכללים
-   האלה סותרים, ובחלק מהדפדפנים זה גורם לבורר להיפתח בעוגן שגוי,
-   למשל בראש הדף במקום צמוד לשדה) כדי שהדפדפן יעגן את הבורר במקום
-   הנכון על המסך - צמוד לשדה הגלוי, לא בפינת המסך.
-   pointer-events: none מונע ממנו לחסום לחיצות/הקלדה על שדה הטקסט
-   הגלוי שמעליו. */
-.date-input-native-hidden {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  opacity: 0;
-  pointer-events: none;
+/* פאנל לוח השנה הגרפי - עצמאי לגמרי, לא input מובנה של הדפדפן.
+   מוצג דרך portal ל-document.body עם position:fixed; top/left
+   מחושבים ב-JS מ-getBoundingClientRect() של השדה בכל פתיחה (ראו
+   DateInput.tsx) - לא מסתמך על שום CSS positioning context של הורים,
+   ולכן חסין ל-transform/filter/overflow על אב כלשהו בעמוד. */
+.date-input-calendar-panel {
+  position: fixed;
+  z-index: 2000;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-elevated);
+  padding: 10px;
+  direction: rtl;
+}
+
+.date-input-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.date-input-calendar-header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
   border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.date-input-calendar-header button:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+
+.date-input-calendar-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.date-input-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.date-input-calendar-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.date-input-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-input-calendar-cell,
+.date-input-calendar-cell-empty {
+  width: 30px;
+  height: 30px;
+}
+
+.date-input-calendar-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.date-input-calendar-cell:hover {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+.date-input-calendar-cell-selected {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  font-weight: 700;
 }
