@@ -1,4 +1,4 @@
-# סיכום: תשתית סנכרון Google Calendar - החיבור עובד, Google Calendar API הופעל
+# סיכום: תשתית סנכרון Google Calendar - ✅ הכל עובד מקצה לקצה, מאומת
 
 ## כתובת ה-OAuth callback
 
@@ -6,49 +6,37 @@
 https://us-central1-esti-wigs-system.cloudfunctions.net/googleCalendarOAuthCallback
 ```
 
-(ללא שינוי - עדיין הכתובת הנכונה.)
+## ✅✅✅ נגמר! החיבור, הסנכרון ההיסטורי, והטריגר החי - כולם מאומתים מול Google Calendar אמיתי
 
-## ✅ החיבור ל-Google Calendar עובד - מאומת ישירות מול Firestore
+אחרי סאגת דיבאג ארוכה (כל הפרטים הכרונולוגיים ב-`progress.md`, סעיף
+"היסטוריית התקלות" - 9 תקלות נפרדות, כולן GCP/IAM, לא קוד):
 
-אחרי סאגת דיבאג ארוכה (כל הפרטים ב-`progress.md`, סעיף "היסטוריית
-התקלות") - **ה-refreshToken נשמר בהצלחה**. אימתתי ישירות מול Firestore
-(לא רק לוגים) - המסמך קיים, עם scope נכון וטיימסטמפ עדכני.
+- **החיבור** (`refreshToken`) נשמר בהצלחה, אומת ישירות מול Firestore.
+- **הסנכרון ההיסטורי** (`syncExistingAppointments`) הצליח במלואו - כל
+  9 הפגישות הקיימות קיבלו `googleCalendarEventId` **אמיתי** מ-Google
+  (למשל `u9g6j3s0c0sl2vprk1s3cprl18`), אומת ישירות מול Firestore.
+- **הטריגר החי** (`onAppointmentCreated`) אומת בבונוס: פגישה חדשה
+  שנוצרה בזמן הבדיקה קיבלה `googleCalendarEventId` אוטומטית תוך
+  שניות, בלי אף שגיאה בלוגים.
 
-## 🔴→✅ תוקן הלילה: APP_BASE_URL שגוי מנע את הסנכרון האוטומטי
+שתי התקלות האחרונות שנפתרו הלילה: `APP_BASE_URL` שגוי (מנע מהאפליקציה
+להיטען בסוף זרימת ההתחברות, ולכן מנע את הסנכרון האוטומטי) - תוקן
+לכתובת ה-workspace האמיתית; ו-Google Calendar API עצמו שמעולם לא הופעל
+בפרויקט (נפרד לגמרי מ-OAuth credentials) - הופעל ישירות דרך Service
+Usage API.
 
-**תיקון לדבר שאמרתי בטעות קודם**: ה"Site Not Found" בסוף ההתחברות
-**לא היה קוסמטי בלבד** - הוא מנע מהאפליקציה להיטען בכלל בסוף הזרימה,
-ולכן `syncExistingAppointments` (שאמור לרוץ אוטומטית שם) מעולם לא
-נקרא בפועל. בדקתי ואישרתי: 5 פגישות קיימות ב-Firestore לעסק הזה, לאף
-אחת אין `googleCalendarEventId` - כי הפונקציה פשוט לא רצה.
+## מה נשאר (ליטוש בלבד, לא חוסם)
 
-**התיקון**: `APP_BASE_URL` עודכן לכתובת ה-workspace האמיתית של
-Firebase Studio, `googleCalendarOAuthCallback` נפרס מחדש בהצלחה,
-ואומת עם `curl` שה-redirect כרגע מצביע נכון.
-
-## 🔴→✅ תוקן: syncedCount=0 כי Google Calendar API עצמו לא הופעל בפרויקט
-
-המשתמשת ניסתה את הטריק (`?googleCalendar=connected`) - הפעם הפונקציה
-**כן רצה**, אבל התוצאה עדיין הייתה "0 סונכרנו". בדקתי בלוגים: הפונקציה
-כן ניסתה ליצור אירועים אמיתיים (קריאות POST אמיתיות ל-Calendar API עם
-תוכן אמיתי), אבל **כל ניסיון נכשל** כי Google Calendar API עצמו (לא
-OAuth - זה עובד) מעולם לא הופעל בפרויקט. הקוד בלע את השגיאות האלה
-בשקט per-appointment, לכן לא הוצגה שגיאה - רק "0".
-
-**הפעלתי את ה-API ישירות** (Service Usage API, אותו מנגנון ש-`firebase
-deploy` כבר משתמש בו אוטומטית) - מאומת: `state: ENABLED`.
-
-## הצעד הבא (ידני, לא דורש עוד קוד)
-
-לנסות שוב `?googleCalendar=connected` (ה-9 פגישות עדיין בלי
-`googleCalendarEventId`) - הפעם אמורות להצליח באמת. אחרי זה - לבדוק
-בפועל ב-Google Calendar שהפגישות מופיעות, וגם תור **חדש** מול
-הטריגרים החיים (גם הם היו נכשלים מאותה סיבה עד עכשיו).
+- `onAppointmentUpdated`/`onAppointmentDeleted` - רק create אומת עד כה
+  בפועל מול Google; הלוגיקה זהה ונבנתה ונבדקה באותה פריסה, אבל שווה
+  אימות ישיר אם רוצים ודאות מלאה.
+- `APP_BASE_URL` מצביע כרגע על כתובת workspace זמנית - לעדכן אם/כשהאתר
+  יפרס לדומיין קבוע.
 
 ## git
 
-בוצע commit+push: `functions/src/config.ts` (APP_BASE_URL) + תיעוד.
-(הפעלת ה-API עצמה היא הגדרת GCP, לא שינוי קוד - אין מה לתעד ב-git.)
+בוצע commit+push לכל השינויים (`functions/src/config.ts`, תיעוד).
+הפעלת ה-API עצמה היא הגדרת GCP, לא שינוי קוד.
 
 ## ⚠️ עדיין פתוח, לא קשור למשימה הזו
 

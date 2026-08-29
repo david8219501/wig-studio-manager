@@ -1,16 +1,19 @@
 # התקדמות: תשתית סנכרון Google Calendar
 
-עדכון אחרון: 2026-08-29
+עדכון אחרון: 2026-08-29 - **✅ הכל עובד מקצה לקצה, מאומת מול Google Calendar אמיתי.**
 
 1. ✅ **firebase init functions (TypeScript)**.
 2. ✅ **npm install googleapis google-auth-library ב-functions/**.
 3. ✅ **HTTP function ל-OAuth callback - פרוסה, ציבורית, מאומתת עובדת עד הסוף.**
    `googleCalendarOAuthCallback`:
    `https://us-central1-esti-wigs-system.cloudfunctions.net/googleCalendarOAuthCallback`
-4. ✅ **Firestore Triggers על appointments - פרוסים ומאומתים** (עוד לא
-   נבדקו מול תור אמיתי חדש - ראו "מה עדיין לא נבדק" למטה).
+4. ✅ **Firestore Triggers על appointments - פרוסים ומאומתים, `onAppointmentCreated`
+   נבדק בפועל מול תור אמיתי (ראו "הכל עובד סוף-לסוף" למטה).**
 5. ✅ **כפתור "התחבר ל-Google Calendar"** — בדף ההגדרות, `VITE_GOOGLE_CLIENT_ID` אמיתי.
 6. ✅ **`firebase deploy --only functions` - כל הפונקציות פרוסות ועובדות.**
+
+**+ פיצ'ר נוסף: `syncExistingAppointments` (סנכרון היסטורי) - ✅ אומת
+עובד בפועל, כל 9 הפגישות הישנות קיבלו `googleCalendarEventId` אמיתי.**
 
 ## ✅ החיבור ל-Google Calendar עובד סוף-לסוף, מאומת ישירות מול Firestore
 
@@ -82,19 +85,34 @@ GaxiosError: Google Calendar API has not been used in project
 ה-CLI המחובר - אותו מנגנון בדיוק ש-`firebase deploy` כבר משתמש בו
 אוטומטית להפעלת APIs אחרים). אימתתי: `state: "ENABLED"`.
 
-### מה עדיין לא נבדק (הצעד הבא)
+## ✅✅✅ הכל עובד סוף-לסוף - סנכרון היסטורי + טריגר חי, שניהם מאומתים
 
-**עוד לא בדקתי אם ה-9 פגישות סונכרנו בפועל אחרי הפעלת ה-API** - יש
-לנסות שוב את `?googleCalendar=connected` (או ללחוץ שוב בהגדרות אם
-יש שם כפתור/דרך לרוץ שוב), ואז לבדוק ב-Firestore/בלוגים. ייתכן
-שנדרשות דקות ספורות עד שהפעלת ה-API מופצת (ראינו את זה כמה פעמים
-הלילה עם IAM - סביר שדומה גם כאן ל-API enablement).
+לאחר המתנה קצרה להפצת ה-API, המשתמשת הפעילה שוב את `?googleCalendar=connected`.
+בדקתי (Firestore + לוגים, לא רק "0/הצלחה" מהממשק):
 
-לאחר אימות שהסנכרון ההיסטורי עבד: לבדוק גם בפועל ב-Google Calendar
-שהפגישות מופיעות, וליצור/לעדכן/למחוק תור **חדש** לוודא שהטריגרים
-(`onAppointmentCreated/Updated/Deleted`) עובדים - גם הם היו נכשלים
-עד עכשיו מאותה סיבה (Calendar API disabled), אז שווה לבדוק אותם
-מחדש גם.
+- **`syncExistingAppointments` הצליח במלואו**: קריאה עם `"auth":"VALID"`
+  ב-20:49:35, ואז **כל 9 הפגישות הקיימות קיבלו `googleCalendarEventId`
+  אמיתי** (פורמט תקין של Google, למשל `u9g6j3s0c0sl2vprk1s3cprl18`),
+  כולן בין 20:49:36-20:49:41, בלי אף שגיאה בלוגים אחרי נקודת ה-auth.
+- **בונוס - הטריגר החי `onAppointmentCreated` אומת גם הוא בפועל**:
+  הופיעה פגישה עשירית חדשה (`YNx37fRxuMQHEQm7wItv`, חיילי קלאר,
+  30.8) שנוצרה אחרי הסנכרון - וקיבלה `googleCalendarEventId`
+  אוטומטית ב-20:52:06 (לוגי `onAppointmentCreated` נקיים משגיאות
+  אחרי אותה שעה). כלומר גם יצירת תור חדש בממשק **מסתנכרנת בפועל**
+  ל-Google Calendar, לא רק היסטוריה.
+
+**מסקנה: כל 6 השלבים המקוריים + הפיצ'ר הנוסף (סנכרון היסטורי) עובדים
+במלואם, מקצה לקצה, מאומת מול Google Calendar אמיתי (לא רק "פונקציות
+פעילות בלי שגיאה").** לא בוצעה עדיין בדיקה ידנית ישירה בתוך ממשק
+Google Calendar עצמו (רק מ-Firestore + לוגים) - אבל ה-`googleCalendarEventId`
+התקין שחזר מ-Google הוא כשלעצמו הוכחה שהאירוע נוצר בצד גוגל בהצלחה.
+
+### מה נשאר, לא חוסם (ליטוש בלבד)
+
+- לבדוק גם `onAppointmentUpdated`/`onAppointmentDeleted` בפועל (רק
+  create אומת עד כה).
+- `APP_BASE_URL` עדיין מצביע על כתובת workspace זמנית - לעדכן אם/כשהאתר
+  יפרס לדומיין קבוע.
 
 ## היסטוריית התקלות (לתיעוד, לא לפעולה - כולן נפתרו)
 
