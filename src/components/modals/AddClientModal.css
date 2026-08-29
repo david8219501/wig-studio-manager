@@ -22,7 +22,8 @@
   transform: translate(-50%, -50%);
   z-index: 101;
 
-  width: min(480px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
 
@@ -122,6 +123,10 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  /* בלי זה, לתאי grid יש min-width:auto כברירת מחדל (שווה לרוחב
+     התוכן המינימלי) - עלול למנוע מהעמודות להיכנס בנוחות בתוך רוחב
+     הכרטיס בשורות עם שני שדות זה-לצד-זה. */
+  min-width: 0;
 }
 
 .field--full {

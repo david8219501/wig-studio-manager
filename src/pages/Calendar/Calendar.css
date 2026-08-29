@@ -411,8 +411,9 @@
   border-radius: var(--radius-xl);
   padding: 32px;
   width: 100%;
-  max-width: 500px;
+  max-width: 560px;
   box-shadow: var(--shadow-elevated);
+  box-sizing: border-box;
 }
 
 .modal-header {
@@ -463,6 +464,11 @@
   flex-direction: column;
   gap: 6px;
   flex: 1;
+  /* בלי זה, ל-flex item יש min-width:auto כברירת מחדל, ששווה לרוחב
+     התוכן המינימלי (כולל ה-input שבפנים) - זה מונע מ-flex:1 לכווץ
+     את שני השדות בשורה מספיק כדי להיכנס לרוחב הכרטיס, וגורם לגלישה
+     החוצה מהגבולות שלו. */
+  min-width: 0;
 }
 
 .form-group label {
@@ -478,6 +484,7 @@
 }
 
 .form-group input, .form-group select {
+  width: 100%;
   height: 40px;
   padding: 0 14px;
   border: 1px solid var(--color-border);
@@ -486,6 +493,7 @@
   font-family: inherit;
   outline: none;
   background: var(--color-background);
+  box-sizing: border-box;
 }
 
 .form-group input:focus, .form-group select:focus {
