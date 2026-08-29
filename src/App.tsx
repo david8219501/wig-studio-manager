@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { getApps } from 'firebase/app';
+import twemoji from '@twemoji/api';
 import { auth, db } from './services/firebase';
 import Login, { type RegisterData } from './pages/Login/Login';
 import Sidebar from './components/Sidebar/Sidebar';
@@ -33,6 +34,53 @@ function App() {
     } else {
       console.error("❌ Firebase is NOT connected.");
     }
+  }, []);
+
+  // הופכת כל תו אימוג'י שמוצג בעמוד לתמונת Twemoji קבועה (SVG), כדי
+  // שהמראה יהיה זהה בכל מחשב/דפדפן/מערכת הפעלה - לא תלוי בגופן
+  // האימוג'י המקומי (שנראה שונה ב-Windows/Linux/Mac). לא נוגעת בשום
+  // קובץ קיים שכבר מציג תו אימוג'י - סורקת ומחליפה אוטומטית בדיעבד.
+  //
+  // MutationObserver ולא רק קריאה חד-פעמית: App.tsx לא מתרנדר מחדש
+  // כשנפתח מודל/נבחרת לשונית בתוך עמוד פנימי (state מקומי שם, לא
+  // כאן) - בלי observer, אימוג'ים חדשים שמופיעים ככה לעולם לא היו
+  // מומרים. ה-observer מריץ מחדש בכל שינוי DOM בעמוד (עם debounce
+  // קל דרך requestAnimationFrame כדי לא להריץ פעמים רבות מיותרות
+  // כשקורים כמה שינויים ברצף).
+  //
+  // הערת אזהרה טכנית: twemoji.parse מחליף Text node בעץ ה-DOM
+  // ב-<img> ישירות, מחוץ ל-React - זה עלול, במקרים נדירים, להתנגש
+  // עם ה-reconciliation של React אם בדיוק אותו node משתנה/מוסר
+  // מ-React באותו רגע (יש דיווחים ידועים על זה בקהילה). לא נתקלתי
+  // בזה בבדיקה הידנית, אבל אם יופיעו שגיאות DOM מוזרות בקונסול
+  // (למשל removeChild/insertBefore) בעתיד - זה החשוד הראשון, והפתרון
+  // היציב יותר (אם יידרש) הוא רכיב <Emoji> ייעודי שמרנדר <img> דרך
+  // React עצמו במקום סריקה גלובלית שמחוץ לו.
+  useEffect(() => {
+    const runTwemoji = () => {
+      twemoji.parse(document.body, {
+        folder: 'svg',
+        ext: '.svg',
+        className: 'twemoji-icon',
+      });
+    };
+
+    runTwemoji();
+
+    let frameId: number | null = null;
+    const observer = new MutationObserver(() => {
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        runTwemoji();
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      observer.disconnect();
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
   }, []);
 
   // פונקציית התחברות

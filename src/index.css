@@ -99,6 +99,19 @@ body {
   user-select: none;
 }
 
+/* Twemoji (ראו App.tsx) - מחליף כל תו אימוג'י בעמוד בתמונת SVG קבועה,
+   כדי שהמראה יהיה זהה בכל דפדפן/מערכת הפעלה. גובה 1em/יישור -0.1em
+   הם ערכי ה-CSS הרשמיים המומלצים על ידי Twemoji עצמו, נותנים גודל
+   שתואם את גובה השורה של הטקסט הסובב ויישור אופטי נכון (לא רק
+   vertical-align: middle גנרי, שנוטה להיראות "צף" מעט מדי גבוה
+   ביחס לטקסט עברי בפועל). */
+img.twemoji-icon {
+  height: 1em;
+  width: 1em;
+  margin: 0 0.05em 0 0.1em;
+  vertical-align: -0.1em;
+}
+
 #root {
   width: 100%;
   min-height: 100vh;
