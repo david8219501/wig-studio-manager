@@ -1,4 +1,4 @@
-# סיכום: תשתית סנכרון Google Calendar + סנכרון היסטורי אוטומטי
+# סיכום: תשתית סנכרון Google Calendar - החיבור עובד, סנכרון היסטורי בהמתנה לצעד ידני אחד
 
 ## כתובת ה-OAuth callback
 
@@ -6,39 +6,37 @@
 https://us-central1-esti-wigs-system.cloudfunctions.net/googleCalendarOAuthCallback
 ```
 
-(ללא שינוי - עדיין הכתובת הנכונה, כבר מוגדרת אצלך ב-Google Cloud Console.)
+(ללא שינוי - עדיין הכתובת הנכונה.)
 
-## מה חדש: syncExistingAppointments
+## ✅ החיבור ל-Google Calendar עובד - מאומת ישירות מול Firestore
 
-נוספה ופרוסה פונקציה חמישית - `syncExistingAppointments` (callable,
-2nd gen). מיד אחרי חיבור ראשוני מוצלח ל-Google Calendar, הממשק
-(`Settings.tsx`) קורא לה אוטומטית - **בלי כפתור נפרד** - והיא מעבירה
-את כל הפגישות הקיימות (בלי `googleCalendarEventId`) ליומן, ומדווחת
-"הועברו N פגישות" (או "אין פגישות ישנות להעביר").
+אחרי סאגת דיבאג ארוכה (כל הפרטים ב-`progress.md`, סעיף "היסטוריית
+התקלות") - **ה-refreshToken נשמר בהצלחה**. אימתתי ישירות מול Firestore
+(לא רק לוגים) - המסמך קיים, עם scope נכון וטיימסטמפ עדכני.
 
-- **אין נוסחה כפולה**: היא משתמשת באותה פונקציית עזר בדיוק
-  (`createCalendarEventForAppointment`, ב-`googleCalendarSync.ts`)
-  שהטריגר `onAppointmentCreated` כבר משתמש בה - חילצתי אותה החוצה
-  כפונקציה משותפת מיוצאת בשביל זה.
-- **בטוחה מהרצה כפולה**: מסננת רק פגישות בלי `googleCalendarEventId` -
-  חיבור חוזר בטעות לא יוצר כפילות ביומן.
-- **פרוסה ומאומתת**: `firebase deploy --only functions:syncExistingAppointments`
-  הצליח (`ACTIVE`, 0 שגיאות). אימתתי עם `curl` (קריאה לא-מאומתת) -
-  קיבלתי בחזרה בדיוק את הודעת השגיאה העברית מהקוד שלי
-  ("יש להתחבר למערכת כדי לסנכרן פגישות") - הוכחה שהיא באמת רצה, לא
-  רק קיימת.
-- `npm run build` (שורש + functions/) עובר נקי.
+## 🔴→✅ תוקן הלילה: APP_BASE_URL שגוי מנע את הסנכרון האוטומטי
 
-## מה עדיין לא נבדק
+**תיקון לדבר שאמרתי בטעות קודם**: ה"Site Not Found" בסוף ההתחברות
+**לא היה קוסמטי בלבד** - הוא מנע מהאפליקציה להיטען בכלל בסוף הזרימה,
+ולכן `syncExistingAppointments` (שאמור לרוץ אוטומטית שם) מעולם לא
+נקרא בפועל. בדקתי ואישרתי: 5 פגישות קיימות ב-Firestore לעסק הזה, לאף
+אחת אין `googleCalendarEventId` - כי הפונקציה פשוט לא רצה.
 
-בדיקת קצה-לקצה אמיתית מול Google עוד לא בוצעה: לחיצה על הכפתור →
-אישור בגוגל → סנכרון אוטומטי → אימות בפועל שהפגישות הופיעו ב-Google
-Calendar. פירוט מלא ב-`progress.md`.
+**התיקון**: `APP_BASE_URL` עודכן לכתובת ה-workspace האמיתית של
+Firebase Studio, `googleCalendarOAuthCallback` נפרס מחדש בהצלחה,
+ואומת עם `curl` שה-redirect כרגע מצביע נכון.
+
+## הצעד הבא (ידני, לא דורש עוד קוד)
+
+ה-5 פגישות הקיימות עדיין לא סונכרנו. הכי מהיר: להיכנס לאפליקציה
+ולהוסיף `?googleCalendar=connected` ל-URL ידנית (מפעיל את הסנכרון
+בלי לעבור שוב על כל אישור גוגל, כי ה-refreshToken כבר קיים). אחרי
+זה - לבדוק בפועל ב-Google Calendar שהפגישות מופיעות, וגם לבדוק תור
+**חדש** מול הטריגרים החיים.
 
 ## git
 
-בוצע commit+push: קוד (הפונקציה החדשה + הרפקטור של googleCalendarSync.ts
-+ עדכון Settings.tsx/firebase.ts) + תיעוד.
+בוצע commit+push: `functions/src/config.ts` (APP_BASE_URL) + תיעוד.
 
 ## ⚠️ עדיין פתוח, לא קשור למשימה הזו
 

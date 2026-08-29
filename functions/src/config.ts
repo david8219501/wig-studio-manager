@@ -9,10 +9,13 @@ export const REGION = "us-central1";
 export const OAUTH_CALLBACK_FUNCTION_NAME = "googleCalendarOAuthCallback";
 export const OAUTH_REDIRECT_URI = `https://${REGION}-${PROJECT_ID}.cloudfunctions.net/${OAUTH_CALLBACK_FUNCTION_NAME}`;
 
-// לאן מחזירים את הדפדפן בסיום זרימת ה-OAuth (הצלחה/כישלון). זוהי הנחה
-// סבירה (דומיין ברירת המחדל של Firebase Hosting) - לא אומתה מול דומיין
-// production בפועל. אם האתר רץ בדומיין אחר, יש לעדכן כאן.
-export const APP_BASE_URL = `https://${PROJECT_ID}.web.app`;
+// לאן מחזירים את הדפדפן בסיום זרימת ה-OAuth (הצלחה/כישלון). האתר עדיין
+// לא פרוס ל-Firebase Hosting בפועל (רק functions) - זו כתובת ה-workspace
+// של Firebase Studio שבה נבדקת האפליקציה כרגע. **זמנית** - אם/כשהאתר
+// יפרס ל-domain קבוע (Firebase Hosting או אחר), יש לעדכן כאן, כי כתובת
+// workspace כזו לא בהכרח קבועה.
+export const APP_BASE_URL =
+  "https://5173-firebase-estiwigsportal-1781016477573.cluster-2nmnojxdmnfh2vwda4kd7uoumu.cloudworkstations.dev";
 
 // היקף ההרשאה המבוקש מגוגל - יצירה/עדכון/מחיקה של אירועים ביומן
 // (לא כולל קריאת יומנים אחרים של המשתמש).
