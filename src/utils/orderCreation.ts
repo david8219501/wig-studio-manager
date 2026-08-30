@@ -30,6 +30,14 @@ export interface ShowroomSpecs {
   color?: string;
 }
 
+// סטטוס תהליך בניית פאת תצוגה - שדה נפרד מ-status הרגיל של הזמנה
+// (Order["status"] ב-Sales.tsx, שמייצג workflow של הזמנת לקוחה) כדי לא
+// "לזהם" את הטיפוס/הבדג'ים הקיימים שם עם ערכים שלא רלוונטיים לזרימת
+// הזמנה רגילה. ברגע שפאת התצוגה נמכרת, ה-status הרגיל נדרס ל-"delivered"
+// (ראו SellShowroomStockModal.tsx) - showroomStatus נשאר כתיעוד היסטורי.
+export type ShowroomBuildStatus = "בבנייה" | "בטיפול" | "ממתינה לגימור" | "מוכנה";
+export const SHOWROOM_BUILD_STATUS_OPTIONS: ShowroomBuildStatus[] = ["בבנייה", "בטיפול", "ממתינה לגימור", "מוכנה"];
+
 export interface NewOrderInput {
   businessId: string;
   clientId: string | null; // null = בלי לקוחה רשומה עדיין (מכירה קמעונאית ללקוחה מזדמנת, או פאת תצוגה שטרם נמכרה)
@@ -56,6 +64,8 @@ export interface NewOrderInput {
   isShowroomStock?: boolean;
   retailPrice?: number; // מחיר המכירה המבוקש (רלוונטי רק כש-isShowroomStock)
   showroomSpecs?: ShowroomSpecs;
+  showroomCode?: string; // מזהה ידידותי ורציף (SHOWROOM-1001 וכו') - ראו nextShowroomCode ב-Inventory.tsx
+  showroomStatus?: ShowroomBuildStatus; // ברירת מחדל "בבנייה" אם לא הועבר (ראו createOrder)
 }
 
 // פאות תצוגה שעדיין לא נמכרו (isShowroomStock && בלי clientId) שייכות
@@ -87,10 +97,18 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
     hairCostEstimated: input.hairCostEstimated,
     notes: input.notes,
     createdAt,
-    // isShowroomStock/retailPrice/showroomSpecs נכתבים רק כשרלוונטי - Firestore
-    // דוחה ערך undefined במפורש, אז אי אפשר סתם לכלול אותם תמיד עם ?? ברירת מחדל.
-    ...(input.isShowroomStock ? { isShowroomStock: true, retailPrice: input.retailPrice ?? 0 } : {}),
+    // isShowroomStock/retailPrice/showroomSpecs/showroomCode/showroomStatus
+    // נכתבים רק כשרלוונטי - Firestore דוחה ערך undefined במפורש, אז אי אפשר
+    // סתם לכלול אותם תמיד עם ?? ברירת מחדל.
+    ...(input.isShowroomStock
+      ? {
+          isShowroomStock: true,
+          retailPrice: input.retailPrice ?? 0,
+          showroomStatus: input.showroomStatus ?? "בבנייה",
+        }
+      : {}),
     ...(input.showroomSpecs ? { showroomSpecs: input.showroomSpecs } : {}),
+    ...(input.showroomCode ? { showroomCode: input.showroomCode } : {}),
   });
 
   return orderRef.id;

@@ -1,103 +1,56 @@
-# סיכום: עיצוב מחדש של "פאות תצוגה" - מודל מבוסס orders במקום HairItem.status
+# סיכום: 4 שינויים לפיצ'ר "פאות תצוגה"
 
-## למה זה קרה
+## 1. תיקון באג מיקום - החלפת `<select>` מובנה ב-CustomSelect
 
-המודל הקודם (מהסבב הקודם) ייצג פאת תצוגה כקוקו בודד (`HairItem` עם
-`status: 'showroom'`) - מגבלה מובנית: לא ניתן היה לייצג פאת תצוגה
-שנבנית מכמה קוקוים שונים (שיוך מרובה), בדיוק כמו הזמנת לקוחה רגילה.
+`ShowroomStockFormModal.tsx` השתמש ב-3 שדות `<select>` מובנים (אורך/
+מבנה/מלאות) - אותו באג ידוע כבר (נפתח בראש הדף, לא צמוד לשדה, בעיקר
+בלינוקס). הוחלפו ל-`CustomSelect` (`src/components/common/CustomSelect.tsx`)
+עם `options` בנויים מ-`HAIR_LENGTH_OPTIONS`/`STRUCTURE_OPTIONS`/
+`FULLNESS_OPTIONS` הקיימים ב-`hairCost.ts`.
 
-## החלטת הארכיטקטורה החדשה
+## 2. usedBulkItems לפאת תצוגה
 
-פאת תצוגה היא עכשיו מסמך רגיל ב-collection `orders` (בדיוק כמו הזמנת
-לקוחה), עם `isShowroomStock: true` ו-`clientId`/`clientName: null` עד
-שנמכרת בפועל. `usedHairItems` (שיוך שיער בפועל) עובד בדיוק כמו בהזמנה
-רגילה - יכול לכלול כמה קוקוים. הסטטוס "בבנייה"/"מוכנה" לא נשמר כשדה -
-מחושב תמיד מ-`usedHairItems.length > 0`.
+נוסף `src/pages/Inventory/AssignBulkItemsModal.tsx` (חדש) - אותה
+יכולת "הוסף פריט מהמלאי" בדיוק כמו ב-`NewOrderWizard`/`OrderDetailsPanel.tsx`
+(itemId/itemName/quantity/unitCostAtTime, מוריד כמות בפועל מ-`bulkItems`,
+עם וולידציית מלאי זהה). נפתח מכפתור "📦 ניהול פריטי מלאי" חדש בטבלת
+"פאות תצוגה". "עלות מחושבת" בטבלה כוללת עכשיו גם `usedBulkItems` (לא
+רק `usedHairItems`). מחיקת פאת תצוגה (`performDeleteShowroomOrder`
+ב-`Inventory.tsx`) עודכנה להחזיר גם כמויות `usedBulkItems` למלאי (לא
+רק משקל שיער) - מקובץ לפי `itemId` כמו קודם, כדי לא לדרוס עדכונים
+אם אותו פריט שויך כמה פעמים.
 
-**בוטל לגמרי** המודל הקודם: הוסר הכפתור "סמן כפאת תצוגה" מטבלת מלאי
-השיער, `handleMarkAsShowroom`/`handleReturnToAvailable`, ה-state/הלשונית
-הישנים מבוססי `HairItem.status==='showroom'`, וה-prop
-`preselectedShowroomItemId` שנוסף ל-`NewOrderWizard.tsx` בסבב הקודם -
-`NewOrderWizard.tsx` חזר בדיוק לגרסה שלפני אותו סבב (`git diff` מול
-הקומיט הקודם ל-76f7641 ריק לגמרי). `HairItem.status: 'showroom'`
-(הטיפוס עצמו) לא נגע - רק הגישה שהשתמשה בו בוטלה.
+## 3. מזהה ידידותי (SHOWROOM-1001 וכו')
 
-## שינויים לפי קובץ
+נוסף שדה חדש `showroomCode` (ב-`orderCreation.ts`, `NewOrderInput`/
+`createOrder`). מחושב ב-`Inventory.tsx` (`nextShowroomCode`) מכל
+ה-`orders` עם `isShowroomStock` - **כולל כאלה שכבר נמכרו**, לא רק
+`showroomOrders` (הלא-נמכרות), כדי שהמספור לא יתאפס/יתנגש אחרי מכירה.
+בשונה מ-`nextHairId`, אין כאן סיכון התנגשות בין-עסקית: זה שדה מידע
+בלבד, לא ה-ID של המסמך עצמו (ש-Firestore יוצר אוטומטית תמיד). מוצג
+בעמודה נפרדת "מזהה" בטבלת "פאות תצוגה", ובטופס היצירה/עריכה.
 
-### `src/utils/orderCreation.ts`
-- `clientName` ב-`NewOrderInput` הורחב ל-`string | null` (null רק
-  כש-`isShowroomStock`).
-- נוספו שדות אופציונליים: `isShowroomStock`, `retailPrice`,
-  `showroomSpecs` (טיפוס חדש `ShowroomSpecs` - אורך/מבנה/מלאות/גוון
-  גולמיים, נשמרים בנוסף ל-`notes` הקריא כדי לאפשר עריכה חוזרת בלי
-  לפרסר מחרוזת). `createOrder` כותב אותם רק כשרלוונטי (Firestore דוחה
-  `undefined`).
-- נוספה `isUnsoldShowroomStock(order)` - הפרדיקט המשותף שקובע אם
-  מסמך `orders` הוא פאת תצוגה שעדיין לא נמכרה (`isShowroomStock &&
-  !clientId`). מוגדר כאן (לא ב-`Sales.tsx`) עם טיפוס פרמטר כללי כדי
-  למנוע import מעגלי (`Sales.tsx` כבר מייבא `ShowroomSpecs` מהקובץ
-  הזה).
+## 4. סטטוס בנייה ניתן לעריכה
 
-### `src/pages/Sales/Sales.tsx`, `Dashboard.tsx`, `Reports.tsx`
-- `Order` (ב-`Sales.tsx`, הטיפוס המשותף) הורחב עם `clientId`,
-  `isShowroomStock`, `retailPrice`, `showroomSpecs`.
-- כל שלוש ה-onSnapshot listeners של `orders` מסננות עכשיו החוצה
-  `isUnsoldShowroomStock` - **קריטי**: בלי הסינון הזה, פאת תצוגה
-  שעדיין בבנייה (בלי לקוחה) הייתה "מזהמת" את טבלת המכירות/הדשבורד/
-  הדוחות. מרגע שנמכרת (מקבלת `clientId`) - מפסיקה אוטומטית להיות
-  מסוננת ומופיעה בהן כרגיל.
-
-### `src/pages/Inventory/ShowroomStockFormModal.tsx` (חדש)
-טופס יצירה/עריכה מצומצם: אותם שדות/אפשרויות בדיוק כמו שלב 3
-ב-`NewOrderWizard.tsx` (אורך/מבנה/מלאות/גוון, `HAIR_LENGTH_OPTIONS`/
-`STRUCTURE_OPTIONS`/`FULLNESS_OPTIONS`, `calculateHairCost` לאומדן
-עלות) + שדה מחיר מכירה מבוקש. יצירה קוראת ל-`createOrder`; עריכה
-עושה `updateDoc` על אותו מסמך - לא נוגעת ב-`usedHairItems` בכלל.
-
-### `src/pages/Inventory/SellShowroomStockModal.tsx` (חדש)
-השלמת מכירה: בחירת לקוחה (אותו דפוס בדיוק כמו ב-`QuickRetailSaleModal.tsx`)
-+ מחיר סופי (ממולא מראש מ-`retailPrice`, ניתן לעריכה). מעדכן
-(לא יוצר!) את אותו מסמך: `clientId`/`clientName`/`clientPhone`,
-`totalPrice`/`paidAmount` מהמחיר הסופי, `status: "delivered"`,
-`payments`. `isShowroomStock` נשאר `true` לתיעוד היסטורי.
-
-### `src/pages/Inventory/Inventory.tsx`
-- listener שלישי (`orders`, מסונן רק ל-`businessId` כמו כל מקום אחר
-  באתר) בנוסף ל-`hairItems`/`bulkItems` הקיימים.
-- `showroomOrders` = `orders.filter(isShowroomStock && !clientId)`.
-- לשונית "פאות תצוגה" מציגה טבלה: מפרט (`notes`), עלות מחושבת (סכימת
-  `costAtTime` על `usedHairItems`, "—" אם ריק), מחיר מכירה מבוקש,
-  תג סטטוס בבנייה/מוכנה, וכפתורי ניהול שיוך שיער / עריכה / מכירה /
-  מחיקה.
-- "ניהול שיוך שיער" פותח את `AssignHairModal` **הקיים ללא שינוי** -
-  מצביע אותו על מסמך ה-order של פאת התצוגה (עם `clientName` תווית
-  תצוגה בלבד, לא לקוחה אמיתית).
-- מחיקה: `ConfirmDialog` (עם הודעה שונה אם כבר יש שיוך שיער בפועל),
-  ולפני מחיקת המסמך - מחזירה משקל/שווי לכל `hairItem` ששויך (מקובץ
-  לפי `hairItemId` כדי לא לדרוס update אחד עם השני אם אותו קוקו שויך
-  כמה פעמים - אותה בעיה שכבר תוקנה קודם ב-`NewOrderWizard.handleFinish`).
-- כל ה-IDs (`assigningShowroomOrderId` וכו') נגזרים חי מ-`orders`
-  (כמו `mergeLogBox` הקיים) - לא state של אובייקט מלא - כדי שהמודלים
-  תמיד יראו נתון עדכני.
-
-## תיקון לינט תוך כדי
-
-הוספת `isUnsoldShowroomStock` כ-export פונקציה רגילה מ-`Sales.tsx`
-(לצד `export default function Sales()`) הפעילה שגיאת
-`react-refresh/only-export-components` חדשה. הועבר ל-`orderCreation.ts`
-במקום (עם טיפוס פרמטר כללי, לא `Order`, כדי למנוע import מעגלי).
+נוסף שדה חדש `showroomStatus` (טיפוס `ShowroomBuildStatus` -
+"בבנייה"/"בטיפול"/"ממתינה לגימור"/"מוכנה", ב-`orderCreation.ts`) -
+**נפרד** מ-`Order.status` הרגיל (workflow של הזמנת לקוחה) כדי לא
+"לזהם" את הטיפוס/הבדג'ים הקיימים ב-Sales.tsx עם ערכים לא-רלוונטיים.
+ברירת מחדל "בבנייה" ביצירה. עדכון אוטומטי ל"מוכנה" כששויך שיער ראשון
+בפועל - מיושם כ-`useEffect` ב-`Inventory.tsx` שצופה ב-`orders` (לא
+בתוך `AssignHairModal` עצמו, שנשאר גנרי וללא שינוי): מעדכן ל"מוכנה"
+רק כשעדיין "בבנייה" (ברירת המחדל) ויש `usedHairItems` - כך שלא דורס
+בחירה ידנית קודמת. ניתן לשינוי ידני בכל רגע דרך `CustomSelect` ישירות
+בטבלת "פאות תצוגה" (לא כפול גם בטופס העריכה - מקום אחד ברור מספיק).
+בעת מכירה בפועל (`SellShowroomStockModal.tsx`, מסבב קודם) - `status`
+הרגיל נדרס ל-"delivered" כרגיל; `showroomStatus` נשאר לתיעוד היסטורי.
 
 ## בדיקות שבוצעו
 
 - `npm run build` (tsc -b + vite build) עובר נקי.
-- `npm run lint` - אין שגיאות/אזהרות חדשות; שתי הקבצים החדשים
-  (`ShowroomStockFormModal.tsx`, `SellShowroomStockModal.tsx`) מציגים
-  את אותה אזהרת `react-hooks/set-state-in-effect` הקיימת כבר במקומות
-  דומים (`QuickRetailSaleModal.tsx`, `RepairOrderForm.tsx` וכו') -
-  דפוס מקובל בפרויקט, לא בעיה חדשה.
-- `git diff` מול הקומיט שלפני הסבב הקודם מוודא ש-`NewOrderWizard.tsx`
-  חזר בדיוק לגרסתו המקורית (diff ריק).
-- לא בוצעה בדיקה ויזואלית בדפדפן בפועל (יצירה/עריכה/שיוך שיער/מכירה/
-  מחיקה של פאת תצוגה, והיעלמות/הופעה נכונה בטבלאות Sales/Dashboard/
-  Reports) - מומלץ לבדוק ידנית לפני סמיכה מלאה, בפרט את זרימת המכירה
-  המלאה מקצה לקצה.
+- `npm run lint` - אין שגיאות/אזהרות חדשות; `AssignBulkItemsModal.tsx`
+  החדש מציג את אותה אזהרת `react-hooks/set-state-in-effect` הקיימת כבר
+  ב-`AssignHairModal.tsx` (הדפוס עצמו, לא בעיה חדשה).
+- לא בוצעה בדיקה ויזואלית בדפדפן בפועל (מיקום נכון של ה-CustomSelect
+  בטופס, הוספת/הסרת פריטי מלאי, מספור SHOWROOM-1001 רציף, מעבר סטטוס
+  אוטומטי+ידני) - מומלץ לבדוק ידנית לפני סמיכה מלאה.

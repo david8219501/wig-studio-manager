@@ -10,17 +10,23 @@ import { db, auth } from "../../services/firebase";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, type HairCostSettings } from "../../utils/hairCost";
 import { createOrder, type ShowroomSpecs } from "../../utils/orderCreation";
 import type { Order } from "../Sales/Sales";
+import CustomSelect from "../../components/common/CustomSelect";
 
 const DEFAULT_HAIR_COST_SETTINGS: HairCostSettings = { pricePerKgUsd: 4700, exchangeRate: 3.0 };
+
+const LENGTH_SELECT_OPTIONS = HAIR_LENGTH_OPTIONS.map((v) => ({ value: String(v), label: `${v} ס״מ` }));
+const STRUCTURE_SELECT_OPTIONS = STRUCTURE_OPTIONS.map((v) => ({ value: v, label: v }));
+const FULLNESS_SELECT_OPTIONS = FULLNESS_OPTIONS.map((v) => ({ value: v, label: v }));
 
 interface ShowroomStockFormModalProps {
   isOpen: boolean;
   editingOrder: Order | null; // null = יצירת פאת תצוגה חדשה, אחרת עריכת הקיימת
+  nextShowroomCode: string; // מזהה ידידותי מוכן מראש ליצירה חדשה (ראו Inventory.tsx) - לא רלוונטי בעריכה
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function ShowroomStockFormModal({ isOpen, editingOrder, onClose, onSaved }: ShowroomStockFormModalProps) {
+export default function ShowroomStockFormModal({ isOpen, editingOrder, nextShowroomCode, onClose, onSaved }: ShowroomStockFormModalProps) {
   const [length, setLength] = useState("");
   const [structure, setStructure] = useState("");
   const [fullness, setFullness] = useState("");
@@ -108,6 +114,7 @@ export default function ShowroomStockFormModal({ isOpen, editingOrder, onClose, 
           isShowroomStock: true,
           retailPrice: price,
           showroomSpecs,
+          showroomCode: nextShowroomCode,
         });
       }
       onSaved();
@@ -129,33 +136,25 @@ export default function ShowroomStockFormModal({ isOpen, editingOrder, onClose, 
           </button>
         </div>
 
+        {!editingOrder && (
+          <div className="restock-preview">מזהה שיוקצה: <strong className="mono">{nextShowroomCode}</strong></div>
+        )}
+        {editingOrder?.showroomCode && (
+          <div className="restock-preview">מזהה: <strong className="mono">{editingOrder.showroomCode}</strong></div>
+        )}
+
         <div className="modal-form-grid">
           <div className="form-field">
             <label>אורך עורף</label>
-            <select value={length} onChange={(e) => setLength(e.target.value)}>
-              <option value="">בחר...</option>
-              {HAIR_LENGTH_OPTIONS.map((v) => (
-                <option key={v} value={v}>{v} ס״מ</option>
-              ))}
-            </select>
+            <CustomSelect value={length} onChange={setLength} options={LENGTH_SELECT_OPTIONS} placeholder="בחר..." />
           </div>
           <div className="form-field">
             <label>מבנה</label>
-            <select value={structure} onChange={(e) => setStructure(e.target.value)}>
-              <option value="">בחר...</option>
-              {STRUCTURE_OPTIONS.map((v) => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
+            <CustomSelect value={structure} onChange={setStructure} options={STRUCTURE_SELECT_OPTIONS} placeholder="בחר..." />
           </div>
           <div className="form-field">
             <label>מלאות</label>
-            <select value={fullness} onChange={(e) => setFullness(e.target.value)}>
-              <option value="">בחר...</option>
-              {FULLNESS_OPTIONS.map((v) => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
+            <CustomSelect value={fullness} onChange={setFullness} options={FULLNESS_SELECT_OPTIONS} placeholder="בחר..." />
           </div>
           <div className="form-field">
             <label>גוון / צבע</label>

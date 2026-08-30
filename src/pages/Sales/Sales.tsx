@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { UsedBulkItem, UsedHairItem, OrderPayment } from "../../types";
-import { isUnsoldShowroomStock, type ShowroomSpecs } from "../../utils/orderCreation";
+import { isUnsoldShowroomStock, type ShowroomBuildStatus, type ShowroomSpecs } from "../../utils/orderCreation";
 import AssignHairModal from "../../components/orders/AssignHairModal";
 import OrderDetailsPanel from "../../components/orders/OrderDetailsPanel";
 import { calculateOrderProfit } from "../../utils/orderProfit";
@@ -28,6 +28,8 @@ export interface Order {
   isShowroomStock?: boolean; // true = מסמך פאת תצוגה שנוצר מראש במלאי; מוצג כאן רק אחרי מכירה (clientId מוגדר)
   retailPrice?: number; // מחיר מכירה מבוקש (לפני מכירה בפועל)
   showroomSpecs?: ShowroomSpecs;
+  showroomCode?: string; // מזהה ידידותי (SHOWROOM-1001 וכו')
+  showroomStatus?: ShowroomBuildStatus; // סטטוס תהליך הבנייה - נפרד מ-status הרגיל, ראו orderCreation.ts
 }
 
 export default function Sales() {

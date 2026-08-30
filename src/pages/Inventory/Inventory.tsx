@@ -13,8 +13,11 @@ import MergeRemnantModal from './MergeRemnantModal';
 import RemnantMergeLogModal from './RemnantMergeLogModal';
 import ShowroomStockFormModal from './ShowroomStockFormModal';
 import SellShowroomStockModal from './SellShowroomStockModal';
+import AssignBulkItemsModal from './AssignBulkItemsModal';
 import AssignHairModal from '../../components/orders/AssignHairModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import CustomSelect from '../../components/common/CustomSelect';
+import { SHOWROOM_BUILD_STATUS_OPTIONS, type ShowroomBuildStatus } from '../../utils/orderCreation';
 import './Inventory.css';
 
 const STATUS_LABELS: Record<HairItem['status'], string> = {
@@ -55,6 +58,7 @@ const Inventory: React.FC = () => {
   const [isShowroomFormOpen, setIsShowroomFormOpen] = useState(false);
   const [editingShowroomOrderId, setEditingShowroomOrderId] = useState<string | null>(null);
   const [assigningShowroomOrderId, setAssigningShowroomOrderId] = useState<string | null>(null);
+  const [assigningBulkItemsOrderId, setAssigningBulkItemsOrderId] = useState<string | null>(null);
   const [sellingShowroomOrderId, setSellingShowroomOrderId] = useState<string | null>(null);
   const [deletingShowroomOrderId, setDeletingShowroomOrderId] = useState<string | null>(null);
 
@@ -128,6 +132,21 @@ const Inventory: React.FC = () => {
     };
   }, []);
 
+  // עדכון אוטומטי של showroomStatus מ-"בבנייה" ל-"מוכנה" ברגע ששויך שיער
+  // ראשון בפועל (usedHairItems הופך לא-ריק) - בלי לגעת ב-AssignHairModal
+  // עצמו (גנרי, לא יודע כלום על showroomStatus). לא דורס בחירה ידנית: רק
+  // כשעדיין "בבנייה" (ברירת המחדל) - אם המשתמשת כבר בחרה סטטוס אחר ידנית,
+  // זה לא "יתקן" את זה בחזרה.
+  useEffect(() => {
+    orders
+      .filter((o) => o.isShowroomStock && (o.usedHairItems?.length ?? 0) > 0 && o.showroomStatus === 'בבנייה')
+      .forEach((o) => {
+        updateDoc(doc(db, 'orders', o.id), { showroomStatus: 'מוכנה' }).catch((err) =>
+          console.error('Error auto-updating showroom status:', err)
+        );
+      });
+  }, [orders]);
+
   // ה-hairItems כאן כבר מסונן ל-businessId הנוכחי בלבד (דרך ה-query ב-
   // onSnapshot למעלה), כך שהמספור הסידורי (maxNum) תמיד עצמאי לעסק. אבל
   // ה-collection 'hairItems' עצמו גלובלי (משותף לכל העסקים, לא subcollection
@@ -161,11 +180,27 @@ const Inventory: React.FC = () => {
     [orders]
   );
 
+  // מזהה ידידותי לפאת תצוגה חדשה (SHOWROOM-1001 וכו') - מחושב מכל ה-orders
+  // עם isShowroomStock (כולל כאלה שכבר נמכרו!) לא רק showroomOrders, כדי
+  // שהמספור לעולם לא יתאפס/יתנגש אחרי שפריט נמכר ונעלם מרשימת הלא-נמכרות.
+  // בשונה מ-nextHairId, אין כאן סיכון התנגשות בין-עסקית - זה רק שדה מידע
+  // (showroomCode), לא ה-ID של המסמך עצמו שנוצר תמיד אוטומטית ע"י Firestore.
+  const nextShowroomCode = useMemo(() => {
+    const maxNum = orders.reduce((max, o) => {
+      if (!o.isShowroomStock) return max;
+      const match = (o.showroomCode || '').match(/^SHOWROOM-(\d+)/);
+      const num = match ? parseInt(match[1], 10) : NaN;
+      return Number.isNaN(num) ? max : Math.max(max, num);
+    }, 1000);
+    return `SHOWROOM-${maxNum + 1}`;
+  }, [orders]);
+
   // כל ה-ids הבאים נגזרים מ-hairItems/orders החיים (לא state של האובייקט
   // עצמו) - כדי שהמודלים תמיד יראו עדכון חי, באותו דפוס כמו mergeLogBox למטה.
   const mergeLogBox = hairItems.find((item) => item.id === mergeLogBoxId) || null;
   const editingShowroomOrder = orders.find((o) => o.id === editingShowroomOrderId) || null;
   const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
+  const assigningBulkItemsOrder = orders.find((o) => o.id === assigningBulkItemsOrderId) || null;
   const sellingShowroomOrder = orders.find((o) => o.id === sellingShowroomOrderId) || null;
   const deletingShowroomOrder = orders.find((o) => o.id === deletingShowroomOrderId) || null;
 
@@ -388,23 +423,29 @@ const Inventory: React.FC = () => {
     setRestockTarget(null);
   };
 
-  // מוחקת פאת תצוגה. אם כבר יש usedHairItems משויכים בפועל (הפאה "מוכנה",
-  // לא רק "בבנייה") - קודם מחזירים את המשקל/השווי לכל hairItem ששויך אליה
-  // (מקובץ לפי hairItemId, כדי לא לדרוס update אחד עם השני אם אותו קוקו
-  // שויך כמה פעמים - אותו דפוס שכבר תוקן ב-NewOrderWizard.handleFinish),
-  // בדיוק כמו handleRemove הבודד ב-AssignHairModal, רק בבת אחת. אחרת
-  // מוחקים את הפאה אבל "שוכחים" להחזיר את השיער שכבר יצא מהמלאי.
+  // מוחקת פאת תצוגה. אם כבר יש usedHairItems/usedBulkItems משויכים בפועל -
+  // קודם מחזירים את המשקל/השווי/הכמות לכל hairItem/bulkItem ששויך אליה
+  // (כל אחד מקובץ לפי itemId, כדי לא לדרוס update אחד עם השני אם אותו
+  // פריט שויך כמה פעמים - אותו דפוס שכבר תוקן ב-NewOrderWizard.handleFinish),
+  // בדיוק כמו handleRemove הבודד ב-AssignHairModal/handleRemoveBulkItem
+  // ב-OrderDetailsPanel, רק בבת אחת. אחרת מוחקים את הפאה אבל "שוכחים"
+  // להחזיר את המלאי שכבר יצא ממנה.
   const performDeleteShowroomOrder = async (order: Order) => {
-    const restoreByItemId = new Map<string, { grams: number; value: number }>();
+    const restoreHairByItemId = new Map<string, { grams: number; value: number }>();
     (order.usedHairItems ?? []).forEach((used) => {
-      const entry = restoreByItemId.get(used.hairItemId) ?? { grams: 0, value: 0 };
+      const entry = restoreHairByItemId.get(used.hairItemId) ?? { grams: 0, value: 0 };
       entry.grams += used.gramsUsed;
       entry.value += used.costAtTime;
-      restoreByItemId.set(used.hairItemId, entry);
+      restoreHairByItemId.set(used.hairItemId, entry);
     });
 
-    await Promise.all(
-      Array.from(restoreByItemId.entries()).map(async ([hairItemId, restore]) => {
+    const restoreBulkByItemId = new Map<string, number>();
+    (order.usedBulkItems ?? []).forEach((used) => {
+      restoreBulkByItemId.set(used.itemId, (restoreBulkByItemId.get(used.itemId) ?? 0) + used.quantity);
+    });
+
+    await Promise.all([
+      ...Array.from(restoreHairByItemId.entries()).map(async ([hairItemId, restore]) => {
         const hairItem = hairItems.find((h) => h.id === hairItemId);
         if (!hairItem) return;
         const restoreUpdate: { currentWeight: number; status: HairItem['status']; remnantTotalValue?: number } = {
@@ -415,8 +456,13 @@ const Inventory: React.FC = () => {
           restoreUpdate.remnantTotalValue = (hairItem.remnantTotalValue ?? 0) + restore.value;
         }
         await updateDoc(doc(db, 'hairItems', hairItemId), restoreUpdate);
-      })
-    );
+      }),
+      ...Array.from(restoreBulkByItemId.entries()).map(async ([bulkItemId, qty]) => {
+        const bulkItem = bulkItems.find((b) => b.id === bulkItemId);
+        if (!bulkItem) return;
+        await updateDoc(doc(db, 'bulkItems', bulkItemId), { quantity: bulkItem.quantity + qty });
+      }),
+    ]);
 
     await deleteDoc(doc(db, 'orders', order.id));
   };
@@ -690,6 +736,7 @@ const Inventory: React.FC = () => {
             <table className="inventory-table">
               <thead>
                 <tr>
+                  <th>מזהה</th>
                   <th>מפרט</th>
                   <th>עלות מחושבת</th>
                   <th>מחיר מכירה מבוקש</th>
@@ -700,24 +747,34 @@ const Inventory: React.FC = () => {
               <tbody>
                 {showroomOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="empty-state">
+                    <td colSpan={6} className="empty-state">
                       אין כרגע פאות תצוגה - אפשר ליצור חדשה בכפתור למעלה
                     </td>
                   </tr>
                 ) : (
                   showroomOrders.map((order) => {
                     const usedHairItems = order.usedHairItems ?? [];
-                    const actualCost = usedHairItems.reduce((sum, u) => sum + u.costAtTime, 0);
-                    const isReady = usedHairItems.length > 0;
+                    const usedBulkItemsList = order.usedBulkItems ?? [];
+                    const actualCost =
+                      usedHairItems.reduce((sum, u) => sum + u.costAtTime, 0) +
+                      usedBulkItemsList.reduce((sum, u) => sum + u.unitCostAtTime * u.quantity, 0);
+                    const hasAnyAssignment = usedHairItems.length > 0 || usedBulkItemsList.length > 0;
                     return (
                       <tr key={order.id}>
+                        <td className="mono">{order.showroomCode || order.id}</td>
                         <td>{order.notes || '—'}</td>
-                        <td>{isReady ? `₪${actualCost.toLocaleString()}` : '—'}</td>
+                        <td>{hasAnyAssignment ? `₪${actualCost.toLocaleString()}` : '—'}</td>
                         <td>₪{(order.retailPrice ?? 0).toLocaleString()}</td>
                         <td>
-                          <span className={`status-badge ${isReady ? 'status-available' : 'status-showroom'}`}>
-                            {isReady ? 'מוכנה' : 'בבנייה'}
-                          </span>
+                          <CustomSelect
+                            value={order.showroomStatus ?? 'בבנייה'}
+                            onChange={(value) =>
+                              updateDoc(doc(db, 'orders', order.id), { showroomStatus: value as ShowroomBuildStatus }).catch(
+                                (err) => console.error('Error updating showroom status:', err)
+                              )
+                            }
+                            options={SHOWROOM_BUILD_STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
+                          />
                         </td>
                         <td>
                           <button
@@ -725,6 +782,12 @@ const Inventory: React.FC = () => {
                             onClick={() => setAssigningShowroomOrderId(order.id)}
                           >
                             🧵 ניהול שיוך שיער
+                          </button>
+                          <button
+                            className="btn-secondary merge-log-btn"
+                            onClick={() => setAssigningBulkItemsOrderId(order.id)}
+                          >
+                            📦 ניהול פריטי מלאי
                           </button>
                           <button
                             className="btn-secondary merge-log-btn"
@@ -818,6 +881,7 @@ const Inventory: React.FC = () => {
       <ShowroomStockFormModal
         isOpen={isShowroomFormOpen}
         editingOrder={editingShowroomOrder}
+        nextShowroomCode={nextShowroomCode}
         onClose={() => setIsShowroomFormOpen(false)}
         onSaved={() => setIsShowroomFormOpen(false)}
       />
@@ -839,6 +903,12 @@ const Inventory: React.FC = () => {
         onClose={() => setAssigningShowroomOrderId(null)}
       />
 
+      <AssignBulkItemsModal
+        isOpen={assigningBulkItemsOrderId !== null}
+        order={assigningBulkItemsOrder}
+        onClose={() => setAssigningBulkItemsOrderId(null)}
+      />
+
       <SellShowroomStockModal
         isOpen={sellingShowroomOrderId !== null}
         order={sellingShowroomOrder}
@@ -850,8 +920,9 @@ const Inventory: React.FC = () => {
         isOpen={deletingShowroomOrderId !== null}
         title="מחיקת פאת תצוגה"
         message={
-          deletingShowroomOrder && (deletingShowroomOrder.usedHairItems ?? []).length > 0
-            ? 'לפאה הזו כבר משויך שיער בפועל - המחיקה תחזיר את המשקל/השווי לכל קוקו ששויך אליה, ואז תמחק את הפאה לצמיתות. להמשיך?'
+          deletingShowroomOrder &&
+          ((deletingShowroomOrder.usedHairItems ?? []).length > 0 || (deletingShowroomOrder.usedBulkItems ?? []).length > 0)
+            ? 'לפאה הזו כבר משויך שיער ו/או פריטי מלאי בפועל - המחיקה תחזיר את המשקל/השווי/הכמות לכל פריט ששויך אליה, ואז תמחק את הפאה לצמיתות. להמשיך?'
             : 'למחוק את פאת התצוגה הזו לצמיתות?'
         }
         variant="danger"
