@@ -14,6 +14,7 @@ import RemnantMergeLogModal from './RemnantMergeLogModal';
 import ShowroomStockFormModal from './ShowroomStockFormModal';
 import SellShowroomStockModal from './SellShowroomStockModal';
 import AssignBulkItemsModal from './AssignBulkItemsModal';
+import ShowroomStockDetailsPanel from './ShowroomStockDetailsPanel';
 import AssignHairModal from '../../components/orders/AssignHairModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import CustomSelect from '../../components/common/CustomSelect';
@@ -55,6 +56,7 @@ const Inventory: React.FC = () => {
 
   // --- פאות תצוגה (orders עם isShowroomStock: true && clientId ריק - ראו Order ב-Sales.tsx) ---
   const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedShowroomOrderId, setSelectedShowroomOrderId] = useState<string | null>(null);
   const [isShowroomFormOpen, setIsShowroomFormOpen] = useState(false);
   const [editingShowroomOrderId, setEditingShowroomOrderId] = useState<string | null>(null);
   const [assigningShowroomOrderId, setAssigningShowroomOrderId] = useState<string | null>(null);
@@ -198,6 +200,7 @@ const Inventory: React.FC = () => {
   // כל ה-ids הבאים נגזרים מ-hairItems/orders החיים (לא state של האובייקט
   // עצמו) - כדי שהמודלים תמיד יראו עדכון חי, באותו דפוס כמו mergeLogBox למטה.
   const mergeLogBox = hairItems.find((item) => item.id === mergeLogBoxId) || null;
+  const selectedShowroomOrder = orders.find((o) => o.id === selectedShowroomOrderId) || null;
   const editingShowroomOrder = orders.find((o) => o.id === editingShowroomOrderId) || null;
   const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
   const assigningBulkItemsOrder = orders.find((o) => o.id === assigningBulkItemsOrderId) || null;
@@ -738,82 +741,40 @@ const Inventory: React.FC = () => {
                 <tr>
                   <th>מזהה</th>
                   <th>מפרט</th>
-                  <th>עלות מחושבת</th>
                   <th>מחיר מכירה מבוקש</th>
                   <th>סטטוס</th>
-                  <th>פעולות</th>
                 </tr>
               </thead>
               <tbody>
                 {showroomOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="empty-state">
+                    <td colSpan={4} className="empty-state">
                       אין כרגע פאות תצוגה - אפשר ליצור חדשה בכפתור למעלה
                     </td>
                   </tr>
                 ) : (
-                  showroomOrders.map((order) => {
-                    const usedHairItems = order.usedHairItems ?? [];
-                    const usedBulkItemsList = order.usedBulkItems ?? [];
-                    const actualCost =
-                      usedHairItems.reduce((sum, u) => sum + u.costAtTime, 0) +
-                      usedBulkItemsList.reduce((sum, u) => sum + u.unitCostAtTime * u.quantity, 0);
-                    const hasAnyAssignment = usedHairItems.length > 0 || usedBulkItemsList.length > 0;
-                    return (
-                      <tr key={order.id}>
-                        <td className="mono">{order.showroomCode || order.id}</td>
-                        <td>{order.notes || '—'}</td>
-                        <td>{hasAnyAssignment ? `₪${actualCost.toLocaleString()}` : '—'}</td>
-                        <td>₪{(order.retailPrice ?? 0).toLocaleString()}</td>
-                        <td>
-                          <CustomSelect
-                            value={order.showroomStatus ?? 'בבנייה'}
-                            onChange={(value) =>
-                              updateDoc(doc(db, 'orders', order.id), { showroomStatus: value as ShowroomBuildStatus }).catch(
-                                (err) => console.error('Error updating showroom status:', err)
-                              )
-                            }
-                            options={SHOWROOM_BUILD_STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
-                          />
-                        </td>
-                        <td>
-                          <button
-                            className="btn-secondary merge-remnant-btn"
-                            onClick={() => setAssigningShowroomOrderId(order.id)}
-                          >
-                            🧵 ניהול שיוך שיער
-                          </button>
-                          <button
-                            className="btn-secondary merge-log-btn"
-                            onClick={() => setAssigningBulkItemsOrderId(order.id)}
-                          >
-                            📦 ניהול פריטי מלאי
-                          </button>
-                          <button
-                            className="btn-secondary merge-log-btn"
-                            onClick={() => {
-                              setEditingShowroomOrderId(order.id);
-                              setIsShowroomFormOpen(true);
-                            }}
-                          >
-                            ✏️ עריכה
-                          </button>
-                          <button
-                            className="btn-primary showroom-sell-btn"
-                            onClick={() => setSellingShowroomOrderId(order.id)}
-                          >
-                            💰 מכירה
-                          </button>
-                          <button
-                            className="btn-secondary showroom-delete-btn"
-                            onClick={() => setDeletingShowroomOrderId(order.id)}
-                          >
-                            🗑️ מחיקה
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
+                  showroomOrders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="showroom-row"
+                      onClick={() => setSelectedShowroomOrderId(order.id)}
+                    >
+                      <td className="mono">{order.showroomCode || order.id}</td>
+                      <td>{order.notes || '—'}</td>
+                      <td>₪{(order.retailPrice ?? 0).toLocaleString()}</td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <CustomSelect
+                          value={order.showroomStatus ?? 'בבנייה'}
+                          onChange={(value) =>
+                            updateDoc(doc(db, 'orders', order.id), { showroomStatus: value as ShowroomBuildStatus }).catch(
+                              (err) => console.error('Error updating showroom status:', err)
+                            )
+                          }
+                          options={SHOWROOM_BUILD_STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
+                        />
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -876,6 +837,20 @@ const Inventory: React.FC = () => {
         variant="warning"
         onConfirm={handleConfirmUndoMerge}
         onCancel={() => setUndoConfirm(null)}
+      />
+
+      <ShowroomStockDetailsPanel
+        isOpen={selectedShowroomOrderId !== null}
+        order={selectedShowroomOrder}
+        onClose={() => setSelectedShowroomOrderId(null)}
+        onOpenAssignHair={() => setAssigningShowroomOrderId(selectedShowroomOrderId)}
+        onOpenAssignBulkItems={() => setAssigningBulkItemsOrderId(selectedShowroomOrderId)}
+        onOpenEdit={() => {
+          setEditingShowroomOrderId(selectedShowroomOrderId);
+          setIsShowroomFormOpen(true);
+        }}
+        onOpenSell={() => setSellingShowroomOrderId(selectedShowroomOrderId)}
+        onDelete={() => setDeletingShowroomOrderId(selectedShowroomOrderId)}
       />
 
       <ShowroomStockFormModal

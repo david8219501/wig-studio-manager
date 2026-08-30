@@ -298,21 +298,11 @@
   margin-inline-start: 6px;
 }
 
-.showroom-sell-btn {
-  padding: 7px 12px;
-  font-size: 13px;
-  white-space: nowrap;
-  margin-inline-start: 6px;
-}
-
-.showroom-delete-btn {
-  padding: 7px 12px;
-  font-size: 13px;
-  white-space: nowrap;
-  margin-inline-start: 6px;
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  border-color: transparent;
+/* כל שורה בטבלת "פאות תצוגה" פותחת את ShowroomStockDetailsPanel בלחיצה
+   (חוץ מבחירת הסטטוס - יש לה stopPropagation) - אותו דפוס כמו .sales-row
+   ב-Sales.css. אפקט ה-hover עצמו כבר גנרי לכל שורה בטבלה (למעלה). */
+.showroom-row {
+  cursor: pointer;
 }
 
 .merge-log-list {

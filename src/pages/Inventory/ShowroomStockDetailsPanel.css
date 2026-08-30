@@ -1,0 +1,287 @@
+/* ShowroomStockDetailsPanel.css - פאנל נשלף מהצד, באותו דפוס עיצובי כמו
+   OrderDetailsPanel.css/ClientDrawer.css (overlay + פאנל קבוע), אך עצמאי
+   לחלוטין (מחלקות משלו) - Inventory.tsx לא טוען CSS של קבצים אחרים. */
+
+.showroom-details-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 900;
+  animation: showroomDetailsFadeIn 0.2s ease-out;
+}
+
+.showroom-details-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 720px;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  direction: rtl;
+  animation: showroomDetailsSlideIn var(--duration-base) var(--easing);
+}
+
+@keyframes showroomDetailsSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes showroomDetailsFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.showroom-details-header {
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: var(--color-background);
+  gap: 20px;
+}
+
+.showroom-details-header-right h2 {
+  font-size: 20px;
+  color: var(--color-primary);
+  margin: 0 0 2px;
+}
+
+.showroom-details-header-right p {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.showroom-details-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.showroom-details-status-badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+.showroom-details-close-btn {
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--color-primary);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--easing);
+  flex-shrink: 0;
+}
+
+.showroom-details-close-btn:hover {
+  background: var(--color-border);
+}
+
+.showroom-details-body {
+  flex: 1;
+  padding: 28px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.showroom-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.showroom-details-section h3 {
+  font-size: 16px;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.showroom-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.showroom-detail-box {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.showroom-detail-box label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.showroom-detail-box p {
+  font-size: 14px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.showroom-details-empty {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.showroom-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.showroom-details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 13px;
+}
+
+.showroom-details-mono {
+  font-family: var(--font-mono);
+}
+
+.showroom-details-font-bold {
+  font-weight: 700;
+}
+
+.showroom-details-footer {
+  padding: 18px 28px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.showroom-details-footer-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.showroom-details-btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--easing);
+}
+
+.showroom-details-btn-primary:hover {
+  opacity: 0.88;
+}
+
+.showroom-details-btn-secondary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.showroom-details-btn-secondary:hover {
+  background: var(--color-surface-hover);
+}
+
+/* כפתור פעולה בולט (לא btn-secondary הרגיל, שעל רקע --color-background
+   נראה שקוף/כמו טקסט) - למשל "ניהול שיוך שיער"/"ניהול פריטי מלאי". */
+.showroom-details-btn-accent {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--easing);
+}
+
+.showroom-details-btn-accent:hover {
+  opacity: 0.85;
+}
+
+/* כפתור המחיקה מובדל בכוונה (צבע + מיקום נפרד מיתר הפעולות) - פעולה
+   הרסנית שלא הפיכה, אותו דפוס אזהרה ויזואלית כמו showroom-delete-btn/
+   confirm-dialog-danger בשאר האתר. */
+.showroom-details-btn-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--easing);
+}
+
+.showroom-details-btn-danger:hover {
+  opacity: 0.85;
+}
+
+@media (max-width: 700px) {
+  .showroom-details-panel {
+    max-width: 100%;
+  }
+
+  .showroom-details-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .showroom-details-footer-actions {
+    justify-content: stretch;
+  }
+
+  .showroom-details-footer-actions button {
+    flex: 1;
+  }
+}
