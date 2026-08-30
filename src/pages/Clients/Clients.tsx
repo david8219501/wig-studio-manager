@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { collection, deleteDoc, doc, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import ClientDrawer from "../../components/clients/ClientDrawer";
 import AddClientModal from "../../components/modals/AddClientModal";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import "./Clients.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -10,6 +11,7 @@ import "./Clients.css";
 export interface Client {
   id: string;
   name: string;
+  firstName?: string; // נכתב תמיד ע"י AddClientModal/Calendar.tsx בפועל - משמש למיון אלפביתי (ראו sortedClients)
   phone: string;
   email: string;
   notes: string;
@@ -28,6 +30,9 @@ const Clients: React.FC = () => {
   // State עבור פאנל הלקוחה הנשלף (Drawer)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // State עבור אישור מחיקה (ConfirmDialog במקום window.confirm)
+  const [deleteConfirmClient, setDeleteConfirmClient] = useState<Client | null>(null);
 
   // האזנה חיה ל-Firestore, מסוננת רק ללקוחות של העסק המחובר (businessId = uid)
   useEffect(() => {
@@ -58,13 +63,10 @@ const Clients: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Delete a client
-  const handleDelete = async (clientId: string, clientName: string) => {
-    const confirmed = window.confirm(
-      `האם את בטוחה שברצונך למחוק את ${clientName}?`
-    );
-    if (!confirmed) return;
-
+  // מחיקת לקוחה בפועל - נקראת רק אחרי אישור ב-ConfirmDialog (ראו handleDelete)
+  const performDelete = async () => {
+    if (!deleteConfirmClient) return;
+    const clientId = deleteConfirmClient.id;
     try {
       await deleteDoc(doc(db, "clients", clientId));
       setClients((prev) => prev.filter((c) => c.id !== clientId));
@@ -74,7 +76,13 @@ const Clients: React.FC = () => {
     } catch (err) {
       console.error("Error deleting client:", err);
       alert("שגיאה במחיקת הלקוחה. נסי שוב.");
+    } finally {
+      setDeleteConfirmClient(null);
     }
+  };
+
+  const handleDelete = (client: Client) => {
+    setDeleteConfirmClient(client);
   };
 
   // Edit client handler
@@ -90,8 +98,19 @@ const Clients: React.FC = () => {
     setIsDrawerOpen(true);
   };
 
+  // מיון אלפביתי לפי שם פרטי - ברירת מחדל, במקום סדר טעינה/יצירה. firstName
+  // נכתב תמיד בפועל (AddClientModal.tsx/Calendar.tsx), אבל fallback לפירוק
+  // name ליתר ביטחון על רשומות ישנות/חריגות בלי השדה.
+  const sortedClients = useMemo(
+    () =>
+      [...clients].sort((a, b) =>
+        (a.firstName || a.name?.split(" ")[0] || "").localeCompare(b.firstName || b.name?.split(" ")[0] || "", "he")
+      ),
+    [clients]
+  );
+
   // Filtered list
-  const filtered = clients.filter((c) => {
+  const filtered = sortedClients.filter((c) => {
     const q = search.toLowerCase();
     return (
       c.name?.toLowerCase().includes(q) ||
@@ -216,7 +235,7 @@ const Clients: React.FC = () => {
                         title={`מחקי את ${client.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(client.id, client.name);
+                          handleDelete(client);
                         }}
                         aria-label={`מחקי את ${client.name}`}
                       >
@@ -247,6 +266,15 @@ const Clients: React.FC = () => {
         }}
         onClientAdded={() => {}}
         editingClient={selectedClient}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteConfirmClient !== null}
+        title="מחיקת לקוחה"
+        message={`האם את בטוחה שברצונך למחוק את ${deleteConfirmClient?.name}?`}
+        variant="danger"
+        onConfirm={performDelete}
+        onCancel={() => setDeleteConfirmClient(null)}
       />
     </div>
   );
