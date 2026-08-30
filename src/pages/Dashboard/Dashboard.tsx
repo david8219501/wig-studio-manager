@@ -6,6 +6,7 @@ import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/fire
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import type { BulkItem } from "../../types";
+import { formatDateIL, getMonthNameIL } from "../../utils/formatDate";
 import "./Dashboard.css";
 
 interface ClientRow {
@@ -55,12 +56,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const currentDate = new Date().toLocaleDateString("he-IL", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const currentDate = formatDateIL(new Date(), { weekday: "long", month: "long" });
 
   useEffect(() => {
     const businessId = auth.currentUser?.uid;
@@ -162,7 +158,7 @@ export default function Dashboard() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        label: d.toLocaleDateString("he-IL", { month: "short" }),
+        label: getMonthNameIL(d, "short"),
       });
     }
     const revenueChartData = months.map(({ key, label }) => ({

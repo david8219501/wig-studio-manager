@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { Plus } from "lucide-react";
 import { db, auth } from "../../services/firebase";
+import { formatDateIL } from "../../utils/formatDate";
 import DateInput from "../../components/common/DateInput";
 import TimeInput from "../../components/common/TimeInput";
 import CustomSelect from "../../components/common/CustomSelect";
@@ -124,13 +125,6 @@ export default function Calendar() {
     };
   }, []);
 
-  const formatDateToIL = (dateStr: string) => {
-    if (!dateStr) return "";
-    const [year, month, day] = dateStr.split("-");
-    if (!year || !month || !day) return dateStr;
-    return `${day}/${month}/${year}`;
-  };
-
   const handlePrev = () => {
     const newDate = new Date(currentDate);
     if (viewMode === "weekly") {
@@ -165,7 +159,7 @@ export default function Calendar() {
       days.push({
         dayName: dayNames[d.getDay()],
         dateIso: isoString,
-        dateFormatted: formatDateToIL(isoString),
+        dateFormatted: formatDateIL(isoString),
       });
     }
     return days;
@@ -380,8 +374,8 @@ export default function Calendar() {
             <button className="nav-arrow-btn" onClick={handlePrev} title="הקודם">&lt;</button>
             <h2>
               {viewMode === "weekly" 
-                ? `שבוע מתאריך ${formatDateToIL(daysList[0]?.dateIso)}` 
-                : `${currentDate.toLocaleDateString("he-IL", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`
+                ? `שבוע מתאריך ${daysList[0] ? formatDateIL(daysList[0].dateIso) : ""}`
+                : formatDateIL(currentDate, { weekday: "long", month: "long" })
               }
             </h2>
             <button className="nav-arrow-btn" onClick={handleNext} title="הבא">&gt;</button>

@@ -5,6 +5,7 @@
 // המודל הזה רק מציג ומזמין ביטול, לא מחליט אם הוא מותר.
 import React, { useState } from 'react';
 import type { HairItem } from '../../types';
+import { formatDateIL } from '../../utils/formatDate';
 
 interface RemnantMergeLogModalProps {
   isOpen: boolean;
@@ -53,7 +54,7 @@ const RemnantMergeLogModal: React.FC<RemnantMergeLogModalProps> = ({ isOpen, box
                 <div className="merge-log-info">
                   <span className="font-bold">{entry.sourceItemLabel}</span>
                   <span className="mono">{entry.weightMerged} גרם · ₪{entry.valueMerged.toFixed(0)}</span>
-                  <span className="merge-log-date">{new Date(entry.mergedAt).toLocaleDateString('he-IL')}</span>
+                  <span className="merge-log-date">{formatDateIL(entry.mergedAt)}</span>
                 </div>
                 <button
                   type="button"

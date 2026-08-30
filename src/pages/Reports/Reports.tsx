@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import type { BulkItem } from "../../types";
+import { getMonthNameIL } from "../../utils/formatDate";
 import "./Reports.css";
 
 interface ExpenseRow {
@@ -119,7 +120,7 @@ export default function Reports() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        label: d.toLocaleDateString("he-IL", { month: "long" }),
+        label: getMonthNameIL(d, "long"),
       });
     }
     const monthlyRows = months
