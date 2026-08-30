@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
-import type { BulkItem, HairItem, UsedBulkItem, UsedHairItem } from "../../types";
+import type { BulkItem, UsedBulkItem, UsedHairItem } from "../../types";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, type HairCostSettings } from "../../utils/hairCost";
 import { createOrder } from "../../utils/orderCreation";
 import DateInput from "../common/DateInput";
@@ -27,7 +27,6 @@ interface NewOrderWizardProps {
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   new: "פאה חדשה",
-  inventory: "פאת תצוגה",
   repair: "תיקון / שירות",
 };
 
@@ -35,7 +34,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   const [step, setStep] = useState(1);
 
   // Step 1: סוג הזמנה
-  const [orderType, setOrderType] = useState<"new" | "inventory" | "repair" | "other">("new");
+  const [orderType, setOrderType] = useState<"new" | "repair" | "other">("new");
 
   // Step 2: לקוחה - נטענת בפועל מ-Firestore
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -63,11 +62,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   const [bulkItemPickerId, setBulkItemPickerId] = useState("");
   const [bulkItemPickerQty, setBulkItemPickerQty] = useState<number | "">(1);
   const [bulkItemQtyError, setBulkItemQtyError] = useState<string | null>(null);
-
-  // Step 3 (פאת תצוגה): בחירת קוקו/פאה קיימים במלאי בסטטוס "פאת תצוגה"
-  const [showroomItems, setShowroomItems] = useState<HairItem[]>([]);
-  const [showroomSearch, setShowroomSearch] = useState("");
-  const [selectedShowroomItemId, setSelectedShowroomItemId] = useState("");
 
   // Step 4: תמחיור ותשלומים
   const [price, setPrice] = useState<number | "">(0);
@@ -97,8 +91,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     setBulkItemPickerId("");
     setBulkItemPickerQty(1);
     setBulkItemQtyError(null);
-    setShowroomSearch("");
-    setSelectedShowroomItemId("");
     setPrice(0);
     setDueDate("");
     setPaymentsCount(1);
@@ -123,16 +115,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
           setBulkItemsCatalog(items);
         })
         .catch((err) => console.error("Error loading bulk items for wizard:", err));
-
-      getDocs(query(collection(db, "hairItems"), where("businessId", "==", businessId)))
-        .then((snapshot) => {
-          const items: HairItem[] = snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...(docSnap.data() as Omit<HairItem, "id">),
-          }));
-          setShowroomItems(items.filter((item) => item.status === "showroom"));
-        })
-        .catch((err) => console.error("Error loading showroom items for wizard:", err));
     }
 
     if (preselectedClient) {
@@ -164,22 +146,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       hairCostSettings
     ).hairCost;
   }, [hairLength, hairStructure, hairFullness, hairCostSettings]);
-
-  const filteredShowroomItems = React.useMemo(
-    () =>
-      showroomItems.filter(
-        (item) =>
-          showroomSearch.trim() === "" ||
-          item.id.toLowerCase().includes(showroomSearch.toLowerCase()) ||
-          item.color.toLowerCase().includes(showroomSearch.toLowerCase())
-      ),
-    [showroomItems, showroomSearch]
-  );
-
-  const selectedShowroomItem = React.useMemo(
-    () => showroomItems.find((item) => item.id === selectedShowroomItemId) || null,
-    [showroomItems, selectedShowroomItemId]
-  );
 
   // וולידציה זהה לדפוס שכבר קיים ב-AssignHairModal.tsx (gramsExceedsStock),
   // OrderDetailsPanel.tsx (bulkQtyExceedsStock) ו-QuickRetailSaleModal.tsx -
@@ -217,9 +183,18 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
 
   if (!isOpen) return null;
 
+  // כשהאשף נפתח עם preselectedClient (מתוך ClientDrawer של לקוחה ספציפית) -
+  // הלקוחה כבר ידועה מההקשר, אז מדלגים על שלב 2 (בחירת לקוחה) לגמרי בשני
+  // הכיוונים (הבא/חזור) - אין טעם לבקש לבחור/לאשר שוב לקוחה שכבר נבחרה.
   const handleNext = () => {
-    // תיקון/שירות מקבל טופס נפרד ופשוט - ברגע שהלקוחה נבחרה (סוף שלב 2),
-    // יוצאים מהאשף לגמרי במקום להמשיך לשלבים 3-4 שלו.
+    // תיקון/שירות מקבל טופס נפרד ופשוט - ברגע שהלקוחה ידועה (מ-preselectedClient
+    // בשלב 1, או בסוף שלב 2 הרגיל כשאין preselectedClient), יוצאים מהאשף
+    // לגמרי במקום להמשיך לשלבים 3-4 שלו.
+    if (step === 1 && orderType === "repair" && preselectedClient) {
+      onOpenRepairForm(preselectedClient);
+      onClose();
+      return;
+    }
     if (step === 2 && orderType === "repair") {
       const client = clients.find((c) => c.id === selectedClientId);
       if (client) {
@@ -228,7 +203,19 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         return;
       }
     }
+    if (step === 1) {
+      setStep(preselectedClient ? 3 : 2);
+      return;
+    }
     setStep(step + 1);
+  };
+
+  const handleBack = () => {
+    if (step === 3 && preselectedClient) {
+      setStep(1);
+      return;
+    }
+    setStep(step - 1);
   };
 
   const handleFinish = async () => {
@@ -238,11 +225,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       setSaveError("יש לבחור לקוחה לפני יצירת ההזמנה.");
       return;
     }
-    if (orderType === "inventory" && !selectedShowroomItem) {
-      setSaveError("יש לבחור פאת תצוגה למכירה.");
-      return;
-    }
-
     setSaving(true);
     setSaveError(null);
 
@@ -267,43 +249,23 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       }
     }
 
-    const isShowroomSale = orderType === "inventory" && selectedShowroomItem;
+    const specsSummary = [
+      `מידה: ${size}`,
+      `תנועה: ${texture}`,
+      `עבודת יד: ${handwork}`,
+      repairs !== "לא" ? `תיקונים: ${repairs}` : null,
+      hairLength ? `אורך: ${hairLength} ס״מ` : null,
+      hairStructure ? `מבנה: ${hairStructure}` : null,
+      hairFullness ? `מלאות: ${hairFullness}` : null,
+      color ? `צבע: ${color}` : null,
+      notes ? `הערות: ${notes}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
 
-    const specsSummary = isShowroomSale
-      ? [
-          `פאת תצוגה: ${selectedShowroomItem!.id}`,
-          `גוון: ${selectedShowroomItem!.color}`,
-          `אורך: ${selectedShowroomItem!.length} ס״מ`,
-          notes ? `הערות: ${notes}` : null,
-        ]
-          .filter(Boolean)
-          .join(" | ")
-      : [
-          `מידה: ${size}`,
-          `תנועה: ${texture}`,
-          `עבודת יד: ${handwork}`,
-          repairs !== "לא" ? `תיקונים: ${repairs}` : null,
-          hairLength ? `אורך: ${hairLength} ס״מ` : null,
-          hairStructure ? `מבנה: ${hairStructure}` : null,
-          hairFullness ? `מלאות: ${hairFullness}` : null,
-          color ? `צבע: ${color}` : null,
-          notes ? `הערות: ${notes}` : null,
-        ]
-          .filter(Boolean)
-          .join(" | ");
-
-    // פאת תצוגה שנמכרת: כל עלות הקוקו (100% מ-costPrice) נכנסת כעלות מלאה בפועל -
-    // אין כאן "אומדן", השיוך ידוע במלואו כבר ברגע המכירה.
-    const usedHairItems: UsedHairItem[] = isShowroomSale
-      ? [
-          {
-            hairItemId: selectedShowroomItem!.id,
-            hairItemLabel: `${selectedShowroomItem!.id} · ${selectedShowroomItem!.color} · ${selectedShowroomItem!.length} ס״מ`,
-            gramsUsed: selectedShowroomItem!.initialWeight,
-            costAtTime: selectedShowroomItem!.costPrice,
-          },
-        ]
-      : [];
+    // שיוך שיער בפועל להזמנה חדשה נעשה תמיד אחרי היצירה, דרך AssignHairModal
+    // (Sales.tsx) - לא כאן.
+    const usedHairItems: UsedHairItem[] = [];
 
     try {
       await createOrder({
@@ -317,7 +279,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         paymentsCount,
         usedBulkItems,
         usedHairItems,
-        hairCostEstimated: isShowroomSale ? 0 : hairCostEstimated,
+        hairCostEstimated,
         notes: specsSummary,
       });
 
@@ -332,14 +294,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
           return updateDoc(doc(db, "bulkItems", itemId), { quantity: remaining });
         })
       );
-
-      // פאת התצוגה שנמכרה יורדת מהמלאי הזמין כפאת תצוגה
-      if (isShowroomSale) {
-        await updateDoc(doc(db, "hairItems", selectedShowroomItem!.id), {
-          status: "sold",
-          currentWeight: 0,
-        });
-      }
 
       onOrderCreated({});
       onClose();
@@ -373,14 +327,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 >
                   <span className="type-icon">✨</span>
                   <span className="type-title">פאה חדשה</span>
-                </button>
-                <button
-                  type="button"
-                  className={`type-card ${orderType === "inventory" ? "active" : ""}`}
-                  onClick={() => setOrderType("inventory")}
-                >
-                  <span className="type-icon">📦</span>
-                  <span className="type-title">פאת תצוגה</span>
                 </button>
                 <button
                   type="button"
@@ -435,36 +381,8 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
             </div>
           )}
 
-          {/* Step 3: מפרט טכני של הפאה (Pills) - או בחירת פאת תצוגה למכירה */}
-          {step === 3 && orderType === "inventory" && (
-            <div className="wizard-step">
-              <h3>בחירת פאת תצוגה למכירה</h3>
-              <input
-                type="text"
-                className="wizard-input"
-                placeholder="חיפוש לפי מזהה קוקו או גוון..."
-                value={showroomSearch}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowroomSearch(e.target.value)}
-              />
-              <div className="client-list-preview">
-                {filteredShowroomItems.length === 0 && <p>לא נמצאו פאות תצוגה זמינות למכירה.</p>}
-                {filteredShowroomItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`client-item ${selectedShowroomItemId === item.id ? "active" : ""}`}
-                    onClick={() => setSelectedShowroomItemId(item.id)}
-                  >
-                    🪞 {item.id} — {item.color} · {item.length} ס״מ · ₪{item.costPrice.toLocaleString()}
-                  </div>
-                ))}
-              </div>
-              {selectedShowroomItem && (
-                <div className="hair-cost-hint">עלות קוקו מלאה (100%): ₪{selectedShowroomItem.costPrice.toLocaleString()}</div>
-              )}
-            </div>
-          )}
-
-          {step === 3 && orderType !== "inventory" && (
+          {/* Step 3: מפרט טכני של הפאה (Pills) */}
+          {step === 3 && (
             <div className="wizard-step">
               <h3>מפרט הפאה</h3>
 
@@ -672,7 +590,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         <div className="wizard-footer">
           {saveError && <span className="field-error" style={{ marginInlineEnd: "auto" }}>{saveError}</span>}
           {step > 1 ? (
-            <button type="button" className="btn-secondary" onClick={() => setStep(step - 1)} disabled={saving}>
+            <button type="button" className="btn-secondary" onClick={handleBack} disabled={saving}>
               חזור
             </button>
           ) : (
@@ -686,7 +604,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
               type="button"
               className="btn-primary"
               onClick={handleNext}
-              disabled={(step === 2 && !selectedClientId) || (step === 3 && orderType === "inventory" && !selectedShowroomItemId)}
+              disabled={step === 2 && !selectedClientId}
             >
               הבא
             </button>

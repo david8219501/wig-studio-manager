@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import { createOrder } from "../../utils/orderCreation";
 import { calculateHairCostFromGrams } from "../../utils/hairCost";
+import type { BulkItem, UsedBulkItem } from "../../types";
 import type { ClientOption } from "./NewOrderWizard";
 import "./RepairOrderForm.css";
 
@@ -37,6 +38,14 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // פריטי מלאי פשוט שנוצלו בתיקון (רשת, ראש פאה וכו') - אותה יכולת בדיוק
+  // כמו ב-NewOrderWizard.tsx (handleAddUsedBulkItem/handleRemoveUsedBulkItem).
+  const [bulkItemsCatalog, setBulkItemsCatalog] = useState<BulkItem[]>([]);
+  const [usedBulkItems, setUsedBulkItems] = useState<UsedBulkItem[]>([]);
+  const [bulkItemPickerId, setBulkItemPickerId] = useState("");
+  const [bulkItemPickerQty, setBulkItemPickerQty] = useState<number | "">(1);
+  const [bulkItemQtyError, setBulkItemQtyError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -49,6 +58,10 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
     setPriceTouched(false);
     setNotes("");
     setError(null);
+    setUsedBulkItems([]);
+    setBulkItemPickerId("");
+    setBulkItemPickerQty(1);
+    setBulkItemQtyError(null);
 
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -59,15 +72,60 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
         }
       })
       .catch((err) => console.error("Error loading business settings for repair form:", err));
+
+    getDocs(query(collection(db, "bulkItems"), where("businessId", "==", businessId)))
+      .then((snapshot) => {
+        const items: BulkItem[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<BulkItem, "id">),
+        }));
+        setBulkItemsCatalog(items);
+      })
+      .catch((err) => console.error("Error loading bulk items for repair form:", err));
   }, [isOpen]);
+
+  // וולידציה זהה לדפוס הקיים ב-NewOrderWizard.tsx/AssignHairModal.tsx/
+  // OrderDetailsPanel.tsx - מול המלאי הזמין כולל כמות שכבר נבחרה לאותו
+  // פריט קודם באותה הזמנה.
+  const handleAddUsedBulkItem = () => {
+    const item = bulkItemsCatalog.find((b) => b.id === bulkItemPickerId);
+    const qty = Number(bulkItemPickerQty) || 0;
+    if (!item || qty <= 0) return;
+
+    const alreadyUsedQty = usedBulkItems
+      .filter((used) => used.itemId === item.id)
+      .reduce((sum, used) => sum + used.quantity, 0);
+    const remaining = item.quantity - alreadyUsedQty;
+
+    if (qty > remaining) {
+      setBulkItemQtyError(`הכמות המבוקשת עולה על המלאי הזמין - נותרו רק ${remaining} יח'.`);
+      return;
+    }
+
+    setBulkItemQtyError(null);
+    setUsedBulkItems((prev) => [
+      ...prev,
+      { itemId: item.id, itemName: item.name, quantity: qty, unitCostAtTime: item.unitCost },
+    ]);
+    setBulkItemPickerId("");
+    setBulkItemPickerQty(1);
+  };
+
+  const handleRemoveUsedBulkItem = (index: number) => {
+    setUsedBulkItems((prev) => prev.filter((_, i) => i !== index));
+    setBulkItemQtyError(null);
+  };
+
+  const usedBulkItemsCost = usedBulkItems.reduce((sum, u) => sum + u.unitCostAtTime * u.quantity, 0);
 
   const calc = useMemo(() => {
     if (grams === "" || Number(grams) <= 0) return null;
     const { waste, hairCost } = calculateHairCostFromGrams(Number(grams), settings);
-    const mfgCost = hairCost + Number(skinTop || 0) + Number(net || 0) + Number(color || 0) + Number(extra || 0);
+    const mfgCost =
+      hairCost + Number(skinTop || 0) + Number(net || 0) + Number(color || 0) + Number(extra || 0) + usedBulkItemsCost;
     const suggestedPrice = mfgCost * (1 + settings.profitMargin / 100);
     return { waste, hairCost, mfgCost, suggestedPrice };
-  }, [grams, skinTop, net, color, extra, settings]);
+  }, [grams, skinTop, net, color, extra, usedBulkItemsCost, settings]);
 
   // מציעים מחיר אוטומטית לפי הרווח הרצוי, אבל לא דורסים מחיר שהמשתמשת כבר שינתה ידנית
   useEffect(() => {
@@ -90,6 +148,24 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
     setSaving(true);
     setError(null);
 
+    // בדיקת הגנה נוספת (defense in depth) - אותו דפוס בדיוק כמו
+    // NewOrderWizard.handleFinish: הוולידציה האמיתית כבר קורית ב-
+    // handleAddUsedBulkItem, זו רק רשת ביטחון למקרה שהמלאי השתנה במקביל.
+    const usedQtyByItemId = new Map<string, number>();
+    usedBulkItems.forEach((used) => {
+      usedQtyByItemId.set(used.itemId, (usedQtyByItemId.get(used.itemId) ?? 0) + used.quantity);
+    });
+    for (const [itemId, totalQty] of usedQtyByItemId) {
+      const catalogItem = bulkItemsCatalog.find((b) => b.id === itemId);
+      if (catalogItem && totalQty > catalogItem.quantity) {
+        setError(
+          `הכמות המבוקשת מ-"${catalogItem.name}" עולה על המלאי הזמין (נותרו ${catalogItem.quantity}) - ייתכן שהמלאי השתנה. יש לעדכן את הכמות ולנסות שוב.`
+        );
+        setSaving(false);
+        return;
+      }
+    }
+
     const specsSummary = [
       `גרם שיער: ${grams}`,
       `סקין/טופ: ₪${Number(skinTop || 0)}`,
@@ -111,11 +187,21 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
         totalPrice: Number(price) || 0,
         dueDate: null,
         paymentsCount: 1,
-        usedBulkItems: [],
+        usedBulkItems,
         usedHairItems: [],
         hairCostEstimated: calc.mfgCost,
         notes: specsSummary,
       });
+
+      // הורדת הכמות שנוצלה בפועל מכל פריט מלאי פשוט - מקובצת לפי itemId,
+      // אותו דפוס בדיוק כמו NewOrderWizard.handleFinish.
+      await Promise.all(
+        Array.from(usedQtyByItemId.entries()).map(([itemId, totalQty]) => {
+          const catalogItem = bulkItemsCatalog.find((b) => b.id === itemId);
+          const remaining = (catalogItem?.quantity ?? totalQty) - totalQty;
+          return updateDoc(doc(db, "bulkItems", itemId), { quantity: remaining });
+        })
+      );
 
       onCreated();
       onClose();
@@ -166,6 +252,57 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
               <label>נוספות (₪)</label>
               <input type="number" value={extra} onChange={(e) => setExtra(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
+          </div>
+
+          <div className="pill-group">
+            <label>פריטי מלאי שנוצלו בתיקון (רשת, ראש פאה וכו'):</label>
+
+            {usedBulkItems.length > 0 && (
+              <div className="bulk-item-list">
+                {usedBulkItems.map((used, idx) => (
+                  <div key={idx} className="bulk-item-row">
+                    <span>{used.itemName} × {used.quantity}</span>
+                    <span className="mono">₪{(used.unitCostAtTime * used.quantity).toFixed(0)}</span>
+                    <button
+                      type="button"
+                      className="bulk-item-remove-btn"
+                      onClick={() => handleRemoveUsedBulkItem(idx)}
+                      aria-label="הסרת פריט"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="bulk-item-add-row">
+              <select
+                value={bulkItemPickerId}
+                onChange={(e) => {
+                  setBulkItemPickerId(e.target.value);
+                  setBulkItemQtyError(null);
+                }}
+              >
+                <option value="">בחרי פריט מהמלאי...</option>
+                {bulkItemsCatalog.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name} (במלאי: {b.quantity})</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={1}
+                value={bulkItemPickerQty}
+                onChange={(e) => {
+                  setBulkItemPickerQty(e.target.value === "" ? "" : Number(e.target.value));
+                  setBulkItemQtyError(null);
+                }}
+              />
+              <button type="button" className="btn-secondary" onClick={handleAddUsedBulkItem} disabled={!bulkItemPickerId}>
+                + הוסף פריט מהמלאי
+              </button>
+            </div>
+            {bulkItemQtyError && <span className="field-error">{bulkItemQtyError}</span>}
           </div>
 
           {calc ? (
