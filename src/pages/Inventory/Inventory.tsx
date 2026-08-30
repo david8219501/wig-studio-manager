@@ -13,7 +13,6 @@ import MergeRemnantModal from './MergeRemnantModal';
 import RemnantMergeLogModal from './RemnantMergeLogModal';
 import ShowroomStockFormModal from './ShowroomStockFormModal';
 import SellShowroomStockModal from './SellShowroomStockModal';
-import AssignBulkItemsModal from './AssignBulkItemsModal';
 import ShowroomStockDetailsPanel from './ShowroomStockDetailsPanel';
 import AssignHairModal from '../../components/orders/AssignHairModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -60,7 +59,6 @@ const Inventory: React.FC = () => {
   const [isShowroomFormOpen, setIsShowroomFormOpen] = useState(false);
   const [editingShowroomOrderId, setEditingShowroomOrderId] = useState<string | null>(null);
   const [assigningShowroomOrderId, setAssigningShowroomOrderId] = useState<string | null>(null);
-  const [assigningBulkItemsOrderId, setAssigningBulkItemsOrderId] = useState<string | null>(null);
   const [sellingShowroomOrderId, setSellingShowroomOrderId] = useState<string | null>(null);
   const [deletingShowroomOrderId, setDeletingShowroomOrderId] = useState<string | null>(null);
 
@@ -203,7 +201,6 @@ const Inventory: React.FC = () => {
   const selectedShowroomOrder = orders.find((o) => o.id === selectedShowroomOrderId) || null;
   const editingShowroomOrder = orders.find((o) => o.id === editingShowroomOrderId) || null;
   const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
-  const assigningBulkItemsOrder = orders.find((o) => o.id === assigningBulkItemsOrderId) || null;
   const sellingShowroomOrder = orders.find((o) => o.id === sellingShowroomOrderId) || null;
   const deletingShowroomOrder = orders.find((o) => o.id === deletingShowroomOrderId) || null;
 
@@ -844,7 +841,6 @@ const Inventory: React.FC = () => {
         order={selectedShowroomOrder}
         onClose={() => setSelectedShowroomOrderId(null)}
         onOpenAssignHair={() => setAssigningShowroomOrderId(selectedShowroomOrderId)}
-        onOpenAssignBulkItems={() => setAssigningBulkItemsOrderId(selectedShowroomOrderId)}
         onOpenEdit={() => {
           setEditingShowroomOrderId(selectedShowroomOrderId);
           setIsShowroomFormOpen(true);
@@ -876,12 +872,6 @@ const Inventory: React.FC = () => {
             : null
         }
         onClose={() => setAssigningShowroomOrderId(null)}
-      />
-
-      <AssignBulkItemsModal
-        isOpen={assigningBulkItemsOrderId !== null}
-        order={assigningBulkItemsOrder}
-        onClose={() => setAssigningBulkItemsOrderId(null)}
       />
 
       <SellShowroomStockModal
