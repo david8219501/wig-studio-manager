@@ -11,6 +11,7 @@ import CreateRemnantBoxModal from './CreateRemnantBoxModal';
 import MergeRemnantModal from './MergeRemnantModal';
 import RemnantMergeLogModal from './RemnantMergeLogModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import NewOrderWizard from '../../components/orders/NewOrderWizard';
 import './Inventory.css';
 
 const STATUS_LABELS: Record<HairItem['status'], string> = {
@@ -20,7 +21,7 @@ const STATUS_LABELS: Record<HairItem['status'], string> = {
   depleted: 'נוצל',
 };
 
-type TabKey = 'hair' | 'bulk';
+type TabKey = 'hair' | 'bulk' | 'showroom';
 
 const Inventory: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('hair');
@@ -45,6 +46,9 @@ const Inventory: React.FC = () => {
   const [isAddBulkModalOpen, setIsAddBulkModalOpen] = useState(false);
   const [restockTarget, setRestockTarget] = useState<BulkItem | null>(null);
   const [quickSaleTarget, setQuickSaleTarget] = useState<BulkItem | null>(null);
+
+  // --- פאות תצוגה (hairItems עם status === 'showroom') ---
+  const [sellShowroomItemId, setSellShowroomItemId] = useState<string | null>(null);
 
   // --- האזנה חיה ל-Firestore, מסוננת רק לנתונים של העסק המחובר (businessId = uid) ---
   useEffect(() => {
@@ -116,6 +120,12 @@ const Inventory: React.FC = () => {
   // קופסאות שאריות פעילות - יעדים אפשריים למיזוג שארית קוקו קטן
   const remnantBoxes = useMemo(
     () => hairItems.filter((item) => item.isRemnantBox && item.status === 'available'),
+    [hairItems]
+  );
+
+  // פאות תצוגה - קוקוים שסומנו כ"פאת תצוגה" (status === 'showroom'), ללשונית הייעודית
+  const showroomItems = useMemo(
+    () => hairItems.filter((item) => item.status === 'showroom'),
     [hairItems]
   );
 
@@ -299,6 +309,17 @@ const Inventory: React.FC = () => {
     setUndoConfirm(null);
   };
 
+  // מסמנת קוקו רגיל כ"פאת תצוגה" - הוא "עובר" ללשונית פאות התצוגה
+  // (ונעלם מטבלת מלאי השיער הרגילה, כי הוא כבר לא status: 'available').
+  const handleMarkAsShowroom = async (id: string) => {
+    await updateDoc(doc(db, 'hairItems', id), { status: 'showroom' });
+  };
+
+  // מבטלת את סימון "פאת תצוגה" - מחזירה את הפריט לטבלת המלאי הרגילה.
+  const handleReturnToAvailable = async (id: string) => {
+    await updateDoc(doc(db, 'hairItems', id), { status: 'available' });
+  };
+
   const handleAddBulkItem = async (item: BulkItem) => {
     const { id, ...data } = item;
     await setDoc(doc(db, 'bulkItems', id), { ...data, businessId: auth.currentUser!.uid });
@@ -360,6 +381,12 @@ const Inventory: React.FC = () => {
             onClick={() => setActiveTab('bulk')}
           >
             מלאי פשוט
+          </button>
+          <button
+            className={activeTab === 'showroom' ? 'tab-btn active' : 'tab-btn'}
+            onClick={() => setActiveTab('showroom')}
+          >
+            פאות תצוגה{showroomItems.length ? ` (${showroomItems.length})` : ''}
           </button>
         </div>
       </div>
@@ -465,6 +492,7 @@ const Inventory: React.FC = () => {
                   filteredHairItems.map((item) => {
                     const isRemnant = item.isRemnantBox === true;
                     const canMerge = !isRemnant && item.currentWeight > 0;
+                    const canMarkAsShowroom = !isRemnant && item.status === 'available';
                     const avgPricePerGram = isRemnant && item.currentWeight > 0
                       ? (item.remnantTotalValue ?? 0) / item.currentWeight
                       : 0;
@@ -491,6 +519,14 @@ const Inventory: React.FC = () => {
                               onClick={() => setMergeSourceItem(item)}
                             >
                               📦 מזג לשאריות
+                            </button>
+                          )}
+                          {canMarkAsShowroom && (
+                            <button
+                              className="btn-secondary showroom-mark-btn"
+                              onClick={() => handleMarkAsShowroom(item.id)}
+                            >
+                              🖼️ סמן כפאת תצוגה
                             </button>
                           )}
                           {isRemnant && (
@@ -580,6 +616,65 @@ const Inventory: React.FC = () => {
         </div>
       )}
 
+      {!loading && !loadError && activeTab === 'showroom' && (
+        <div className="tab-content">
+          <div className="table-wrapper">
+            <table className="inventory-table">
+              <thead>
+                <tr>
+                  <th>מזהה / ברקוד</th>
+                  <th>גוון</th>
+                  <th>אורך</th>
+                  <th>סוג שיער</th>
+                  <th>עלות</th>
+                  <th>ימים במלאי</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody>
+                {showroomItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty-state">
+                      אין כרגע פאות תצוגה מסומנות
+                    </td>
+                  </tr>
+                ) : (
+                  showroomItems.map((item) => {
+                    const daysInStock = Math.floor(
+                      (new Date().getTime() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+                    );
+                    return (
+                      <tr key={item.id}>
+                        <td className="mono">{item.id}</td>
+                        <td>{item.color}</td>
+                        <td>{item.length} ס"מ</td>
+                        <td>{item.hairType}</td>
+                        <td>₪{item.costPrice.toLocaleString()}</td>
+                        <td>{daysInStock >= 0 ? `${daysInStock} ימים` : '—'}</td>
+                        <td>
+                          <button
+                            className="btn-primary showroom-sell-btn"
+                            onClick={() => setSellShowroomItemId(item.id)}
+                          >
+                            💰 מכירה
+                          </button>
+                          <button
+                            className="btn-secondary showroom-return-btn"
+                            onClick={() => handleReturnToAvailable(item.id)}
+                          >
+                            ↩️ החזר לזמין
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <AddHairModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -635,6 +730,16 @@ const Inventory: React.FC = () => {
         variant="warning"
         onConfirm={handleConfirmUndoMerge}
         onCancel={() => setUndoConfirm(null)}
+      />
+
+      {/* מכירת פאת תצוגה - פותחת את אשף ההזמנה הרגיל, עם סוג הזמנה ופריט
+          מוקדם-מוגדרים; בחירת הלקוחה עצמה עדיין נעשית בתוך האשף. */}
+      <NewOrderWizard
+        isOpen={sellShowroomItemId !== null}
+        onClose={() => setSellShowroomItemId(null)}
+        onOrderCreated={() => setSellShowroomItemId(null)}
+        preselectedShowroomItemId={sellShowroomItemId}
+        onOpenRepairForm={() => {}}
       />
     </div>
   );

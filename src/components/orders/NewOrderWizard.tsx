@@ -20,6 +20,7 @@ interface NewOrderWizardProps {
   onClose: () => void;
   onOrderCreated: (orderData: any) => void;
   preselectedClient?: ClientOption | null; // אם נפתח מתוך כרטיס לקוחה - הלקוחה כבר ידועה מראש
+  preselectedShowroomItemId?: string | null; // אם נפתח מתוך "מכירה" בלשונית פאות תצוגה - הפריט כבר ידוע מראש
   // תיקון/שירות מטופל בטופס נפרד ופשוט יותר (RepairOrderForm) - האשף רק
   // מזהה את הבחירה ומעביר את הלקוחה שנבחרה הלאה, בלי לעבור את שלבי 3-4 שלו.
   onOpenRepairForm: (client: ClientOption) => void;
@@ -31,7 +32,7 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   repair: "תיקון / שירות",
 };
 
-export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, preselectedClient = null, onOpenRepairForm }: NewOrderWizardProps) {
+export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, preselectedClient = null, preselectedShowroomItemId = null, onOpenRepairForm }: NewOrderWizardProps) {
   const [step, setStep] = useState(1);
 
   // Step 1: סוג הזמנה
@@ -82,7 +83,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     if (!isOpen) return;
 
     setStep(1);
-    setOrderType("new");
+    setOrderType(preselectedShowroomItemId ? "inventory" : "new");
     setClientSearch("");
     setSize("M");
     setTexture("גלי");
@@ -98,7 +99,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     setBulkItemPickerQty(1);
     setBulkItemQtyError(null);
     setShowroomSearch("");
-    setSelectedShowroomItemId("");
+    setSelectedShowroomItemId(preselectedShowroomItemId || "");
     setPrice(0);
     setDueDate("");
     setPaymentsCount(1);
@@ -155,7 +156,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       })
       .catch((err) => console.error("Error loading clients for wizard:", err))
       .finally(() => setLoadingClients(false));
-  }, [isOpen, preselectedClient]);
+  }, [isOpen, preselectedClient, preselectedShowroomItemId]);
 
   const hairCostEstimated = React.useMemo(() => {
     if (!hairLength || !hairStructure || !hairFullness) return 0;

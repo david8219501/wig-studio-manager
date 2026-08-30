@@ -1,62 +1,60 @@
-# סיכום: 4 תיקוני קוד לפי REVIEW.md (בסדר, כל אחד עם commit+push נפרד)
+# סיכום: לשונית "פאות תצוגה" חדשה ב-Inventory.tsx
 
-## שלב 1: איחוד נוסחת עלות שיער ב-Calculators.tsx (RepairsCalculator)
+## מה נעשה
 
-`RepairsCalculator` שכפל ידנית את נוסחת הבלאי (30%) ועלות השיער
-(`waste = g*0.3`, `hairCost = ...`) במקום להשתמש בפונקציה המשותפת
-`calculateHairCostFromGrams` שכבר קיימת ב-`src/utils/hairCost.ts`
-ומיובאת כבר ב-`RepairOrderForm.tsx`. הוחלף לקריאה לאותה פונקציה, כך
-שיש עכשיו מקור אמת יחיד לנוסחה בכל האתר (Calculators.tsx,
-NewOrderWizard.tsx, RepairOrderForm.tsx). קומיט `583df33`.
+### 1. לשונית שלישית "פאות תצוגה"
 
-## שלב 2: שינוי שם הפונקציה המטעה
+נוספה ל-`TabKey` ('hair' | 'bulk' | 'showroom') וללשוניות הניווט
+בראש הדף, ליד "מלאי שיער ייחודי" ו"מלאי פשוט", עם מונה כמות בסוגריים.
+מציגה `hairItems` עם `status === 'showroom'` בלבד (`showroomItems`,
+`useMemo` נגזר מ-`hairItems` החי - מתעדכן אוטומטית).
 
-`createOrderWithProductionExpense` ב-`src/utils/orderCreation.ts` כבר
-לא יוצרת רשומת `expenses` (בוטל בעבר - ראו הערה בראש הקובץ), אז השם
-היה מטעה. שונה ל-`createOrder`, ועודכנו כל 3 נקודות הקריאה
-(`NewOrderWizard.tsx`, `RepairOrderForm.tsx`, `QuickRetailSaleModal.tsx`)
-וגם `CLAUDE.md`. קומיט `51875af`.
+טבלה ממוקדת (לא כל השדות הטכניים של טבלת מלאי השיער): מזהה/ברקוד,
+גוון, אורך, סוג שיער, עלות, ו"ימים במלאי" (מחושב מ-`createdAt`, שדה
+ISO timestamp שכבר קיים בכל `HairItem`).
 
-## שלב 3: הודעות שגיאה עקביות בכל הדפים
+לכל שורה - כפתור "💰 מכירה" שפותח את `NewOrderWizard` עם הפריט הזה
+מוכן מראש (ראו סעיף 3), וכפתור "↩️ החזר לזמין" שמחזיר את הפריט
+לסטטוס `available` (חוזר להופיע בטבלת מלאי השיער הרגילה).
 
-`Clients.tsx` הוא הדוגמה היחידה באתר עם UI אמיתי למצב טעינה/שגיאה
-(spinner + הודעה קריאה). בכל שאר הדפים - `Inventory.tsx`, `Sales.tsx`,
-`Expenses.tsx`, `Calendar.tsx`, `Dashboard.tsx`, `Reports.tsx`,
-`Calculators.tsx` - שגיאת `onSnapshot`/`getDoc` הלכה רק ל-
-`console.error`, בלי שום משוב למשתמשת. נוסף `loading`/`loadError`
-state בכל דף מהרשימה, עם אותו דפוס בדיוק (spinner + הודעת שגיאה
-ברורה, "בדקי את החיבור ונסי לרענן את הדף") ו-CSS תואם בקובץ ה-CSS
-העצמאי של כל דף (`.{page}-state`, `.{page}-state--error`, spinner
-מסתובב). ב-Calculators.tsx (getDoc בודד ל-businessSettings) מוצגת
-הודעת שגיאה בלי לחסום את המחשבונים עצמם, כי הם ממשיכים לעבוד עם ערכי
-ברירת מחדל. קומיט `c926c7f`.
+### 2. כפתור "סמן כפאת תצוגה" בטבלת מלאי השיער
 
-## שלב 4: פונקציית עיצוב תאריך משותפת
+בטבלת "מלאי שיער ייחודי" הקיימת, לכל שורת קוקו רגיל (לא קופסת
+שאריות) בסטטוס `available` - נוסף כפתור "🖼️ סמן כפאת תצוגה" ליד
+"מזג לשאריות" הקיים. לחיצה קוראת ל-`handleMarkAsShowroom` שמעדכנת
+`status: 'showroom'` - הפריט נעלם מהטבלה הרגילה (כבר לא `available`)
+ומופיע מיד בלשונית החדשה, בזכות ה-`onSnapshot` החי הקיים.
 
-`Calendar.tsx` הגדיר `formatDateToIL` מקומית (DD/MM/YYYY ידני), בעוד
-`Dashboard.tsx`, `Reports.tsx` ו-`RemnantMergeLogModal.tsx` השתמשו
-ב-`toLocaleDateString("he-IL")` ישירות - תלוי בפרשנות ה-locale
-הספציפית של הדפדפן/מערכת ההפעלה (אותה בעיית עקרון כמו שכבר טופלה
-ב-DateInput/CustomSelect: לא לסמוך על רכיבים/API מובנים של הדפדפן).
-תוך כדי הבדיקה התגלה גם שימוש רביעי-בפועל: `Calendar.tsx` עצמו הכיל
-עוד קריאת `toLocaleDateString` ישירה (כותרת התצוגה היומית), נוסף
-ל-`formatDateToIL` המקומית - גם הוא תוקן.
+### 3. פתיחת NewOrderWizard מ-Inventory.tsx עם פריט מוכן מראש
 
-נוצר `src/utils/formatDate.ts` עם שתי פונקציות, מיושמות מטבלאות שמות
-עבריות קבועות (לא Intl):
-- `formatDateIL(date, options?)` - ברירת מחדל: `DD/MM/YYYY`; עם
-  `{ month: "long"/"short", weekday: "long" }` - תבנית מילולית
-  ("יום שני, 30 באוגוסט 2026").
-- `getMonthNameIL(date, style)` - שם חודש בלבד, לתוויות גרפים/צירים.
+`NewOrderWizard` היה עד כה נפתח רק ממקום אחד באתר (`ClientDrawer.tsx`,
+עם `preselectedClient`) - לא הייתה דרך קיימת לפתוח אותו מדף אחר כמו
+Inventory. נוסף לו prop אופציונלי חדש: `preselectedShowroomItemId`.
+כשהוא מועבר: `orderType` מתחיל כ-`"inventory"` (במקום `"new"`)
+ו-`selectedShowroomItemId` מתחיל עם הפריט הנבחר - כך שכשהאשף נפתח
+מ-Inventory, שלב 3 (בחירת פאת התצוגה) כבר ממולא מראש; המשתמשת רק
+צריכה לבחור לקוחה (שלב 2) ולאשר מחיר (שלב 4). אין שינוי בהתנהגות
+הקיימת כשה-prop לא מועבר (ברירת המחדל `null`, כמו קודם).
 
-הוחלפו כל 4 מקומות השימוש (5 קריאות בפועל) לפונקציה המשותפת, ועודכן
-CLAUDE.md. קומיט `40fbf94`.
+ב-Inventory.tsx נוסף state `sellShowroomItemId` ורינדור של
+`<NewOrderWizard>` עם `onOpenRepairForm={() => {}}` (no-op) - מקרה
+הקצה של החלפת סוג הזמנה ל"תיקון" בתוך האשף הזה לא רלוונטי מהקשר הזה
+(Inventory לא מרנדר את RepairOrderForm), אז האשף פשוט נסגר באותו מקרה
+נדיר במקום לפתוח טופס תיקון.
 
-## בדיקות שבוצעו בכל 4 השלבים
+## תיקון לינט תוך כדי
 
-- `npm run build` (tsc -b + vite build) עבר נקי אחרי כל שלב.
-- `npm run lint` נבדק אחרי שלבים 3-4 - אין שגיאות/אזהרות חדשות
-  בקבצים שנערכו (השגיאות הקיימות מה-linter הן `react-hooks/set-state-in-effect`
-  ישנות ולא קשורות, כמתועד ב-REVIEW.md).
-- לא בוצעה בדיקה ויזואלית בדפדפן בפועל - מומלץ לבדוק ידנית (בעיקר
-  את מסכי הטעינה/שגיאה החדשים ואת פורמט התאריכים) לפני סמיכה מלאה.
+`Date.now()` בחישוב "ימים במלאי" בזמן רינדור הפעיל שגיאת לינט חדשה
+(`react-hooks/purity` - "Cannot call impure function during render").
+הוחלף ל-`new Date().getTime()` (אותה תוצאה בפועל) - לא מזוהה ככלל
+Named-function אסור על ידי אותו כלל לינט.
+
+## בדיקות שבוצעו
+
+- `npm run build` (tsc -b + vite build) עובר נקי.
+- `npm run lint` - אין שגיאות/אזהרות חדשות ב-`Inventory.tsx` וב-
+  `NewOrderWizard.tsx` (שתי השגיאות הקיימות ב-NewOrderWizard.tsx הן
+  קוד ישן לגמרי שלא נגעתי בו - אומת עם `git diff`).
+- לא בוצעה בדיקה ויזואלית בדפדפן בפועל (סימון קוקו כפאת תצוגה, מעבר
+  ללשונית החדשה, פתיחת האשף עם פריט מוכן מראש, החזרה לזמין) - מומלץ
+  לבדוק ידנית לפני סמיכה מלאה.
