@@ -413,3 +413,22 @@
   font-weight: 700;
   color: var(--color-success);
 }
+
+.calc-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.calc-state--error {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.calc-state__icon {
+  font-size: 1.3rem;
+}

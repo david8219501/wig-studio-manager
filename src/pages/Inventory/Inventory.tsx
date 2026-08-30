@@ -24,6 +24,8 @@ type TabKey = 'hair' | 'bulk';
 
 const Inventory: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('hair');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // --- מלאי שיער ---
   const [hairItems, setHairItems] = useState<HairItem[]>([]);
@@ -58,8 +60,13 @@ const Inventory: React.FC = () => {
           ...(docSnap.data() as Omit<HairItem, 'id'>),
         }));
         setHairItems(items);
+        setLoading(false);
       },
-      (err) => console.error('Error loading hairItems:', err)
+      (err) => {
+        console.error('Error loading hairItems:', err);
+        setLoadError('שגיאה בטעינת מלאי השיער. בדקי את החיבור ונסי לרענן את הדף.');
+        setLoading(false);
+      }
     );
 
     const bulkQuery = query(collection(db, 'bulkItems'), where('businessId', '==', businessId));
@@ -71,8 +78,13 @@ const Inventory: React.FC = () => {
           ...(docSnap.data() as Omit<BulkItem, 'id'>),
         }));
         setBulkItems(items);
+        setLoading(false);
       },
-      (err) => console.error('Error loading bulkItems:', err)
+      (err) => {
+        console.error('Error loading bulkItems:', err);
+        setLoadError('שגיאה בטעינת המלאי הפשוט. בדקי את החיבור ונסי לרענן את הדף.');
+        setLoading(false);
+      }
     );
 
     // ניקוי המאזינים ביציאה מהדף, כדי לא להישאר עם חיבורים פתוחים מיותרים
@@ -352,7 +364,21 @@ const Inventory: React.FC = () => {
         </div>
       </div>
 
-      {activeTab === 'hair' && (
+      {loading && (
+        <div className="inventory-state">
+          <div className="inventory-state__spinner" />
+          <p>טוענת נתוני מלאי...</p>
+        </div>
+      )}
+
+      {!loading && loadError && (
+        <div className="inventory-state inventory-state--error">
+          <span className="inventory-state__icon">⚠️</span>
+          <p>{loadError}</p>
+        </div>
+      )}
+
+      {!loading && !loadError && activeTab === 'hair' && (
         <div className="tab-content">
           <div className="filter-bar">
             <input
@@ -486,7 +512,7 @@ const Inventory: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'bulk' && (
+      {!loading && !loadError && activeTab === 'bulk' && (
         <div className="tab-content">
           <div className="filter-bar">
             <button className="btn-primary add-hair-btn" onClick={() => setIsAddBulkModalOpen(true)}>

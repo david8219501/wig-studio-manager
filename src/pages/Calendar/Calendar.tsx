@@ -48,6 +48,8 @@ export default function Calendar() {
   const [viewMode, setViewMode] = useState<"weekly" | "daily">("weekly");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -93,8 +95,13 @@ export default function Calendar() {
         setAppointments(
           snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Appointment, "id">) }))
         );
+        setLoading(false);
       },
-      (err) => console.error("Error loading appointments:", err)
+      (err) => {
+        console.error("Error loading appointments:", err);
+        setLoadError("שגיאה בטעינת הפגישות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     const clientsQuery = query(collection(db, "clients"), where("businessId", "==", businessId));
@@ -102,8 +109,13 @@ export default function Calendar() {
       clientsQuery,
       (snapshot) => {
         setClients(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Client, "id">) })));
+        setLoading(false);
       },
-      (err) => console.error("Error loading clients:", err)
+      (err) => {
+        console.error("Error loading clients:", err);
+        setLoadError("שגיאה בטעינת רשימת הלקוחות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     return () => {
@@ -346,7 +358,22 @@ export default function Calendar() {
         </div>
       </div>
 
+      {loading && (
+        <div className="calendar-state">
+          <div className="calendar-state__spinner" />
+          <p>טוענת יומן...</p>
+        </div>
+      )}
+
+      {!loading && loadError && (
+        <div className="calendar-state calendar-state--error">
+          <span className="calendar-state__icon">⚠️</span>
+          <p>{loadError}</p>
+        </div>
+      )}
+
       {/* Main Calendar Container */}
+      {!loading && !loadError && (
       <div className="calendar-container">
         <div className="calendar-toolbar-sub">
           <div className="calendar-nav-controls">
@@ -479,6 +506,7 @@ export default function Calendar() {
           </div>
         )}
       </div>
+      )}
 
       {/* Modal - קביעת / עריכת פגישה */}
       {isAddAptModalOpen && (

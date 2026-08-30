@@ -29,6 +29,8 @@ export default function Reports() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const businessId = auth.currentUser?.uid;
@@ -36,20 +38,41 @@ export default function Reports() {
 
     const ordersUnsub = onSnapshot(
       query(collection(db, "orders"), where("businessId", "==", businessId)),
-      (snapshot) => setOrders(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) }))),
-      (err) => console.error("Error loading orders:", err)
+      (snapshot) => {
+        setOrders(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) })));
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error loading orders:", err);
+        setLoadError("שגיאה בטעינת נתוני הדוחות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     const expensesUnsub = onSnapshot(
       query(collection(db, "expenses"), where("businessId", "==", businessId)),
-      (snapshot) => setExpenses(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ExpenseRow, "id">) }))),
-      (err) => console.error("Error loading expenses:", err)
+      (snapshot) => {
+        setExpenses(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ExpenseRow, "id">) })));
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error loading expenses:", err);
+        setLoadError("שגיאה בטעינת נתוני הדוחות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     const bulkUnsub = onSnapshot(
       query(collection(db, "bulkItems"), where("businessId", "==", businessId)),
-      (snapshot) => setBulkItems(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<BulkItem, "id">) }))),
-      (err) => console.error("Error loading bulk items:", err)
+      (snapshot) => {
+        setBulkItems(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<BulkItem, "id">) })));
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error loading bulk items:", err);
+        setLoadError("שגיאה בטעינת נתוני הדוחות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     return () => {
@@ -155,6 +178,22 @@ export default function Reports() {
         <p>סקירה עסקית מעמיקה, ביצועים פיננסיים ופילוח שירותים</p>
       </div>
 
+      {loading && (
+        <div className="reports-state">
+          <div className="reports-state__spinner" />
+          <p>טוענת נתוני דוחות...</p>
+        </div>
+      )}
+
+      {!loading && loadError && (
+        <div className="reports-state reports-state--error">
+          <span className="reports-state__icon">⚠️</span>
+          <p>{loadError}</p>
+        </div>
+      )}
+
+      {!loading && !loadError && (
+      <>
       {/* KPI Row */}
       <div className="reports-stats-grid">
         {report.summaryStats.map((stat, i) => (
@@ -215,6 +254,8 @@ export default function Reports() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

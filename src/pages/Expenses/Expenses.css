@@ -195,6 +195,37 @@
   padding: 32px;
 }
 
+.expenses-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.expenses-state--error {
+  color: var(--color-danger);
+}
+
+.expenses-state__icon {
+  font-size: 2rem;
+}
+
+.expenses-state__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .category-tag {
   background: var(--color-background);
   border: 1px solid var(--color-border);

@@ -316,6 +316,7 @@ export default function CalculatorsPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // טעינת ההגדרות הגלובליות של העסק מ-Firestore (ואם עדיין אין - שמירת ברירת המחדל)
   useEffect(() => {
@@ -333,7 +334,10 @@ export default function CalculatorsPage() {
           );
         }
       })
-      .catch((err) => console.error("Error loading business settings:", err))
+      .catch((err) => {
+        console.error("Error loading business settings:", err);
+        setLoadError("שגיאה בטעינת הגדרות התמחור - מוצגים ערכי ברירת מחדל. בדקי את החיבור ונסי לרענן את הדף.");
+      })
       .finally(() => setSettingsLoaded(true));
   }, []);
 
@@ -356,6 +360,13 @@ export default function CalculatorsPage() {
           ⚙️ הגדרות גלובליות
         </button>
       </div>
+
+      {loadError && (
+        <div className="calc-state calc-state--error">
+          <span className="calc-state__icon">⚠️</span>
+          <p>{loadError}</p>
+        </div>
+      )}
 
       {showSettings && (
         <div className="calc-global-settings">

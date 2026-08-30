@@ -52,6 +52,8 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const currentDate = new Date().toLocaleDateString("he-IL", {
     weekday: "long",
@@ -72,8 +74,13 @@ export default function Dashboard() {
       query(collection(db, "orders"), where("businessId", "==", businessId)),
       (snapshot) => {
         setOrders(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) })));
+        setLoading(false);
       },
-      (err) => console.error("Error loading orders:", err)
+      (err) => {
+        console.error("Error loading orders:", err);
+        setLoadError("שגיאה בטעינת נתוני הדשבורד. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     const clientsUnsub = onSnapshot(
@@ -89,16 +96,26 @@ export default function Dashboard() {
             };
           })
         );
+        setLoading(false);
       },
-      (err) => console.error("Error loading clients:", err)
+      (err) => {
+        console.error("Error loading clients:", err);
+        setLoadError("שגיאה בטעינת נתוני הדשבורד. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     const bulkUnsub = onSnapshot(
       query(collection(db, "bulkItems"), where("businessId", "==", businessId)),
       (snapshot) => {
         setBulkItems(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<BulkItem, "id">) })));
+        setLoading(false);
       },
-      (err) => console.error("Error loading bulk items:", err)
+      (err) => {
+        console.error("Error loading bulk items:", err);
+        setLoadError("שגיאה בטעינת נתוני הדשבורד. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     return () => {
@@ -218,6 +235,22 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {loading && (
+        <div className="dash-state">
+          <div className="dash-state__spinner" />
+          <p>טוענת נתוני דשבורד...</p>
+        </div>
+      )}
+
+      {!loading && loadError && (
+        <div className="dash-state dash-state--error">
+          <span className="dash-state__icon">⚠️</span>
+          <p>{loadError}</p>
+        </div>
+      )}
+
+      {!loading && !loadError && (
+      <>
       {/* KPI Cards */}
       <div className="dash-kpi-grid">
         <div className="kpi-card">
@@ -376,6 +409,8 @@ export default function Dashboard() {
 
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

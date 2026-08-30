@@ -17,6 +17,8 @@ interface Expense {
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
@@ -53,8 +55,13 @@ export default function Expenses() {
           ...(docSnap.data() as Omit<Expense, "id">),
         }));
         setExpenses(data);
+        setLoading(false);
       },
-      (err) => console.error("Error loading expenses:", err)
+      (err) => {
+        console.error("Error loading expenses:", err);
+        setLoadError("שגיאה בטעינת ההוצאות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     return () => unsubscribe();
@@ -239,7 +246,21 @@ export default function Expenses() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="empty-row expenses-state">
+                  <div className="expenses-state__spinner" />
+                  <span>טוענת הוצאות...</span>
+                </td>
+              </tr>
+            ) : loadError ? (
+              <tr>
+                <td colSpan={8} className="empty-row expenses-state expenses-state--error">
+                  <span className="expenses-state__icon">⚠️</span>
+                  <span>{loadError}</span>
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={8} className="empty-row">
                   לא נמצאו הוצאות לתקופה הנבחרת.

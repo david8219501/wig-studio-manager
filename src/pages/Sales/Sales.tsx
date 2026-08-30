@@ -26,6 +26,8 @@ export interface Order {
 
 export default function Sales() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
@@ -50,8 +52,13 @@ export default function Sales() {
           ...(docSnap.data() as Omit<Order, "id">),
         }));
         setOrders(data);
+        setLoading(false);
       },
-      (err) => console.error("Error loading orders:", err)
+      (err) => {
+        console.error("Error loading orders:", err);
+        setLoadError("שגיאה בטעינת ההזמנות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
     );
 
     return () => unsubscribe();
@@ -172,7 +179,17 @@ export default function Sales() {
       </div>
 
       <div className="sales-table-wrapper">
-        {filteredOrders.length === 0 ? (
+        {loading ? (
+          <div className="sales-state">
+            <div className="sales-state__spinner" />
+            <p>טוענת הזמנות...</p>
+          </div>
+        ) : loadError ? (
+          <div className="sales-state sales-state--error">
+            <span className="sales-state__icon">⚠️</span>
+            <p>{loadError}</p>
+          </div>
+        ) : filteredOrders.length === 0 ? (
           <div className="sales-state">
             <p>לא נמצאו הזמנות תואמות לסינון הנבחר.</p>
           </div>
