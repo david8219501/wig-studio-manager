@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
-import { createOrderWithProductionExpense } from "../../utils/orderCreation";
+import { createOrder } from "../../utils/orderCreation";
 import { calculateHairCostFromGrams } from "../../utils/hairCost";
 import type { ClientOption } from "./NewOrderWizard";
 import "./RepairOrderForm.css";
@@ -102,7 +102,7 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
       .join(" | ");
 
     try {
-      await createOrderWithProductionExpense({
+      await createOrder({
         businessId,
         clientId: client.id,
         clientName: client.name,

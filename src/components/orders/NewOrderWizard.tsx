@@ -3,7 +3,7 @@ import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "fireb
 import { db, auth } from "../../services/firebase";
 import type { BulkItem, HairItem, UsedBulkItem, UsedHairItem } from "../../types";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, type HairCostSettings } from "../../utils/hairCost";
-import { createOrderWithProductionExpense } from "../../utils/orderCreation";
+import { createOrder } from "../../utils/orderCreation";
 import DateInput from "../common/DateInput";
 import "./NewOrderWizard.css";
 
@@ -306,7 +306,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       : [];
 
     try {
-      await createOrderWithProductionExpense({
+      await createOrder({
         businessId,
         clientId: client.id,
         clientName: client.name,

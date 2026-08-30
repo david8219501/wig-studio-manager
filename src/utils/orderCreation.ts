@@ -41,7 +41,7 @@ export interface NewOrderInput {
   payments?: OrderPayment[];
 }
 
-export async function createOrderWithProductionExpense(input: NewOrderInput): Promise<string> {
+export async function createOrder(input: NewOrderInput): Promise<string> {
   const createdAt = new Date().toISOString().split("T")[0];
 
   const orderRef = await addDoc(collection(db, "orders"), {

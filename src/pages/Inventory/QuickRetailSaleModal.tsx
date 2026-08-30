@@ -8,7 +8,7 @@ import { collection, doc, getDocs, query, updateDoc, where } from "firebase/fire
 import { db, auth } from "../../services/firebase";
 import type { BulkItem } from "../../types";
 import type { ClientOption } from "../../components/orders/NewOrderWizard";
-import { createOrderWithProductionExpense } from "../../utils/orderCreation";
+import { createOrder } from "../../utils/orderCreation";
 
 interface QuickRetailSaleModalProps {
   isOpen: boolean;
@@ -80,7 +80,7 @@ export default function QuickRetailSaleModal({ isOpen, item, onClose }: QuickRet
     const today = new Date().toISOString().split("T")[0];
 
     try {
-      await createOrderWithProductionExpense({
+      await createOrder({
         businessId,
         clientId: selectedClient ? selectedClient.id : null,
         clientName,
