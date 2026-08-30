@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { UsedBulkItem, UsedHairItem, OrderPayment } from "../../types";
+import { isUnsoldShowroomStock, type ShowroomSpecs } from "../../utils/orderCreation";
 import AssignHairModal from "../../components/orders/AssignHairModal";
 import OrderDetailsPanel from "../../components/orders/OrderDetailsPanel";
 import { calculateOrderProfit } from "../../utils/orderProfit";
@@ -10,6 +11,7 @@ import "./Sales.css";
 
 export interface Order {
   id: string;
+  clientId?: string | null; // null/חסר = עדיין בלי לקוחה (רלוונטי רק לפאת תצוגה, ראו isShowroomStock)
   clientName: string;
   clientPhone: string;
   orderType: string;
@@ -22,6 +24,10 @@ export interface Order {
   usedBulkItems?: UsedBulkItem[];
   usedHairItems?: UsedHairItem[];
   hairCostEstimated?: number;
+  // --- פאת תצוגה (Inventory.tsx) - ראו ShowroomStockFormModal/SellShowroomStockModal ---
+  isShowroomStock?: boolean; // true = מסמך פאת תצוגה שנוצר מראש במלאי; מוצג כאן רק אחרי מכירה (clientId מוגדר)
+  retailPrice?: number; // מחיר מכירה מבוקש (לפני מכירה בפועל)
+  showroomSpecs?: ShowroomSpecs;
 }
 
 export default function Sales() {
@@ -47,10 +53,12 @@ export default function Sales() {
     const unsubscribe = onSnapshot(
       ordersQuery,
       (snapshot) => {
-        const data = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<Order, "id">),
-        }));
+        const data = snapshot.docs
+          .map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<Order, "id">),
+          }))
+          .filter((order) => !isUnsoldShowroomStock(order));
         setOrders(data);
         setLoading(false);
       },

@@ -1,60 +1,103 @@
-# סיכום: לשונית "פאות תצוגה" חדשה ב-Inventory.tsx
+# סיכום: עיצוב מחדש של "פאות תצוגה" - מודל מבוסס orders במקום HairItem.status
 
-## מה נעשה
+## למה זה קרה
 
-### 1. לשונית שלישית "פאות תצוגה"
+המודל הקודם (מהסבב הקודם) ייצג פאת תצוגה כקוקו בודד (`HairItem` עם
+`status: 'showroom'`) - מגבלה מובנית: לא ניתן היה לייצג פאת תצוגה
+שנבנית מכמה קוקוים שונים (שיוך מרובה), בדיוק כמו הזמנת לקוחה רגילה.
 
-נוספה ל-`TabKey` ('hair' | 'bulk' | 'showroom') וללשוניות הניווט
-בראש הדף, ליד "מלאי שיער ייחודי" ו"מלאי פשוט", עם מונה כמות בסוגריים.
-מציגה `hairItems` עם `status === 'showroom'` בלבד (`showroomItems`,
-`useMemo` נגזר מ-`hairItems` החי - מתעדכן אוטומטית).
+## החלטת הארכיטקטורה החדשה
 
-טבלה ממוקדת (לא כל השדות הטכניים של טבלת מלאי השיער): מזהה/ברקוד,
-גוון, אורך, סוג שיער, עלות, ו"ימים במלאי" (מחושב מ-`createdAt`, שדה
-ISO timestamp שכבר קיים בכל `HairItem`).
+פאת תצוגה היא עכשיו מסמך רגיל ב-collection `orders` (בדיוק כמו הזמנת
+לקוחה), עם `isShowroomStock: true` ו-`clientId`/`clientName: null` עד
+שנמכרת בפועל. `usedHairItems` (שיוך שיער בפועל) עובד בדיוק כמו בהזמנה
+רגילה - יכול לכלול כמה קוקוים. הסטטוס "בבנייה"/"מוכנה" לא נשמר כשדה -
+מחושב תמיד מ-`usedHairItems.length > 0`.
 
-לכל שורה - כפתור "💰 מכירה" שפותח את `NewOrderWizard` עם הפריט הזה
-מוכן מראש (ראו סעיף 3), וכפתור "↩️ החזר לזמין" שמחזיר את הפריט
-לסטטוס `available` (חוזר להופיע בטבלת מלאי השיער הרגילה).
+**בוטל לגמרי** המודל הקודם: הוסר הכפתור "סמן כפאת תצוגה" מטבלת מלאי
+השיער, `handleMarkAsShowroom`/`handleReturnToAvailable`, ה-state/הלשונית
+הישנים מבוססי `HairItem.status==='showroom'`, וה-prop
+`preselectedShowroomItemId` שנוסף ל-`NewOrderWizard.tsx` בסבב הקודם -
+`NewOrderWizard.tsx` חזר בדיוק לגרסה שלפני אותו סבב (`git diff` מול
+הקומיט הקודם ל-76f7641 ריק לגמרי). `HairItem.status: 'showroom'`
+(הטיפוס עצמו) לא נגע - רק הגישה שהשתמשה בו בוטלה.
 
-### 2. כפתור "סמן כפאת תצוגה" בטבלת מלאי השיער
+## שינויים לפי קובץ
 
-בטבלת "מלאי שיער ייחודי" הקיימת, לכל שורת קוקו רגיל (לא קופסת
-שאריות) בסטטוס `available` - נוסף כפתור "🖼️ סמן כפאת תצוגה" ליד
-"מזג לשאריות" הקיים. לחיצה קוראת ל-`handleMarkAsShowroom` שמעדכנת
-`status: 'showroom'` - הפריט נעלם מהטבלה הרגילה (כבר לא `available`)
-ומופיע מיד בלשונית החדשה, בזכות ה-`onSnapshot` החי הקיים.
+### `src/utils/orderCreation.ts`
+- `clientName` ב-`NewOrderInput` הורחב ל-`string | null` (null רק
+  כש-`isShowroomStock`).
+- נוספו שדות אופציונליים: `isShowroomStock`, `retailPrice`,
+  `showroomSpecs` (טיפוס חדש `ShowroomSpecs` - אורך/מבנה/מלאות/גוון
+  גולמיים, נשמרים בנוסף ל-`notes` הקריא כדי לאפשר עריכה חוזרת בלי
+  לפרסר מחרוזת). `createOrder` כותב אותם רק כשרלוונטי (Firestore דוחה
+  `undefined`).
+- נוספה `isUnsoldShowroomStock(order)` - הפרדיקט המשותף שקובע אם
+  מסמך `orders` הוא פאת תצוגה שעדיין לא נמכרה (`isShowroomStock &&
+  !clientId`). מוגדר כאן (לא ב-`Sales.tsx`) עם טיפוס פרמטר כללי כדי
+  למנוע import מעגלי (`Sales.tsx` כבר מייבא `ShowroomSpecs` מהקובץ
+  הזה).
 
-### 3. פתיחת NewOrderWizard מ-Inventory.tsx עם פריט מוכן מראש
+### `src/pages/Sales/Sales.tsx`, `Dashboard.tsx`, `Reports.tsx`
+- `Order` (ב-`Sales.tsx`, הטיפוס המשותף) הורחב עם `clientId`,
+  `isShowroomStock`, `retailPrice`, `showroomSpecs`.
+- כל שלוש ה-onSnapshot listeners של `orders` מסננות עכשיו החוצה
+  `isUnsoldShowroomStock` - **קריטי**: בלי הסינון הזה, פאת תצוגה
+  שעדיין בבנייה (בלי לקוחה) הייתה "מזהמת" את טבלת המכירות/הדשבורד/
+  הדוחות. מרגע שנמכרת (מקבלת `clientId`) - מפסיקה אוטומטית להיות
+  מסוננת ומופיעה בהן כרגיל.
 
-`NewOrderWizard` היה עד כה נפתח רק ממקום אחד באתר (`ClientDrawer.tsx`,
-עם `preselectedClient`) - לא הייתה דרך קיימת לפתוח אותו מדף אחר כמו
-Inventory. נוסף לו prop אופציונלי חדש: `preselectedShowroomItemId`.
-כשהוא מועבר: `orderType` מתחיל כ-`"inventory"` (במקום `"new"`)
-ו-`selectedShowroomItemId` מתחיל עם הפריט הנבחר - כך שכשהאשף נפתח
-מ-Inventory, שלב 3 (בחירת פאת התצוגה) כבר ממולא מראש; המשתמשת רק
-צריכה לבחור לקוחה (שלב 2) ולאשר מחיר (שלב 4). אין שינוי בהתנהגות
-הקיימת כשה-prop לא מועבר (ברירת המחדל `null`, כמו קודם).
+### `src/pages/Inventory/ShowroomStockFormModal.tsx` (חדש)
+טופס יצירה/עריכה מצומצם: אותם שדות/אפשרויות בדיוק כמו שלב 3
+ב-`NewOrderWizard.tsx` (אורך/מבנה/מלאות/גוון, `HAIR_LENGTH_OPTIONS`/
+`STRUCTURE_OPTIONS`/`FULLNESS_OPTIONS`, `calculateHairCost` לאומדן
+עלות) + שדה מחיר מכירה מבוקש. יצירה קוראת ל-`createOrder`; עריכה
+עושה `updateDoc` על אותו מסמך - לא נוגעת ב-`usedHairItems` בכלל.
 
-ב-Inventory.tsx נוסף state `sellShowroomItemId` ורינדור של
-`<NewOrderWizard>` עם `onOpenRepairForm={() => {}}` (no-op) - מקרה
-הקצה של החלפת סוג הזמנה ל"תיקון" בתוך האשף הזה לא רלוונטי מהקשר הזה
-(Inventory לא מרנדר את RepairOrderForm), אז האשף פשוט נסגר באותו מקרה
-נדיר במקום לפתוח טופס תיקון.
+### `src/pages/Inventory/SellShowroomStockModal.tsx` (חדש)
+השלמת מכירה: בחירת לקוחה (אותו דפוס בדיוק כמו ב-`QuickRetailSaleModal.tsx`)
++ מחיר סופי (ממולא מראש מ-`retailPrice`, ניתן לעריכה). מעדכן
+(לא יוצר!) את אותו מסמך: `clientId`/`clientName`/`clientPhone`,
+`totalPrice`/`paidAmount` מהמחיר הסופי, `status: "delivered"`,
+`payments`. `isShowroomStock` נשאר `true` לתיעוד היסטורי.
+
+### `src/pages/Inventory/Inventory.tsx`
+- listener שלישי (`orders`, מסונן רק ל-`businessId` כמו כל מקום אחר
+  באתר) בנוסף ל-`hairItems`/`bulkItems` הקיימים.
+- `showroomOrders` = `orders.filter(isShowroomStock && !clientId)`.
+- לשונית "פאות תצוגה" מציגה טבלה: מפרט (`notes`), עלות מחושבת (סכימת
+  `costAtTime` על `usedHairItems`, "—" אם ריק), מחיר מכירה מבוקש,
+  תג סטטוס בבנייה/מוכנה, וכפתורי ניהול שיוך שיער / עריכה / מכירה /
+  מחיקה.
+- "ניהול שיוך שיער" פותח את `AssignHairModal` **הקיים ללא שינוי** -
+  מצביע אותו על מסמך ה-order של פאת התצוגה (עם `clientName` תווית
+  תצוגה בלבד, לא לקוחה אמיתית).
+- מחיקה: `ConfirmDialog` (עם הודעה שונה אם כבר יש שיוך שיער בפועל),
+  ולפני מחיקת המסמך - מחזירה משקל/שווי לכל `hairItem` ששויך (מקובץ
+  לפי `hairItemId` כדי לא לדרוס update אחד עם השני אם אותו קוקו שויך
+  כמה פעמים - אותה בעיה שכבר תוקנה קודם ב-`NewOrderWizard.handleFinish`).
+- כל ה-IDs (`assigningShowroomOrderId` וכו') נגזרים חי מ-`orders`
+  (כמו `mergeLogBox` הקיים) - לא state של אובייקט מלא - כדי שהמודלים
+  תמיד יראו נתון עדכני.
 
 ## תיקון לינט תוך כדי
 
-`Date.now()` בחישוב "ימים במלאי" בזמן רינדור הפעיל שגיאת לינט חדשה
-(`react-hooks/purity` - "Cannot call impure function during render").
-הוחלף ל-`new Date().getTime()` (אותה תוצאה בפועל) - לא מזוהה ככלל
-Named-function אסור על ידי אותו כלל לינט.
+הוספת `isUnsoldShowroomStock` כ-export פונקציה רגילה מ-`Sales.tsx`
+(לצד `export default function Sales()`) הפעילה שגיאת
+`react-refresh/only-export-components` חדשה. הועבר ל-`orderCreation.ts`
+במקום (עם טיפוס פרמטר כללי, לא `Order`, כדי למנוע import מעגלי).
 
 ## בדיקות שבוצעו
 
 - `npm run build` (tsc -b + vite build) עובר נקי.
-- `npm run lint` - אין שגיאות/אזהרות חדשות ב-`Inventory.tsx` וב-
-  `NewOrderWizard.tsx` (שתי השגיאות הקיימות ב-NewOrderWizard.tsx הן
-  קוד ישן לגמרי שלא נגעתי בו - אומת עם `git diff`).
-- לא בוצעה בדיקה ויזואלית בדפדפן בפועל (סימון קוקו כפאת תצוגה, מעבר
-  ללשונית החדשה, פתיחת האשף עם פריט מוכן מראש, החזרה לזמין) - מומלץ
-  לבדוק ידנית לפני סמיכה מלאה.
+- `npm run lint` - אין שגיאות/אזהרות חדשות; שתי הקבצים החדשים
+  (`ShowroomStockFormModal.tsx`, `SellShowroomStockModal.tsx`) מציגים
+  את אותה אזהרת `react-hooks/set-state-in-effect` הקיימת כבר במקומות
+  דומים (`QuickRetailSaleModal.tsx`, `RepairOrderForm.tsx` וכו') -
+  דפוס מקובל בפרויקט, לא בעיה חדשה.
+- `git diff` מול הקומיט שלפני הסבב הקודם מוודא ש-`NewOrderWizard.tsx`
+  חזר בדיוק לגרסתו המקורית (diff ריק).
+- לא בוצעה בדיקה ויזואלית בדפדפן בפועל (יצירה/עריכה/שיוך שיער/מכירה/
+  מחיקה של פאת תצוגה, והיעלמות/הופעה נכונה בטבלאות Sales/Dashboard/
+  Reports) - מומלץ לבדוק ידנית לפני סמיכה מלאה, בפרט את זרימת המכירה
+  המלאה מקצה לקצה.

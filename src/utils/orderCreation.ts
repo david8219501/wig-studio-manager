@@ -20,10 +20,20 @@ import type { OrderPayment, UsedBulkItem, UsedHairItem } from "../types";
 // (עמודים שמגדירים טיפוסים מקומיים דומים במקום לשתף קובץ אחד יחיד).
 type OrderStatus = "new" | "in_progress" | "styling" | "ready" | "delivered";
 
+// שדות מפרט גולמיים לפאת תצוגה (Inventory.tsx) - נשמרים בנוסף ל-notes
+// (שמכיל תקציר קריא, כמו בכל הזמנה) כדי שאפשר יהיה למלא מחדש את טופס
+// העריכה בלי לפרסר את מחרוזת ה-notes בחזרה.
+export interface ShowroomSpecs {
+  length?: string;
+  structure?: string;
+  fullness?: string;
+  color?: string;
+}
+
 export interface NewOrderInput {
   businessId: string;
-  clientId: string | null; // null = בלי לקוחה רשומה (למשל מכירה קמעונאית ללקוחה מזדמנת)
-  clientName: string;
+  clientId: string | null; // null = בלי לקוחה רשומה עדיין (מכירה קמעונאית ללקוחה מזדמנת, או פאת תצוגה שטרם נמכרה)
+  clientName: string | null; // null רק כש-isShowroomStock: true (עדיין אין לקוחה)
   clientPhone: string;
   orderType: string; // תווית מוצגת (כבר מתורגמת), למשל "פאה חדשה" / "תיקון / שירות"
   totalPrice: number;
@@ -39,6 +49,22 @@ export interface NewOrderInput {
   status?: OrderStatus;
   paidAmount?: number;
   payments?: OrderPayment[];
+  // פאת תצוגה שנוצרת מראש במלאי (Inventory.tsx), בלי לקוחה - ראו
+  // ShowroomStockFormModal.tsx/SellShowroomStockModal.tsx. מסמך כזה מוצג
+  // בלשונית "פאות תצוגה" כל עוד clientId === null, ונכנס לתצוגת המכירות
+  // הרגילה (Sales.tsx) רק אחרי שנמכר בפועל וקיבל clientId אמיתי.
+  isShowroomStock?: boolean;
+  retailPrice?: number; // מחיר המכירה המבוקש (רלוונטי רק כש-isShowroomStock)
+  showroomSpecs?: ShowroomSpecs;
+}
+
+// פאות תצוגה שעדיין לא נמכרו (isShowroomStock && בלי clientId) שייכות
+// ללשונית "פאות תצוגה" ב-Inventory.tsx בלבד - לא להזמנות לקוחה אמיתיות,
+// אז Sales.tsx/Dashboard.tsx/Reports.tsx מסננים אותן החוצה עם הפונקציה
+// הזו לפני הצגה/חישוב. הטיפוס כאן כללי בכוונה (לא Order מ-Sales.tsx) כדי
+// לא ליצור import מעגלי (Sales.tsx כבר מייבא ShowroomSpecs מהקובץ הזה).
+export function isUnsoldShowroomStock(order: { isShowroomStock?: boolean; clientId?: string | null }): boolean {
+  return order.isShowroomStock === true && !order.clientId;
 }
 
 export async function createOrder(input: NewOrderInput): Promise<string> {
@@ -61,6 +87,10 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
     hairCostEstimated: input.hairCostEstimated,
     notes: input.notes,
     createdAt,
+    // isShowroomStock/retailPrice/showroomSpecs נכתבים רק כשרלוונטי - Firestore
+    // דוחה ערך undefined במפורש, אז אי אפשר סתם לכלול אותם תמיד עם ?? ברירת מחדל.
+    ...(input.isShowroomStock ? { isShowroomStock: true, retailPrice: input.retailPrice ?? 0 } : {}),
+    ...(input.showroomSpecs ? { showroomSpecs: input.showroomSpecs } : {}),
   });
 
   return orderRef.id;

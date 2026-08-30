@@ -5,6 +5,7 @@ import {
 import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
+import { isUnsoldShowroomStock } from "../../utils/orderCreation";
 import type { BulkItem } from "../../types";
 import { formatDateIL, getMonthNameIL } from "../../utils/formatDate";
 import "./Dashboard.css";
@@ -69,7 +70,11 @@ export default function Dashboard() {
     const ordersUnsub = onSnapshot(
       query(collection(db, "orders"), where("businessId", "==", businessId)),
       (snapshot) => {
-        setOrders(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) })));
+        setOrders(
+          snapshot.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) }))
+            .filter((order) => !isUnsoldShowroomStock(order))
+        );
         setLoading(false);
       },
       (err) => {

@@ -298,27 +298,21 @@
   margin-inline-start: 6px;
 }
 
-.showroom-mark-btn {
-  padding: 6px 10px;
-  font-size: 12px;
-  white-space: nowrap;
-  margin-inline-start: 6px;
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-  border-color: transparent;
-}
-
 .showroom-sell-btn {
   padding: 7px 12px;
   font-size: 13px;
   white-space: nowrap;
+  margin-inline-start: 6px;
 }
 
-.showroom-return-btn {
+.showroom-delete-btn {
   padding: 7px 12px;
   font-size: 13px;
   white-space: nowrap;
   margin-inline-start: 6px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border-color: transparent;
 }
 
 .merge-log-list {

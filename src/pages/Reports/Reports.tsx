@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
+import { isUnsoldShowroomStock } from "../../utils/orderCreation";
 import type { BulkItem } from "../../types";
 import { getMonthNameIL } from "../../utils/formatDate";
 import "./Reports.css";
@@ -40,7 +41,11 @@ export default function Reports() {
     const ordersUnsub = onSnapshot(
       query(collection(db, "orders"), where("businessId", "==", businessId)),
       (snapshot) => {
-        setOrders(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) })));
+        setOrders(
+          snapshot.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) }))
+            .filter((order) => !isUnsoldShowroomStock(order))
+        );
         setLoading(false);
       },
       (err) => {

@@ -1,8 +1,9 @@
 // src/pages/Inventory/Inventory.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, onSnapshot, setDoc, updateDoc, doc, query, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, onSnapshot, setDoc, updateDoc, doc, query, where } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
 import type { BulkItem, HairItem, RemnantMergeLogEntry } from '../../types';
+import type { Order } from '../Sales/Sales';
 import AddHairModal from './AddHairModal';
 import AddBulkItemModal from './AddBulkItemModal';
 import RestockModal from './RestockModal';
@@ -10,8 +11,10 @@ import QuickRetailSaleModal from './QuickRetailSaleModal';
 import CreateRemnantBoxModal from './CreateRemnantBoxModal';
 import MergeRemnantModal from './MergeRemnantModal';
 import RemnantMergeLogModal from './RemnantMergeLogModal';
+import ShowroomStockFormModal from './ShowroomStockFormModal';
+import SellShowroomStockModal from './SellShowroomStockModal';
+import AssignHairModal from '../../components/orders/AssignHairModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import NewOrderWizard from '../../components/orders/NewOrderWizard';
 import './Inventory.css';
 
 const STATUS_LABELS: Record<HairItem['status'], string> = {
@@ -47,8 +50,13 @@ const Inventory: React.FC = () => {
   const [restockTarget, setRestockTarget] = useState<BulkItem | null>(null);
   const [quickSaleTarget, setQuickSaleTarget] = useState<BulkItem | null>(null);
 
-  // --- פאות תצוגה (hairItems עם status === 'showroom') ---
-  const [sellShowroomItemId, setSellShowroomItemId] = useState<string | null>(null);
+  // --- פאות תצוגה (orders עם isShowroomStock: true && clientId ריק - ראו Order ב-Sales.tsx) ---
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isShowroomFormOpen, setIsShowroomFormOpen] = useState(false);
+  const [editingShowroomOrderId, setEditingShowroomOrderId] = useState<string | null>(null);
+  const [assigningShowroomOrderId, setAssigningShowroomOrderId] = useState<string | null>(null);
+  const [sellingShowroomOrderId, setSellingShowroomOrderId] = useState<string | null>(null);
+  const [deletingShowroomOrderId, setDeletingShowroomOrderId] = useState<string | null>(null);
 
   // --- האזנה חיה ל-Firestore, מסוננת רק לנתונים של העסק המחובר (businessId = uid) ---
   useEffect(() => {
@@ -91,10 +99,32 @@ const Inventory: React.FC = () => {
       }
     );
 
+    // כל ה-orders של העסק (לא רק פאות תצוגה) - בדיוק כמו ב-Sales.tsx/
+    // Dashboard.tsx/Reports.tsx; מסננים ללשונית "פאות תצוגה" רק את אלה
+    // עם isShowroomStock && ללא clientId (ראו showroomOrders למטה).
+    const ordersQuery = query(collection(db, 'orders'), where('businessId', '==', businessId));
+    const unsubOrders = onSnapshot(
+      ordersQuery,
+      (snapshot) => {
+        const items = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<Order, 'id'>),
+        }));
+        setOrders(items);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error loading orders for showroom stock:', err);
+        setLoadError('שגיאה בטעינת פאות התצוגה. בדקי את החיבור ונסי לרענן את הדף.');
+        setLoading(false);
+      }
+    );
+
     // ניקוי המאזינים ביציאה מהדף, כדי לא להישאר עם חיבורים פתוחים מיותרים
     return () => {
       unsubHair();
       unsubBulk();
+      unsubOrders();
     };
   }, []);
 
@@ -123,15 +153,21 @@ const Inventory: React.FC = () => {
     [hairItems]
   );
 
-  // פאות תצוגה - קוקוים שסומנו כ"פאת תצוגה" (status === 'showroom'), ללשונית הייעודית
-  const showroomItems = useMemo(
-    () => hairItems.filter((item) => item.status === 'showroom'),
-    [hairItems]
+  // פאות תצוגה שעדיין לא נמכרו - orders עם isShowroomStock: true וללא clientId
+  // (isUnsoldShowroomStock ב-Sales.tsx הוא אותו תנאי בדיוק, כדי שהן לא
+  // יופיעו גם שם/ב-Dashboard/Reports עד שנמכרות בפועל).
+  const showroomOrders = useMemo(
+    () => orders.filter((o) => o.isShowroomStock === true && !o.clientId),
+    [orders]
   );
 
-  // נגזר מ-hairItems החי (לא state נפרד) - כדי שיומן המיזוגים במודל יתעדכן
-  // אוטומטית אחרי כל "בטל מיזוג", באותו דפוס כמו assigningOrder ב-Sales.tsx.
+  // כל ה-ids הבאים נגזרים מ-hairItems/orders החיים (לא state של האובייקט
+  // עצמו) - כדי שהמודלים תמיד יראו עדכון חי, באותו דפוס כמו mergeLogBox למטה.
   const mergeLogBox = hairItems.find((item) => item.id === mergeLogBoxId) || null;
+  const editingShowroomOrder = orders.find((o) => o.id === editingShowroomOrderId) || null;
+  const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
+  const sellingShowroomOrder = orders.find((o) => o.id === sellingShowroomOrderId) || null;
+  const deletingShowroomOrder = orders.find((o) => o.id === deletingShowroomOrderId) || null;
 
   // אפשרויות הפילטר נגזרות מהנתונים בפועל, כדי שהרשימה תישאר מסונכרנת עם מה שבאמת קיים במלאי
   const textureOptions = useMemo(
@@ -309,17 +345,6 @@ const Inventory: React.FC = () => {
     setUndoConfirm(null);
   };
 
-  // מסמנת קוקו רגיל כ"פאת תצוגה" - הוא "עובר" ללשונית פאות התצוגה
-  // (ונעלם מטבלת מלאי השיער הרגילה, כי הוא כבר לא status: 'available').
-  const handleMarkAsShowroom = async (id: string) => {
-    await updateDoc(doc(db, 'hairItems', id), { status: 'showroom' });
-  };
-
-  // מבטלת את סימון "פאת תצוגה" - מחזירה את הפריט לטבלת המלאי הרגילה.
-  const handleReturnToAvailable = async (id: string) => {
-    await updateDoc(doc(db, 'hairItems', id), { status: 'available' });
-  };
-
   const handleAddBulkItem = async (item: BulkItem) => {
     const { id, ...data } = item;
     await setDoc(doc(db, 'bulkItems', id), { ...data, businessId: auth.currentUser!.uid });
@@ -363,6 +388,46 @@ const Inventory: React.FC = () => {
     setRestockTarget(null);
   };
 
+  // מוחקת פאת תצוגה. אם כבר יש usedHairItems משויכים בפועל (הפאה "מוכנה",
+  // לא רק "בבנייה") - קודם מחזירים את המשקל/השווי לכל hairItem ששויך אליה
+  // (מקובץ לפי hairItemId, כדי לא לדרוס update אחד עם השני אם אותו קוקו
+  // שויך כמה פעמים - אותו דפוס שכבר תוקן ב-NewOrderWizard.handleFinish),
+  // בדיוק כמו handleRemove הבודד ב-AssignHairModal, רק בבת אחת. אחרת
+  // מוחקים את הפאה אבל "שוכחים" להחזיר את השיער שכבר יצא מהמלאי.
+  const performDeleteShowroomOrder = async (order: Order) => {
+    const restoreByItemId = new Map<string, { grams: number; value: number }>();
+    (order.usedHairItems ?? []).forEach((used) => {
+      const entry = restoreByItemId.get(used.hairItemId) ?? { grams: 0, value: 0 };
+      entry.grams += used.gramsUsed;
+      entry.value += used.costAtTime;
+      restoreByItemId.set(used.hairItemId, entry);
+    });
+
+    await Promise.all(
+      Array.from(restoreByItemId.entries()).map(async ([hairItemId, restore]) => {
+        const hairItem = hairItems.find((h) => h.id === hairItemId);
+        if (!hairItem) return;
+        const restoreUpdate: { currentWeight: number; status: HairItem['status']; remnantTotalValue?: number } = {
+          currentWeight: hairItem.currentWeight + restore.grams,
+          status: 'available',
+        };
+        if (hairItem.isRemnantBox) {
+          restoreUpdate.remnantTotalValue = (hairItem.remnantTotalValue ?? 0) + restore.value;
+        }
+        await updateDoc(doc(db, 'hairItems', hairItemId), restoreUpdate);
+      })
+    );
+
+    await deleteDoc(doc(db, 'orders', order.id));
+  };
+
+  const handleConfirmDeleteShowroomOrder = async () => {
+    if (deletingShowroomOrder) {
+      await performDeleteShowroomOrder(deletingShowroomOrder);
+    }
+    setDeletingShowroomOrderId(null);
+  };
+
   const statusBadgeClass = (status: HairItem['status']) => `status-badge status-${status}`;
 
   return (
@@ -386,7 +451,7 @@ const Inventory: React.FC = () => {
             className={activeTab === 'showroom' ? 'tab-btn active' : 'tab-btn'}
             onClick={() => setActiveTab('showroom')}
           >
-            פאות תצוגה{showroomItems.length ? ` (${showroomItems.length})` : ''}
+            פאות תצוגה{showroomOrders.length ? ` (${showroomOrders.length})` : ''}
           </button>
         </div>
       </div>
@@ -492,7 +557,6 @@ const Inventory: React.FC = () => {
                   filteredHairItems.map((item) => {
                     const isRemnant = item.isRemnantBox === true;
                     const canMerge = !isRemnant && item.currentWeight > 0;
-                    const canMarkAsShowroom = !isRemnant && item.status === 'available';
                     const avgPricePerGram = isRemnant && item.currentWeight > 0
                       ? (item.remnantTotalValue ?? 0) / item.currentWeight
                       : 0;
@@ -519,14 +583,6 @@ const Inventory: React.FC = () => {
                               onClick={() => setMergeSourceItem(item)}
                             >
                               📦 מזג לשאריות
-                            </button>
-                          )}
-                          {canMarkAsShowroom && (
-                            <button
-                              className="btn-secondary showroom-mark-btn"
-                              onClick={() => handleMarkAsShowroom(item.id)}
-                            >
-                              🖼️ סמן כפאת תצוגה
                             </button>
                           )}
                           {isRemnant && (
@@ -618,51 +674,78 @@ const Inventory: React.FC = () => {
 
       {!loading && !loadError && activeTab === 'showroom' && (
         <div className="tab-content">
+          <div className="filter-bar">
+            <button
+              className="btn-primary add-hair-btn"
+              onClick={() => {
+                setEditingShowroomOrderId(null);
+                setIsShowroomFormOpen(true);
+              }}
+            >
+              + יצירת פאת תצוגה
+            </button>
+          </div>
+
           <div className="table-wrapper">
             <table className="inventory-table">
               <thead>
                 <tr>
-                  <th>מזהה / ברקוד</th>
-                  <th>גוון</th>
-                  <th>אורך</th>
-                  <th>סוג שיער</th>
-                  <th>עלות</th>
-                  <th>ימים במלאי</th>
+                  <th>מפרט</th>
+                  <th>עלות מחושבת</th>
+                  <th>מחיר מכירה מבוקש</th>
+                  <th>סטטוס</th>
                   <th>פעולות</th>
                 </tr>
               </thead>
               <tbody>
-                {showroomItems.length === 0 ? (
+                {showroomOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="empty-state">
-                      אין כרגע פאות תצוגה מסומנות
+                    <td colSpan={5} className="empty-state">
+                      אין כרגע פאות תצוגה - אפשר ליצור חדשה בכפתור למעלה
                     </td>
                   </tr>
                 ) : (
-                  showroomItems.map((item) => {
-                    const daysInStock = Math.floor(
-                      (new Date().getTime() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24)
-                    );
+                  showroomOrders.map((order) => {
+                    const usedHairItems = order.usedHairItems ?? [];
+                    const actualCost = usedHairItems.reduce((sum, u) => sum + u.costAtTime, 0);
+                    const isReady = usedHairItems.length > 0;
                     return (
-                      <tr key={item.id}>
-                        <td className="mono">{item.id}</td>
-                        <td>{item.color}</td>
-                        <td>{item.length} ס"מ</td>
-                        <td>{item.hairType}</td>
-                        <td>₪{item.costPrice.toLocaleString()}</td>
-                        <td>{daysInStock >= 0 ? `${daysInStock} ימים` : '—'}</td>
+                      <tr key={order.id}>
+                        <td>{order.notes || '—'}</td>
+                        <td>{isReady ? `₪${actualCost.toLocaleString()}` : '—'}</td>
+                        <td>₪{(order.retailPrice ?? 0).toLocaleString()}</td>
+                        <td>
+                          <span className={`status-badge ${isReady ? 'status-available' : 'status-showroom'}`}>
+                            {isReady ? 'מוכנה' : 'בבנייה'}
+                          </span>
+                        </td>
                         <td>
                           <button
+                            className="btn-secondary merge-remnant-btn"
+                            onClick={() => setAssigningShowroomOrderId(order.id)}
+                          >
+                            🧵 ניהול שיוך שיער
+                          </button>
+                          <button
+                            className="btn-secondary merge-log-btn"
+                            onClick={() => {
+                              setEditingShowroomOrderId(order.id);
+                              setIsShowroomFormOpen(true);
+                            }}
+                          >
+                            ✏️ עריכה
+                          </button>
+                          <button
                             className="btn-primary showroom-sell-btn"
-                            onClick={() => setSellShowroomItemId(item.id)}
+                            onClick={() => setSellingShowroomOrderId(order.id)}
                           >
                             💰 מכירה
                           </button>
                           <button
-                            className="btn-secondary showroom-return-btn"
-                            onClick={() => handleReturnToAvailable(item.id)}
+                            className="btn-secondary showroom-delete-btn"
+                            onClick={() => setDeletingShowroomOrderId(order.id)}
                           >
-                            ↩️ החזר לזמין
+                            🗑️ מחיקה
                           </button>
                         </td>
                       </tr>
@@ -732,14 +815,48 @@ const Inventory: React.FC = () => {
         onCancel={() => setUndoConfirm(null)}
       />
 
-      {/* מכירת פאת תצוגה - פותחת את אשף ההזמנה הרגיל, עם סוג הזמנה ופריט
-          מוקדם-מוגדרים; בחירת הלקוחה עצמה עדיין נעשית בתוך האשף. */}
-      <NewOrderWizard
-        isOpen={sellShowroomItemId !== null}
-        onClose={() => setSellShowroomItemId(null)}
-        onOrderCreated={() => setSellShowroomItemId(null)}
-        preselectedShowroomItemId={sellShowroomItemId}
-        onOpenRepairForm={() => {}}
+      <ShowroomStockFormModal
+        isOpen={isShowroomFormOpen}
+        editingOrder={editingShowroomOrder}
+        onClose={() => setIsShowroomFormOpen(false)}
+        onSaved={() => setIsShowroomFormOpen(false)}
+      />
+
+      {/* ניהול שיוך שיער לפאת תצוגה - אותו AssignHairModal בדיוק כמו על
+          הזמנת לקוחה רגילה (Sales.tsx); clientName כאן הוא רק תווית תצוגה
+          למודל (הפריט הזה עדיין בלי לקוחה אמיתית). */}
+      <AssignHairModal
+        isOpen={assigningShowroomOrderId !== null}
+        order={
+          assigningShowroomOrder
+            ? {
+                id: assigningShowroomOrder.id,
+                clientName: `פאת תצוגה${assigningShowroomOrder.notes ? ` - ${assigningShowroomOrder.notes}` : ''}`,
+                usedHairItems: assigningShowroomOrder.usedHairItems,
+              }
+            : null
+        }
+        onClose={() => setAssigningShowroomOrderId(null)}
+      />
+
+      <SellShowroomStockModal
+        isOpen={sellingShowroomOrderId !== null}
+        order={sellingShowroomOrder}
+        onClose={() => setSellingShowroomOrderId(null)}
+        onSold={() => setSellingShowroomOrderId(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={deletingShowroomOrderId !== null}
+        title="מחיקת פאת תצוגה"
+        message={
+          deletingShowroomOrder && (deletingShowroomOrder.usedHairItems ?? []).length > 0
+            ? 'לפאה הזו כבר משויך שיער בפועל - המחיקה תחזיר את המשקל/השווי לכל קוקו ששויך אליה, ואז תמחק את הפאה לצמיתות. להמשיך?'
+            : 'למחוק את פאת התצוגה הזו לצמיתות?'
+        }
+        variant="danger"
+        onConfirm={handleConfirmDeleteShowroomOrder}
+        onCancel={() => setDeletingShowroomOrderId(null)}
       />
     </div>
   );
