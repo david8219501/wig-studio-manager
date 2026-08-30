@@ -62,6 +62,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   const [usedBulkItems, setUsedBulkItems] = useState<UsedBulkItem[]>([]);
   const [bulkItemPickerId, setBulkItemPickerId] = useState("");
   const [bulkItemPickerQty, setBulkItemPickerQty] = useState<number | "">(1);
+  const [bulkItemQtyError, setBulkItemQtyError] = useState<string | null>(null);
 
   // Step 3 (פאת תצוגה): בחירת קוקו/פאה קיימים במלאי בסטטוס "פאת תצוגה"
   const [showroomItems, setShowroomItems] = useState<HairItem[]>([]);
@@ -95,6 +96,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     setUsedBulkItems([]);
     setBulkItemPickerId("");
     setBulkItemPickerQty(1);
+    setBulkItemQtyError(null);
     setShowroomSearch("");
     setSelectedShowroomItemId("");
     setPrice(0);
@@ -179,10 +181,27 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     [showroomItems, selectedShowroomItemId]
   );
 
+  // וולידציה זהה לדפוס שכבר קיים ב-AssignHairModal.tsx (gramsExceedsStock),
+  // OrderDetailsPanel.tsx (bulkQtyExceedsStock) ו-QuickRetailSaleModal.tsx -
+  // בודקת מול המלאי הזמין **כולל** כמות שכבר נבחרה לאותו פריט קודם
+  // באותה הזמנה (אפשר להוסיף את אותו פריט כמה פעמים), לא רק את הכמות
+  // הבודדת שמתווספת עכשיו.
   const handleAddUsedBulkItem = () => {
     const item = bulkItemsCatalog.find((b) => b.id === bulkItemPickerId);
     const qty = Number(bulkItemPickerQty) || 0;
     if (!item || qty <= 0) return;
+
+    const alreadyUsedQty = usedBulkItems
+      .filter((used) => used.itemId === item.id)
+      .reduce((sum, used) => sum + used.quantity, 0);
+    const remaining = item.quantity - alreadyUsedQty;
+
+    if (qty > remaining) {
+      setBulkItemQtyError(`הכמות המבוקשת עולה על המלאי הזמין - נותרו רק ${remaining} יח'.`);
+      return;
+    }
+
+    setBulkItemQtyError(null);
     setUsedBulkItems((prev) => [
       ...prev,
       { itemId: item.id, itemName: item.name, quantity: qty, unitCostAtTime: item.unitCost },
@@ -193,6 +212,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
 
   const handleRemoveUsedBulkItem = (index: number) => {
     setUsedBulkItems((prev) => prev.filter((_, i) => i !== index));
+    setBulkItemQtyError(null);
   };
 
   if (!isOpen) return null;
@@ -225,6 +245,27 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
 
     setSaving(true);
     setSaveError(null);
+
+    // בדיקת הגנה נוספת (defense in depth) - הוולידציה האמיתית כבר קורית
+    // ב-handleAddUsedBulkItem בזמן הבחירה (כולל צבירה נכונה אם אותו פריט
+    // נבחר כמה פעמים). זו רק רשת ביטחון למקרה שהמלאי בפועל השתנה במקביל
+    // (למשל מכירה אחרת) בין פתיחת האשף (וטעינת bulkItemsCatalog) לבין
+    // לחיצה על "סיום" - אם מתגלה כאן חריגה בכל זאת, עוצרים לגמרי לפני
+    // שההזמנה נוצרת, במקום ליצור אותה עם מלאי שיירד בשקט ל-0.
+    const usedQtyByItemId = new Map<string, number>();
+    usedBulkItems.forEach((used) => {
+      usedQtyByItemId.set(used.itemId, (usedQtyByItemId.get(used.itemId) ?? 0) + used.quantity);
+    });
+    for (const [itemId, totalQty] of usedQtyByItemId) {
+      const catalogItem = bulkItemsCatalog.find((b) => b.id === itemId);
+      if (catalogItem && totalQty > catalogItem.quantity) {
+        setSaveError(
+          `הכמות המבוקשת מ-"${catalogItem.name}" עולה על המלאי הזמין (נותרו ${catalogItem.quantity}) - ייתכן שהמלאי השתנה. יש לעדכן את הכמות ולנסות שוב.`
+        );
+        setSaving(false);
+        return;
+      }
+    }
 
     const isShowroomSale = orderType === "inventory" && selectedShowroomItem;
 
@@ -280,12 +321,15 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         notes: specsSummary,
       });
 
-      // הורדת הכמות שנוצלה בפועל מכל פריט מלאי פשוט שצורף להזמנה
+      // הורדת הכמות שנוצלה בפועל מכל פריט מלאי פשוט שצורף להזמנה - מקובצת
+      // לפי itemId (usedQtyByItemId מהבדיקה למעלה), כדי שאם אותו פריט נבחר
+      // כמה פעמים באותה הזמנה, ההורדה תהיה update אחד עם הסכום הכולל,
+      // ולא כמה update-ים מקבילים על אותו מסמך שדורסים זה את זה.
       await Promise.all(
-        usedBulkItems.map((used) => {
-          const catalogItem = bulkItemsCatalog.find((b) => b.id === used.itemId);
-          const remaining = Math.max(0, (catalogItem?.quantity ?? used.quantity) - used.quantity);
-          return updateDoc(doc(db, "bulkItems", used.itemId), { quantity: remaining });
+        Array.from(usedQtyByItemId.entries()).map(([itemId, totalQty]) => {
+          const catalogItem = bulkItemsCatalog.find((b) => b.id === itemId);
+          const remaining = (catalogItem?.quantity ?? totalQty) - totalQty;
+          return updateDoc(doc(db, "bulkItems", itemId), { quantity: remaining });
         })
       );
 
@@ -543,7 +587,13 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 )}
 
                 <div className="bulk-item-add-row">
-                  <select value={bulkItemPickerId} onChange={(e) => setBulkItemPickerId(e.target.value)}>
+                  <select
+                    value={bulkItemPickerId}
+                    onChange={(e) => {
+                      setBulkItemPickerId(e.target.value);
+                      setBulkItemQtyError(null);
+                    }}
+                  >
                     <option value="">בחרי פריט מהמלאי...</option>
                     {bulkItemsCatalog.map((b) => (
                       <option key={b.id} value={b.id}>{b.name} (במלאי: {b.quantity})</option>
@@ -553,14 +603,16 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                     type="number"
                     min={1}
                     value={bulkItemPickerQty}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setBulkItemPickerQty(e.target.value === "" ? "" : Number(e.target.value))
-                    }
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setBulkItemPickerQty(e.target.value === "" ? "" : Number(e.target.value));
+                      setBulkItemQtyError(null);
+                    }}
                   />
                   <button type="button" className="btn-secondary" onClick={handleAddUsedBulkItem} disabled={!bulkItemPickerId}>
                     + הוסף פריט מהמלאי
                   </button>
                 </div>
+                {bulkItemQtyError && <span className="field-error">{bulkItemQtyError}</span>}
               </div>
 
               <div className="field">
