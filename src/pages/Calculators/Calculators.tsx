@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
-import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost } from "../../utils/hairCost";
+import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, calculateHairCostFromGrams } from "../../utils/hairCost";
 import './Calculators.css';
 
 const DEFAULT_SETTINGS = {
@@ -271,8 +271,7 @@ function RepairsCalculator({ settings }: { settings: Settings }) {
   const calc = useMemo(() => {
     if (missing) return null;
     const g        = Number(grams);
-    const waste    = g * 0.3;
-    const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * (g + waste) / 1000;
+    const { waste, hairCost } = calculateHairCostFromGrams(g, settings);
     const mfgCost  = hairCost + Number(skinTop || 0) + Number(net || 0) + Number(color || 0) + Number(extra || 0);
     const final    = mfgCost * (1 + (settings.profitMargin / 100));
     return { waste, hairCost, mfgCost, final };
