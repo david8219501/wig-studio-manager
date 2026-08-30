@@ -1,50 +1,67 @@
-# סיכום: עדכון עיצוב ShowroomStockDetailsPanel.tsx - התאמה ל-OrderDetailsPanel.tsx
+# סיכום: 6 שיפורים ל-Calendar.tsx
 
-## 1. שיוך שיער - כפתור מוטבע באזור עצמו
+## 1. מיקום כפתור ה-"+"
 
-כפתור "🧵 ניהול שיוך שיער" עבר משורת הכפתורים בתחתית לתוך כותרת אזור
-"שיוך שיער בפועל" עצמו (`showroom-details-section-title-row`, אותו
-דפוס בדיוק כמו `order-details-section-title-row` ב-OrderDetailsPanel.tsx) -
-`h3` + כפתור accent זה-לצד-זה. הרשימה שמציגה קוקוים משויכים לא השתנתה.
+הוסר `margin-top: auto` מ-`.day-add-appointment-btn` (Calendar.css).
+זה היה הגורם שהצמיד את הכפתור לתחתית הקבועה של הקובייה
+(`.day-column-body` הוא `flex:1` בעמודה עם `min-height: 320px`) - בלי
+זה, הכפתור פשוט זורם מיד אחרי הפגישה האחרונה בסדר הרגיל של ה-DOM
+(או בראש האזור אם אין פגישות בכלל). לא נדרש שינוי ב-TSX - הבעיה הייתה
+כולה ב-CSS.
 
-## 2. פריטי מלאי - טופס הוספה מוטבע במקום מודל נפרד
+## 2. אזהרת חפיפת שעות (לא חוסמת)
 
-הוסר `AssignBulkItemsModal.tsx` **לגמרי** (נמחק - אין עוד קורא לו).
-הלוגיקה שלו (`loadBulkItemsCatalog`/`handleAddBulkItem`/
-`handleRemoveBulkItem`, זהה ל-`OrderDetailsPanel.tsx`) הועברה ישירות
-לתוך `ShowroomStockDetailsPanel.tsx` - הרכיב הפך מ"תצוגה בלבד" לרכיב
-עם state/כתיבות Firestore משלו (בדיוק כמו `OrderDetailsPanel.tsx`).
-בתוך אזור "פריטי מלאי שנוצלו": רשימה עם כפתור הסרה לכל שורה + טופס
-מוטבע (`CustomSelect` לבחירת פריט - לא `<select>` מובנה, כדי לא
-להכניס מחדש את אותו באג מיקום - שדה כמות, כפתור "+ הוסף פריט"),
-אותו וולידציית מלאי (`bulkQtyExceedsStock`) כמו בכל מקום אחר באתר.
+`hasTimeOverlap` (`useMemo`) בודק אם קיימת פגישה אחרת **באותו יום**
+שחופפת בטווח השעות (`a.startTime < endTime && startTime < a.endTime`
+- חפיפת intervals קלאסית, עובד ישירות על מחרוזות "HH:MM"), תוך
+התעלמות מהפגישה הנערכת עצמה (`a.id !== editingAptId`). כשיש חפיפה:
+מוצגת אזהרה מוטבעת בטופס (`.field-warning`, צבעי warning) לפני שליחה,
+**וגם** ב-`handleSaveAppointment` - אם עדיין קיימת חפיפה בזמן השליחה,
+נפתח `ConfirmDialog` (`variant="warning"`, "לשמור בכל זאת?") במקום
+לשמור ישר; השמירה בפועל (`performSaveAppointment`, מופרד מהטיפול
+בטופס) מתבצעת רק אם המשתמשת מאשרת - לא חסימה מוחלטת.
 
-## 3. כפתורי תחתית - 3 בלבד
+## 3. דיאלוג מחיקה בעיצוב האתר
 
-נשארו: עריכה (secondary), מכירה (primary), מחיקה (danger, מובדל
-ויזואלית בקצה השורה). "ניהול שיוך שיער" ו"ניהול פריטי מלאי" עברו
-לאזורים שלהם (סעיפים 1-2).
+`window.confirm` הוחלף ב-`ConfirmDialog` (`variant="danger"`) הקיים.
+`handleDeleteAppointment` הפך מלוקח `aptId` כפרמטר למבצע מחיקה ישירה
+של `deleteConfirmId` (state חדש) - כפתורי "מחיקה" בתפריטי שתי התצוגות
+(שבועית/יומית) קוראים עכשיו ל-`setDeleteConfirmId(apt.id)` במקום
+למחוק ישר.
 
-## 4. מזהה קצר בכותרת - כבר ממומש, אומת
+## 4. מיון פגישות לפי שעה
 
-`order.showroomCode || order.id` כבר היה בכותרת הפאנל מהתיקון הקודם -
-אומת end-to-end (`ShowroomStockFormModal.tsx` כותב אותו ביצירה,
-`Inventory.tsx` מחשב את הבא בתור, הטבלה והפאנל מציגים אותו) - לא
-נדרש שינוי. פריטים שנוצרו לפני התיקון (בלי `showroomCode`) ימשיכו
-להציג את ה-ID הארוך כ-fallback, בדיוק כמתוכנן.
+גם ברשימת התצוגה השבועית (`dayApts`) וגם ברשימת התצוגה היומית -
+`.sort((a, b) => a.startTime.localeCompare(b.startTime))` אחרי הסינון
+לפי תאריך, לפני המיפוי לתצוגה.
 
-## `Inventory.tsx`
+## 5. "אחר / הוסף חדש" במטרת הפגישה
 
-הוסרו: `assigningBulkItemsOrderId`, `assigningBulkItemsOrder`,
-ה-import וה-render של `AssignBulkItemsModal`, ו-prop
-`onOpenAssignBulkItems` מהפאנל (לא רלוונטי יותר - ההוספה קורית ישירות
-בפאנל עצמו).
+נוסף ל-`APPOINTMENT_TYPE_OPTIONS` ערך-סמן `OTHER_APPOINTMENT_TYPE`
+("אחר / הוסף חדש"). כשנבחר - נפתח שדה טקסט חופשי (`customAptType`)
+מתחת ל-`CustomSelect`; בשמירה, `finalType` הוא הטקסט החופשי (אחרי
+`trim`) במקום ערך הסמן עצמו - הוא לעולם לא נשמר ל-Firestore. בעריכת
+פגישה קיימת שהמטרה שלה **לא** ברשימה הקבועה (הוזנה בעבר כ"אחר") -
+`handleOpenEditModal` מזהה זאת ומציג את הטקסט המקורי מוכן לעריכה
+בשדה החופשי, במקום "אחר" ריק.
+
+## 6. וולידציה: שעת סיום אחרי שעת התחלה
+
+ב-`handleSaveAppointment`: אם `endTime <= startTime` - נחסמת השמירה
+לגמרי עם הודעת שגיאה ברורה (`.error-banner` הקיים, לא `alert` - כדי
+לא לסתור את התיקון בסעיף 3 של אותו קובץ). זו חסימה אמיתית, בניגוד
+לאזהרת החפיפה בסעיף 2 שניתנת לעקיפה.
+
+## ניקוי לוואי
+
+`setOverlapConfirmOpen(false)` הועבר לתחילת `performSaveAppointment`
+(לפני הכתיבה ל-Firestore) במקום רק בנתיב ההצלחה - כדי שדיאלוג האישור
+ייסגר מיד גם אם השמירה בפועל נכשלת, ולא יישאר פתוח מעל הודעת השגיאה.
 
 ## בדיקות שבוצעו
 
 - `npm run build` (tsc -b + vite build) עובר נקי.
-- `npm run lint` - אין שגיאות/אזהרות חדשות; `ShowroomStockDetailsPanel.tsx`
-  מציג את אותה אזהרת `react-hooks/set-state-in-effect` הקיימת כבר
-  ב-`OrderDetailsPanel.tsx` (אותו דפוס reset-on-open בדיוק).
+- `npm run lint` - אין שגיאות/אזהרות חדשות ב-`Calendar.tsx`.
 - לא בוצעה בדיקה ויזואלית בדפדפן בפועל - מומלץ לבדוק ידנית לפני סמיכה
-  מלאה, בפרט את מיקום ה-`CustomSelect` בטופס המוטבע.
+  מלאה, בפרט את מיקום כפתור ה-"+" (סעיף 1) ואת זרימת אישור החפיפה
+  (סעיף 2).

@@ -177,14 +177,15 @@
 }
 
 /* כפתור "הוסף פגישה" ברור ביום ספציפי - יושב בתוך הקובייה שמציגה את
-   רשימת הפגישות של אותו יום (בתחתית הרשימה), גם בתצוגה השבועית וגם
-   בתצוגה היומית - לא איקון זעיר בכותרת. */
+   רשימת הפגישות של אותו יום, גם בתצוגה השבועית וגם בתצוגה היומית - לא
+   איקון זעיר בכותרת. בכוונה בלי margin-top: auto - כדי שהוא יופיע תמיד
+   מיד אחרי הפגישה האחרונה בזרימה הרגילה (לא מוצמד לתחתית הקובייה הקבועה,
+   שהייתה משאירה רווח אפור ריק גדול כשיש מעט פגישות).*/
 .day-add-appointment-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: auto;
   padding: 10px;
   border: 1px dashed var(--color-accent-border);
   border-radius: var(--radius-lg);
@@ -446,6 +447,18 @@
   margin-bottom: 16px;
   font-weight: 600;
   border: 1px solid var(--color-danger-bg);
+}
+
+/* אזהרת חפיפת שעות בטופס קביעת/עריכת פגישה - אזהרה בלבד, לא חוסמת שמירה */
+.field-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  border: 1px solid var(--color-warning-bg);
 }
 
 .apt-form, .client-form {

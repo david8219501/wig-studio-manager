@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   collection,
   addDoc,
@@ -16,13 +16,19 @@ import { formatDateIL } from "../../utils/formatDate";
 import DateInput from "../../components/common/DateInput";
 import TimeInput from "../../components/common/TimeInput";
 import CustomSelect from "../../components/common/CustomSelect";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import "./Calendar.css";
+
+// ערך-סמן לבחירת "אחר / הוסף חדש" ב-CustomSelect של מטרת הפגישה - לא
+// נשמר בפועל כ-type של הפגישה, רק פותח שדה טקסט חופשי (ראו customAptType).
+const OTHER_APPOINTMENT_TYPE = "__other__";
 
 const APPOINTMENT_TYPE_OPTIONS = [
   { value: "מדידת פאה חדשה", label: "מדידת פאה חדשה" },
   { value: "תיקון רשת", label: "תיקון רשת" },
   { value: "סירוק והחלקה", label: "סירוק והחלקה" },
   { value: "מסירת פאה מוכנה", label: "מסירת פאה מוכנה" },
+  { value: OTHER_APPOINTMENT_TYPE, label: "אחר / הוסף חדש" },
 ];
 
 // טיפוס הלקוחה תואם בדיוק למבנה האמיתי ב-collection "clients" (ראו Clients.tsx)
@@ -64,9 +70,13 @@ export default function Calendar() {
   const [clientSearchText, setClientSearchText] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [aptType, setAptType] = useState("מדידת פאה חדשה");
+  const [customAptType, setCustomAptType] = useState("");
   const [aptDate, setAptDate] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("11:00");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [overlapConfirmOpen, setOverlapConfirmOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
   const [newFirstName, setNewFirstName] = useState("");
@@ -172,14 +182,27 @@ export default function Calendar() {
     (c) => c.name.includes(clientSearchText) || c.phone.includes(clientSearchText)
   );
 
+  // חפיפת שעות מול פגישה אחרת קיימת באותו יום - אזהרה בלבד, לא חסימה
+  // (ראו handleSaveAppointment). חפיפה קלאסית: a.startTime < endTime &&
+  // startTime < a.endTime - עובד ישירות על מחרוזות "HH:MM" כי השוואת
+  // מחרוזות בפורמט הזה תואמת להשוואה כרונולוגית.
+  const hasTimeOverlap = useMemo(() => {
+    if (!aptDate || !startTime || !endTime) return false;
+    return appointments.some(
+      (a) => a.date === aptDate && a.id !== editingAptId && a.startTime < endTime && startTime < a.endTime
+    );
+  }, [appointments, aptDate, startTime, endTime, editingAptId]);
+
   const handleOpenAddModal = () => {
     setEditingAptId(null);
     setSelectedClientId("");
     setClientSearchText("");
     setAptType("מדידת פאה חדשה");
+    setCustomAptType("");
     setAptDate(currentDateIso);
     setStartTime("10:00");
     setEndTime("11:00");
+    setFormError(null);
     setIsAddAptModalOpen(true);
   };
 
@@ -190,9 +213,11 @@ export default function Calendar() {
     setSelectedClientId("");
     setClientSearchText("");
     setAptType("מדידת פאה חדשה");
+    setCustomAptType("");
     setAptDate(dateIso);
     setStartTime("10:00");
     setEndTime("11:00");
+    setFormError(null);
     setIsAddAptModalOpen(true);
   };
 
@@ -200,41 +225,52 @@ export default function Calendar() {
     setEditingAptId(apt.id);
     setSelectedClientId(apt.clientId);
     setClientSearchText(apt.clientName);
-    setAptType(apt.type);
+    // מטרה שכבר לא ברשימת האפשרויות הקבועות (הוזנה בעבר כ"אחר / הוסף
+    // חדש") - ממלאים מראש את שדה הטקסט החופשי, לא רק בוחרים "אחר" ריק.
+    const isKnownType = APPOINTMENT_TYPE_OPTIONS.some((o) => o.value === apt.type);
+    setAptType(isKnownType ? apt.type : OTHER_APPOINTMENT_TYPE);
+    setCustomAptType(isKnownType ? "" : apt.type);
     setAptDate(apt.date);
     setStartTime(apt.startTime);
     setEndTime(apt.endTime);
+    setFormError(null);
     setIsAddAptModalOpen(true);
   };
 
-  const handleDeleteAppointment = async (aptId: string) => {
-    if (!window.confirm("האם את בטוחה שברצונך למחוק את הפגישה?")) return;
+  const handleDeleteAppointment = async () => {
+    if (!deleteConfirmId) return;
     try {
-      await deleteDoc(doc(db, "appointments", aptId));
+      await deleteDoc(doc(db, "appointments", deleteConfirmId));
     } catch (err) {
       console.error("Error deleting appointment:", err);
       alert("שגיאה במחיקת הפגישה. נסי שוב.");
+    } finally {
+      setDeleteConfirmId(null);
     }
   };
 
-  const handleSaveAppointment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ביצוע השמירה בפועל ב-Firestore - מופרד מ-handleSaveAppointment כדי
+  // שאפשר יהיה לקרוא לו גם ישירות (אין חפיפה) וגם אחרי אישור מפורש
+  // ב-ConfirmDialog (יש חפיפה, אבל המשתמשת בחרה להמשיך בכל זאת).
+  const performSaveAppointment = async () => {
     const targetClient = clients.find((c) => c.id === selectedClientId);
-    if (!targetClient) {
-      alert("נא לבחור לקוחה מהרשימה");
-      return;
-    }
+    if (!targetClient) return;
 
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
 
+    const finalType = aptType === OTHER_APPOINTMENT_TYPE ? customAptType.trim() : aptType;
+
+    // סוגרים את אישור החפיפה מיד (אם היה פתוח) - לא תלוי בהצלחת השמירה,
+    // כדי שלא יישאר פתוח מעל הודעת שגיאה אם השמירה עצמה נכשלת.
+    setOverlapConfirmOpen(false);
     setSaving(true);
     try {
       if (editingAptId) {
         await updateDoc(doc(db, "appointments", editingAptId), {
           clientId: targetClient.id,
           clientName: targetClient.name,
-          type: aptType,
+          type: finalType,
           date: aptDate,
           startTime,
           endTime,
@@ -245,7 +281,7 @@ export default function Calendar() {
           businessId,
           clientId: targetClient.id,
           clientName: targetClient.name,
-          type: aptType,
+          type: finalType,
           date: aptDate,
           startTime,
           endTime,
@@ -263,6 +299,33 @@ export default function Calendar() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveAppointment = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!clients.find((c) => c.id === selectedClientId)) {
+      alert("נא לבחור לקוחה מהרשימה");
+      return;
+    }
+    if (aptType === OTHER_APPOINTMENT_TYPE && !customAptType.trim()) {
+      setFormError("יש להזין מטרת פגישה מותאמת אישית.");
+      return;
+    }
+    if (endTime <= startTime) {
+      setFormError('שעת "עד" חייבת להיות מאוחרת משעת "משעה".');
+      return;
+    }
+
+    // חפיפה - אזהרה בלבד, לא חסימה: מציגים אישור מפורש, ורק אם המשתמשת
+    // בוחרת להמשיך בכל זאת קוראים בפועל ל-performSaveAppointment.
+    if (hasTimeOverlap) {
+      setOverlapConfirmOpen(true);
+      return;
+    }
+
+    performSaveAppointment();
   };
 
   const handleAddClientFromModal = async (e: React.FormEvent) => {
@@ -385,7 +448,9 @@ export default function Calendar() {
         {viewMode === "weekly" ? (
           <div className="weekly-days-grid">
             {daysList.map((dayObj, idx) => {
-              const dayApts = appointments.filter((a) => a.date === dayObj.dateIso);
+              const dayApts = appointments
+                .filter((a) => a.date === dayObj.dateIso)
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
               return (
                 <div key={idx} className="day-column">
                   <div className="day-column-header">
@@ -413,7 +478,7 @@ export default function Calendar() {
                                   <button onClick={() => { setActiveMenuId(null); handleOpenEditModal(apt); }}>
                                     ✏️ עריכה
                                   </button>
-                                  <button className="text-danger" onClick={() => { setActiveMenuId(null); handleDeleteAppointment(apt.id); }}>
+                                  <button className="text-danger" onClick={() => { setActiveMenuId(null); setDeleteConfirmId(apt.id); }}>
                                     🗑️ מחיקה
                                   </button>
                                 </div>
@@ -451,6 +516,7 @@ export default function Calendar() {
             ) : (
               appointments
                 .filter((a) => a.date === currentDateIso)
+                .sort((a, b) => a.startTime.localeCompare(b.startTime))
                 .map((apt) => (
                   <div key={apt.id} className="appointment-card">
                     <div className="apt-time-box-daily mono" dir="ltr">
@@ -481,7 +547,7 @@ export default function Calendar() {
                           <button onClick={() => { setActiveMenuId(null); handleOpenEditModal(apt); }}>
                             ✏️ עריכה
                           </button>
-                          <button className="text-danger" onClick={() => { setActiveMenuId(null); handleDeleteAppointment(apt.id); }}>
+                          <button className="text-danger" onClick={() => { setActiveMenuId(null); setDeleteConfirmId(apt.id); }}>
                             🗑️ מחיקה
                           </button>
                         </div>
@@ -568,6 +634,19 @@ export default function Calendar() {
                 </div>
               </div>
 
+              {aptType === OTHER_APPOINTMENT_TYPE && (
+                <div className="form-group">
+                  <label>מטרה מותאמת אישית *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="הקלידי מטרת פגישה..."
+                    value={customAptType}
+                    onChange={(e) => setCustomAptType(e.target.value)}
+                  />
+                </div>
+              )}
+
               <div className="form-row">
                 <div className="form-group">
                   <label>משעה *</label>
@@ -578,6 +657,11 @@ export default function Calendar() {
                   <TimeInput required value={endTime} onChange={setEndTime} />
                 </div>
               </div>
+
+              {hasTimeOverlap && (
+                <div className="field-warning">⚠️ יש כבר פגישה בשעה זו באותו יום.</div>
+              )}
+              {formError && <div className="error-banner">{formError}</div>}
 
               <div className="modal-actions" style={{ marginTop: '15px' }}>
                 <button type="submit" className="btn-primary" disabled={saving}>{saving ? "שומר..." : "שמור שינויים"}</button>
@@ -694,6 +778,25 @@ export default function Calendar() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirmId !== null}
+        title="מחיקת פגישה"
+        message="האם את בטוחה שברצונך למחוק את הפגישה?"
+        variant="danger"
+        onConfirm={handleDeleteAppointment}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={overlapConfirmOpen}
+        title="חפיפת שעות"
+        message="יש כבר פגישה בשעה זו באותו יום. לשמור בכל זאת?"
+        variant="warning"
+        confirmLabel="שמירה בכל זאת"
+        onConfirm={performSaveAppointment}
+        onCancel={() => setOverlapConfirmOpen(false)}
+      />
     </div>
   );
 }
