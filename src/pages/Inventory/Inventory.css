@@ -298,6 +298,41 @@
   margin-inline-start: 6px;
 }
 
+/* פילטר "במלאי"/"נמכרו"/"הכל" בראש לשונית "פאות תצוגה" - אותו מראה
+   בדיוק כמו .tab-switch/.tab-btn למעלה, רק בקנה מידה קטן יותר כדי
+   להשתלב בתוך .filter-bar לצד כפתור "יצירת פאת תצוגה". */
+.showroom-view-toggle {
+  display: flex;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 3px;
+}
+
+.showroom-view-btn {
+  border: none;
+  background: transparent;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background var(--duration-fast) var(--easing), color var(--duration-fast) var(--easing);
+}
+
+.showroom-view-btn:hover {
+  background: var(--color-accent-bg);
+}
+
+.showroom-view-btn.active {
+  background: var(--color-accent);
+  color: var(--color-on-primary);
+  font-weight: 600;
+}
+
 /* כל שורה בטבלת "פאות תצוגה" פותחת את ShowroomStockDetailsPanel בלחיצה
    (חוץ מבחירת הסטטוס - יש לה stopPropagation) - אותו דפוס כמו .sales-row
    ב-Sales.css. אפקט ה-hover עצמו כבר גנרי לכל שורה בטבלה (למעלה). */

@@ -14,6 +14,7 @@ import RemnantMergeLogModal from './RemnantMergeLogModal';
 import ShowroomStockFormModal from './ShowroomStockFormModal';
 import SellShowroomStockModal from './SellShowroomStockModal';
 import ShowroomStockDetailsPanel from './ShowroomStockDetailsPanel';
+import OrderDetailsPanel from '../../components/orders/OrderDetailsPanel';
 import AssignHairModal from '../../components/orders/AssignHairModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import CustomSelect from '../../components/common/CustomSelect';
@@ -61,6 +62,12 @@ const Inventory: React.FC = () => {
   const [assigningShowroomOrderId, setAssigningShowroomOrderId] = useState<string | null>(null);
   const [sellingShowroomOrderId, setSellingShowroomOrderId] = useState<string | null>(null);
   const [deletingShowroomOrderId, setDeletingShowroomOrderId] = useState<string | null>(null);
+  // פילטר תצוגה בלשונית "פאות תצוגה" - "במלאי" (ברירת מחדל, כמו ההתנהגות
+  // הקודמת), "נמכרו" או "הכל". פאה שנמכרה נפתחת ב-OrderDetailsPanel הרגיל
+  // (יש לה clientId/תשלומים אמיתיים) ולא ב-ShowroomStockDetailsPanel
+  // (שמניח פאה שעדיין לא נמכרה - יש לו כפתור "מכירה" שלא רלוונטי יותר).
+  const [showroomViewFilter, setShowroomViewFilter] = useState<'unsold' | 'sold' | 'all'>('unsold');
+  const [selectedSoldShowroomOrderId, setSelectedSoldShowroomOrderId] = useState<string | null>(null);
 
   // --- האזנה חיה ל-Firestore, מסוננת רק לנתונים של העסק המחובר (businessId = uid) ---
   useEffect(() => {
@@ -180,6 +187,20 @@ const Inventory: React.FC = () => {
     [orders]
   );
 
+  // כל פאות התצוגה - כולל כאלה שכבר נמכרו (clientId קיים) - לתצוגה/פילטור
+  // בטבלת הלשונית עצמה. showroomOrders למעלה (לא נמכרו בלבד) ממשיך לשמש
+  // גם לספירת הכרטיסייה וגם למקומות אחרים שצריכים רק את הלא-נמכרות.
+  const allShowroomOrders = useMemo(
+    () => orders.filter((o) => o.isShowroomStock === true),
+    [orders]
+  );
+
+  const filteredShowroomOrders = useMemo(() => {
+    if (showroomViewFilter === 'unsold') return allShowroomOrders.filter((o) => !o.clientId);
+    if (showroomViewFilter === 'sold') return allShowroomOrders.filter((o) => !!o.clientId);
+    return allShowroomOrders;
+  }, [allShowroomOrders, showroomViewFilter]);
+
   // מזהה ידידותי לפאת תצוגה חדשה (SHOWROOM-1001 וכו') - מחושב מכל ה-orders
   // עם isShowroomStock (כולל כאלה שכבר נמכרו!) לא רק showroomOrders, כדי
   // שהמספור לעולם לא יתאפס/יתנגש אחרי שפריט נמכר ונעלם מרשימת הלא-נמכרות.
@@ -203,6 +224,7 @@ const Inventory: React.FC = () => {
   const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
   const sellingShowroomOrder = orders.find((o) => o.id === sellingShowroomOrderId) || null;
   const deletingShowroomOrder = orders.find((o) => o.id === deletingShowroomOrderId) || null;
+  const selectedSoldShowroomOrder = orders.find((o) => o.id === selectedSoldShowroomOrderId) || null;
 
   // אפשרויות הפילטר נגזרות מהנתונים בפועל, כדי שהרשימה תישאר מסונכרנת עם מה שבאמת קיים במלאי
   const textureOptions = useMemo(
@@ -721,6 +743,26 @@ const Inventory: React.FC = () => {
       {!loading && !loadError && activeTab === 'showroom' && (
         <div className="tab-content">
           <div className="filter-bar">
+            <div className="showroom-view-toggle">
+              <button
+                className={showroomViewFilter === 'unsold' ? 'showroom-view-btn active' : 'showroom-view-btn'}
+                onClick={() => setShowroomViewFilter('unsold')}
+              >
+                במלאי
+              </button>
+              <button
+                className={showroomViewFilter === 'sold' ? 'showroom-view-btn active' : 'showroom-view-btn'}
+                onClick={() => setShowroomViewFilter('sold')}
+              >
+                נמכרו
+              </button>
+              <button
+                className={showroomViewFilter === 'all' ? 'showroom-view-btn active' : 'showroom-view-btn'}
+                onClick={() => setShowroomViewFilter('all')}
+              >
+                הכל
+              </button>
+            </div>
             <button
               className="btn-primary add-hair-btn"
               onClick={() => {
@@ -739,39 +781,56 @@ const Inventory: React.FC = () => {
                   <th>מזהה</th>
                   <th>מפרט</th>
                   <th>מחיר מכירה מבוקש</th>
-                  <th>סטטוס</th>
+                  <th>סטטוס בנייה</th>
+                  <th>סטטוס מלאי</th>
                 </tr>
               </thead>
               <tbody>
-                {showroomOrders.length === 0 ? (
+                {filteredShowroomOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="empty-state">
-                      אין כרגע פאות תצוגה - אפשר ליצור חדשה בכפתור למעלה
+                    <td colSpan={5} className="empty-state">
+                      {showroomViewFilter === 'unsold'
+                        ? 'אין כרגע פאות תצוגה במלאי - אפשר ליצור חדשה בכפתור למעלה'
+                        : showroomViewFilter === 'sold'
+                          ? 'עדיין לא נמכרה אף פאת תצוגה'
+                          : 'אין כרגע פאות תצוגה - אפשר ליצור חדשה בכפתור למעלה'}
                     </td>
                   </tr>
                 ) : (
-                  showroomOrders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="showroom-row"
-                      onClick={() => setSelectedShowroomOrderId(order.id)}
-                    >
-                      <td className="mono">{order.showroomCode || order.id}</td>
-                      <td>{order.notes || '—'}</td>
-                      <td>₪{(order.retailPrice ?? 0).toLocaleString()}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <CustomSelect
-                          value={order.showroomStatus ?? 'בבנייה'}
-                          onChange={(value) =>
-                            updateDoc(doc(db, 'orders', order.id), { showroomStatus: value as ShowroomBuildStatus }).catch(
-                              (err) => console.error('Error updating showroom status:', err)
-                            )
-                          }
-                          options={SHOWROOM_BUILD_STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
-                        />
-                      </td>
-                    </tr>
-                  ))
+                  filteredShowroomOrders.map((order) => {
+                    const isSold = !!order.clientId;
+                    return (
+                      <tr
+                        key={order.id}
+                        className="showroom-row"
+                        onClick={() =>
+                          isSold ? setSelectedSoldShowroomOrderId(order.id) : setSelectedShowroomOrderId(order.id)
+                        }
+                      >
+                        <td className="mono">{order.showroomCode || order.id}</td>
+                        <td>{order.notes || '—'}</td>
+                        <td>₪{(order.retailPrice ?? 0).toLocaleString()}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <CustomSelect
+                            value={order.showroomStatus ?? 'בבנייה'}
+                            onChange={(value) =>
+                              updateDoc(doc(db, 'orders', order.id), { showroomStatus: value as ShowroomBuildStatus }).catch(
+                                (err) => console.error('Error updating showroom status:', err)
+                              )
+                            }
+                            options={SHOWROOM_BUILD_STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
+                          />
+                        </td>
+                        <td>
+                          {isSold ? (
+                            <span className="status-badge status-sold">נמכרה{order.clientName ? ` - ${order.clientName}` : ''}</span>
+                          ) : (
+                            <span className="status-badge status-available">במלאי</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -847,6 +906,18 @@ const Inventory: React.FC = () => {
         }}
         onOpenSell={() => setSellingShowroomOrderId(selectedShowroomOrderId)}
         onDelete={() => setDeletingShowroomOrderId(selectedShowroomOrderId)}
+      />
+
+      {/* פאת תצוגה שכבר נמכרה - נפתחת ב-OrderDetailsPanel הרגיל (אותו רכיב
+          כמו הזמנה רגילה ב-Sales.tsx/ClientDrawer.tsx), לא ב-
+          ShowroomStockDetailsPanel: יש לה clientId/תשלומים אמיתיים, וכפתור
+          "מכירה" כבר לא רלוונטי. שיוך שיער בפועל ממשיך להיפתח דרך אותו
+          AssignHairModal המשותף למטה (assigningShowroomOrderId). */}
+      <OrderDetailsPanel
+        isOpen={selectedSoldShowroomOrderId !== null}
+        order={selectedSoldShowroomOrder}
+        onClose={() => setSelectedSoldShowroomOrderId(null)}
+        onOpenAssignHair={(orderId) => setAssigningShowroomOrderId(orderId)}
       />
 
       <ShowroomStockFormModal
