@@ -131,7 +131,7 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
             </div>
             <div className="client-details">
               <h2>{client.name}</h2>
-              <p className="mono">
+              <p className="mono" dir="ltr">
                 {client.phone}{" "}
                 {client.email && (
                   <>

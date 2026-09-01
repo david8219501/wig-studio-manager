@@ -446,7 +446,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
             <div className="wizard-step">
               <h3>בחירת לקוחה</h3>
               {preselectedClient ? (
-                <div className="client-item active">👤 {preselectedClient.name} ({preselectedClient.phone})</div>
+                <div className="client-item active">👤 {preselectedClient.name} (<span dir="ltr">{preselectedClient.phone}</span>)</div>
               ) : (
                 <>
                   <input
@@ -473,7 +473,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                             className={`client-item ${selectedClientId === client.id ? "active" : ""}`}
                             onClick={() => setSelectedClientId(client.id)}
                           >
-                            👤 {client.name} ({client.phone})
+                            👤 {client.name} (<span dir="ltr">{client.phone}</span>)
                           </div>
                         ))}
                   </div>

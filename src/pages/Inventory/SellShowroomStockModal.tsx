@@ -112,7 +112,7 @@ export default function SellShowroomStockModal({ isOpen, order, onClose, onSold,
           <div className="form-field form-field-full">
             <label>לקוחה</label>
             {preselectedClient ? (
-              <div className="restock-preview">👤 {preselectedClient.name} ({preselectedClient.phone})</div>
+              <div className="restock-preview">👤 {preselectedClient.name} (<span dir="ltr">{preselectedClient.phone}</span>)</div>
             ) : (
               <select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)}>
                 <option value="">בחרי לקוחה...</option>

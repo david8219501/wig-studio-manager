@@ -615,7 +615,7 @@ export default function Calendar() {
                             setIsDropdownOpen(false);
                           }}
                         >
-                          {c.name} ({c.phone})
+                          {c.name} (<span dir="ltr">{c.phone}</span>)
                         </div>
                       ))
                     )}

@@ -195,7 +195,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
         <div className="order-details-header">
           <div className="order-details-header-right">
             <h2>{order.clientName}</h2>
-            <p className="mono">{order.clientPhone}</p>
+            <p className="mono" dir="ltr">{order.clientPhone}</p>
           </div>
           <div className="order-details-header-left">
             <span className={`badge order-status-badge status-${order.status}`}>
