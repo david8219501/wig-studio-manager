@@ -5,7 +5,7 @@
 // כדי שהתוצאה תמיד תהיה עקבית בין שני המקומות.
 
 export const HAIR_LENGTH_OPTIONS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75];
-export const STRUCTURE_OPTIONS = ["טופ", "סקין", "קלאסי", "סרט"];
+export const STRUCTURE_OPTIONS = ["טופ", "סקין", "סרט"];
 export const FULLNESS_OPTIONS = ["דליל", "קלאסי", "מלא"];
 
 const BASE_WEIGHTS: Record<number, number> = {
@@ -14,7 +14,7 @@ const BASE_WEIGHTS: Record<number, number> = {
   55: 410, 60: 440, 65: 470, 70: 500, 75: 530,
 };
 
-const STRUCTURE_MOD: Record<string, number> = { טופ: -50, סקין: -40, קלאסי: 0, סרט: 0 };
+const STRUCTURE_MOD: Record<string, number> = { טופ: -50, סקין: -40, סרט: 0 };
 const FULLNESS_MOD: Record<string, number> = { דליל: -30, קלאסי: 0, מלא: 30 };
 
 export interface HairCostSettings {

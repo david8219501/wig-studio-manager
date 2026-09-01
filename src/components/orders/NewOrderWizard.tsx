@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { BulkItem, UsedBulkItem, UsedHairItem } from "../../types";
@@ -40,9 +40,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
 
   // Step 1: סוג הזמנה
   const [orderType, setOrderType] = useState<"new" | "repair" | "showroom" | "other">("new");
-  // הגנה מפני לחיצה כפולה מהירה על כרטיסיית הבחירה בשלב 1 (ראו handleNext) -
-  // חותמת הזמן של הבחירה האחרונה בסוג הזמנה.
-  const lastTypeSelectRef = useRef(0);
 
   // Step 2: לקוחה - נטענת בפועל מ-Firestore
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -182,13 +179,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     [showroomOrders, showroomSearch]
   );
 
-  // כל בחירת סוג הזמנה בשלב 1 עוברת דרך כאן, כדי לתעד מתי בדיוק היא קרתה
-  // (ראו handleNext - הגנה מפני לחיצה כפולה מהירה).
-  const handleTypeSelect = (type: "new" | "repair" | "showroom") => {
-    lastTypeSelectRef.current = Date.now();
-    setOrderType(type);
-  };
-
   // וולידציה זהה לדפוס שכבר קיים ב-AssignHairModal.tsx (gramsExceedsStock),
   // OrderDetailsPanel.tsx (bulkQtyExceedsStock) ו-QuickRetailSaleModal.tsx -
   // בודקת מול המלאי הזמין **כולל** כמות שכבר נבחרה לאותו פריט קודם
@@ -230,25 +220,22 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   // הכיוונים (הבא/חזור) - אין טעם לבקש לבחור/לאשר שוב לקוחה שכבר נבחרה.
   // (לא רלוונטי ל"פאת תצוגה" - שם שלב 2 הוא תמיד רשימת פאות למכירה, לא
   // בחירת לקוחה, אז אין מה לדלג עליו.)
-  const handleNext = () => {
-    // הגנה מפני לחיצה כפולה מהירה על כרטיסיית הבחירה בשלב 1 (למשל דאבל-קליק
-    // בטעות בזמן שהיא רק רצתה לבחור סוג הזמנה) - אם "הבא" נלחץ תוך פחות
-    // מ-400ms מרגע שנבחר סוג הזמנה, זו כמעט בוודאות אותה מחווה פיזית ולא
-    // כוונה אמיתית להתקדם, אז מתעלמים מהלחיצה. לחיצה מודעת על "הבא" תמיד
-    // מגיעה יותר מאוחר מזה בפועל.
-    if (step === 1 && Date.now() - lastTypeSelectRef.current < 400) {
-      return;
-    }
+  // overrideOrderType מאפשר לקרוא ל-handleNext מיד אחרי setOrderType (למשל
+  // מדאבל-קליק על כרטיסייה, ראו handleTypeSelectAndAdvance) בלי לחכות
+  // לרינדור הבא - setState אסינכרוני, אז orderType מה-state עדיין היה
+  // מציג את הערך הישן באותה קריאה סינכרונית.
+  const handleNext = (overrideOrderType?: typeof orderType) => {
+    const effectiveOrderType = overrideOrderType ?? orderType;
 
     // תיקון/שירות מקבל טופס נפרד ופשוט - ברגע שהלקוחה ידועה (מ-preselectedClient
     // בשלב 1, או בסוף שלב 2 הרגיל כשאין preselectedClient), יוצאים מהאשף
     // לגמרי במקום להמשיך לשלבים 3-4 שלו.
-    if (step === 1 && orderType === "repair" && preselectedClient) {
+    if (step === 1 && effectiveOrderType === "repair" && preselectedClient) {
       onOpenRepairForm(preselectedClient);
       onClose();
       return;
     }
-    if (step === 2 && orderType === "repair") {
+    if (step === 2 && effectiveOrderType === "repair") {
       const client = clients.find((c) => c.id === selectedClientId);
       if (client) {
         onOpenRepairForm(client);
@@ -260,7 +247,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     // פאת תצוגה: שלב 2 הוא רשימת הפאות הזמינות למכירה (לא בחירת לקוחה) -
     // ברגע שנבחרה אחת ונלחץ "הבא", יוצאים מהאשף לגמרי אל SellShowroomStockModal
     // (הלקוחה כבר ידועה שם מ-preselectedClient, ראו ClientDrawer.tsx).
-    if (step === 2 && orderType === "showroom") {
+    if (step === 2 && effectiveOrderType === "showroom") {
       const order = showroomOrders.find((o) => o.id === selectedShowroomOrderId);
       if (order) {
         onOpenSellShowroom(order);
@@ -270,7 +257,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     }
 
     if (step === 1) {
-      if (orderType === "showroom") {
+      if (effectiveOrderType === "showroom") {
         setStep(2);
         return;
       }
@@ -278,6 +265,14 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       return;
     }
     setStep(step + 1);
+  };
+
+  // דאבל-קליק על כרטיסיית סוג הזמנה בשלב 1 = בחירה + מעבר לשלב הבא
+  // ("הבא") באותה פעולה - שקול ללחיצה בודדת ואז לחיצה נפרדת על "הבא".
+  // קליק בודד (onClick על הכרטיסייה) ממשיך להתנהג בדיוק כמו היום - רק בוחר.
+  const handleTypeSelectAndAdvance = (type: "new" | "repair" | "showroom") => {
+    setOrderType(type);
+    handleNext(type);
   };
 
   const handleBack = () => {
@@ -392,7 +387,8 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 <button
                   type="button"
                   className={`type-card ${orderType === "new" ? "active" : ""}`}
-                  onClick={() => handleTypeSelect("new")}
+                  onClick={() => setOrderType("new")}
+                  onDoubleClick={() => handleTypeSelectAndAdvance("new")}
                 >
                   <span className="type-icon">✨</span>
                   <span className="type-title">פאה חדשה</span>
@@ -400,7 +396,8 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 <button
                   type="button"
                   className={`type-card ${orderType === "repair" ? "active" : ""}`}
-                  onClick={() => handleTypeSelect("repair")}
+                  onClick={() => setOrderType("repair")}
+                  onDoubleClick={() => handleTypeSelectAndAdvance("repair")}
                 >
                   <span className="type-icon">🧵</span>
                   <span className="type-title">תיקון / שירות</span>
@@ -408,7 +405,8 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 <button
                   type="button"
                   className={`type-card ${orderType === "showroom" ? "active" : ""}`}
-                  onClick={() => handleTypeSelect("showroom")}
+                  onClick={() => setOrderType("showroom")}
+                  onDoubleClick={() => handleTypeSelectAndAdvance("showroom")}
                 >
                   <span className="type-icon">📦</span>
                   <span className="type-title">פאת תצוגה</span>
@@ -695,7 +693,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
             <button
               type="button"
               className="btn-primary"
-              onClick={handleNext}
+              onClick={() => handleNext()}
               disabled={step === 2 && (orderType === "showroom" ? !selectedShowroomOrderId : !selectedClientId)}
             >
               הבא
