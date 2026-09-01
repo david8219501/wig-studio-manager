@@ -265,6 +265,56 @@
     font-size: 13px;
   }
 
+  /* פירוט תשלומים לפי הזמנה - לשונית "תשלומים וחובות" */
+  .payments-orders-section {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .payments-orders-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .payments-orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .payments-orders-table th {
+    background: var(--color-surface-hover);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    padding: 10px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+
+  .payments-orders-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    white-space: nowrap;
+  }
+
+  .payments-orders-table tbody tr {
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--easing);
+  }
+
+  .payments-orders-table tbody tr:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .payments-orders-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
   /* Specs & Editing */
   .specs-grid, .docs-list {
     display: flex;

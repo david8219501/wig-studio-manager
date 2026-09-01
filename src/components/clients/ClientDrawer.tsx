@@ -6,6 +6,8 @@ import type { Order } from "../../pages/Sales/Sales";
 import NewOrderWizard, { type ClientOption } from "../orders/NewOrderWizard";
 import RepairOrderForm from "../orders/RepairOrderForm";
 import SellShowroomStockModal from "../../pages/Inventory/SellShowroomStockModal";
+import OrderDetailsPanel from "../orders/OrderDetailsPanel";
+import AssignHairModal from "../orders/AssignHairModal";
 import "./ClientDrawer.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -28,6 +30,11 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [repairFormClient, setRepairFormClient] = useState<ClientOption | null>(null);
   const [sellingShowroomOrder, setSellingShowroomOrder] = useState<Order | null>(null);
+  // ניהול תשלומים אמיתי בלשונית "תשלומים וחובות" - אותם רכיבים בדיוק כמו
+  // ב-Sales.tsx (לא נבנה ניהול תשלומים נפרד): לחיצה על הזמנה פותחת
+  // OrderDetailsPanel, שמאפשר משם גם לפתוח AssignHairModal.
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
 
   // State עבור מצב עריכת מידות ומפרט
   const [isEditingSpecs, setIsEditingSpecs] = useState(false);
@@ -80,6 +87,11 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
 
   const totalPrice = clientOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
   const totalPaid = clientOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+
+  // נגזרים חי מ-clientOrders (לא state של האובייקט עצמו) - כדי שהפאנל/המודל
+  // תמיד יראו עדכון מיידי (למשל אחרי הוספת תשלום), אותו דפוס כמו ב-Sales.tsx.
+  const selectedOrder = clientOrders.find((o) => o.id === selectedOrderId) || null;
+  const assigningOrder = clientOrders.find((o) => o.id === assigningOrderId) || null;
 
   const handleSaveSpecs = async () => {
     setSavingSpecs(true);
@@ -211,25 +223,66 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
             </div>
           )}
 
-          {/* TAB 2: PAYMENTS */}
+          {/* TAB 2: PAYMENTS - נתונים אמיתיים מ-clientOrders בלבד, בדיוק כמו בדף מכירות */}
           {activeTab === "payments" && (
             <div className="tab-content">
               <h3>סיכום מאזן ותשלומים</h3>
               <div className="financial-summary-grid">
                 <div className="fin-card">
-                  <span>סה"כ עסקאות</span>
+                  <span>סה"כ חויב</span>
                   <span className="mono font-bold">₪{totalPrice.toLocaleString()}</span>
                 </div>
                 <div className="fin-card">
-                  <span>שולם בפועל</span>
+                  <span>סה"כ שולם</span>
                   <span className="mono font-bold text-success">₪{totalPaid.toLocaleString()}</span>
                 </div>
                 <div className="fin-card">
-                  <span>יתרת חוב</span>
+                  <span>סה"כ חוב פתוח</span>
                   <span className="mono font-bold text-danger">
                     ₪{(totalPrice - totalPaid).toLocaleString()}
                   </span>
                 </div>
+              </div>
+
+              <div className="payments-orders-section">
+                <h3>פירוט לפי הזמנה</h3>
+                {clientOrders.length === 0 ? (
+                  <p className="order-specs">עדיין אין הזמנות ללקוחה זו.</p>
+                ) : (
+                  <div className="payments-orders-table-wrapper">
+                    <table className="payments-orders-table" dir="rtl">
+                      <thead>
+                        <tr>
+                          <th>תאריך</th>
+                          <th>סוג עבודה</th>
+                          <th>מחיר כולל</th>
+                          <th>שולם</th>
+                          <th>חוב פתוח</th>
+                          <th>סטטוס</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientOrders.map((ord) => {
+                          const debt = (ord.totalPrice || 0) - (ord.paidAmount || 0);
+                          return (
+                            <tr key={ord.id} onClick={() => setSelectedOrderId(ord.id)}>
+                              <td className="mono">{ord.createdAt}</td>
+                              <td>{ord.orderType}</td>
+                              <td className="mono">₪{(ord.totalPrice || 0).toLocaleString()}</td>
+                              <td className="mono text-success">₪{(ord.paidAmount || 0).toLocaleString()}</td>
+                              <td className="mono text-danger">₪{debt.toLocaleString()}</td>
+                              <td>
+                                <span className={`order-status-badge status-${ord.status}`}>
+                                  {ORDER_STATUS_LABELS[ord.status] || ord.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -322,6 +375,21 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
         preselectedClient={{ id: client.id, name: client.name, phone: client.phone }}
         onClose={() => setSellingShowroomOrder(null)}
         onSold={() => setSellingShowroomOrder(null)}
+      />
+
+      {/* פאנל פרטי הזמנה - אותו רכיב בדיוק כמו ב-Sales.tsx (לא שכפול), עם
+          ניהול תשלומים מובנה. נפתח בלחיצה על שורת הזמנה בלשונית "תשלומים וחובות" */}
+      <OrderDetailsPanel
+        isOpen={selectedOrderId !== null}
+        order={selectedOrder}
+        onClose={() => setSelectedOrderId(null)}
+        onOpenAssignHair={(orderId) => setAssigningOrderId(orderId)}
+      />
+
+      <AssignHairModal
+        isOpen={assigningOrderId !== null}
+        order={assigningOrder}
+        onClose={() => setAssigningOrderId(null)}
       />
     </>
   );
