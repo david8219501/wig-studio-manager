@@ -86,6 +86,11 @@ export default function SellShowroomStockModal({ isOpen, order, onClose, onSold,
         paidAmount: price,
         status: "delivered",
         payments: [{ amount: price, method: "cash", date: today }],
+        // createdAt נדרס לתאריך המכירה בפועל - Dashboard.tsx/Sales.tsx/
+        // Reports.tsx מקבצים הכנסות לפי createdAt (כמו כל הזמנה אחרת), אז
+        // בלי הדריסה הזו הכנסת המכירה הייתה "נספרת" תחת החודש/השנה שבהם
+        // הפאה רק נוצרה במלאי - לא כשהיא נמכרה בפועל ללקוחה.
+        createdAt: today,
       });
       onSold();
     } catch (err) {
