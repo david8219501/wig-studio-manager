@@ -156,7 +156,8 @@
   font-size: 13px;
 }
 
-.assign-hair-card .bulk-item-remove-btn {
+.assign-hair-card .bulk-item-remove-btn,
+.assign-hair-card .bulk-item-edit-btn {
   background: none;
   border: none;
   color: var(--color-text-muted);
@@ -167,6 +168,37 @@
 
 .assign-hair-card .bulk-item-remove-btn:hover {
   color: var(--color-danger, #d33);
+}
+
+.assign-hair-card .bulk-item-edit-btn:hover {
+  color: var(--color-accent);
+}
+
+/* שורת שיוך במצב עריכת כמות גרמים - column כדי להכיל שדה קלט + כפתורי
+   שמירה/ביטול, במקום שורת ה-flex הרגילה לתצוגה בלבד. */
+.assign-hair-card .bulk-item-row--editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.assign-hair-card .bulk-item-row--editing input {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.assign-hair-card .bulk-item-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .assign-hair-card .field {

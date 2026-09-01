@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { HairItem, UsedHairItem } from "../../types";
+import ConfirmDialog from "../common/ConfirmDialog";
 import "./AssignHairModal.css";
 
 // משקל שיורי קטן מזה נחשב "נגמר" - לא שווה להשאיר את הקוקו זמין לשיוך נוסף
@@ -39,6 +40,15 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // עריכה/מחיקה של שיוך קוקו בודד - עריכה משנה את כמות הגרמים במקום
+  // (הפרש ישיר על currentWeight, לא ביטול+יצירה מחדש), מחיקה עוברת דרך
+  // ConfirmDialog (danger) במקום הסרה ישירה בלי אישור.
+  const [editingHairIndex, setEditingHairIndex] = useState<number | null>(null);
+  const [editGramsValue, setEditGramsValue] = useState<number | "">("");
+  const [savingEditHair, setSavingEditHair] = useState(false);
+  const [editHairError, setEditHairError] = useState<string | null>(null);
+  const [deletingHairIndex, setDeletingHairIndex] = useState<number | null>(null);
+
   const loadHairItems = () => {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -63,6 +73,9 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
     setSelectedHairItemId("");
     setGramsUsed("");
     setError(null);
+    setEditingHairIndex(null);
+    setEditHairError(null);
+    setDeletingHairIndex(null);
     loadHairItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, order?.id]);
@@ -188,9 +201,97 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
     }
   };
 
+  const handleConfirmRemove = async () => {
+    if (deletingHairIndex === null) return;
+    const idx = deletingHairIndex;
+    setDeletingHairIndex(null);
+    await handleRemove(idx);
+  };
+
+  const handleStartEditHair = (index: number) => {
+    const used = usedHairItems[index];
+    if (!used) return;
+    setEditingHairIndex(index);
+    setEditGramsValue(used.gramsUsed);
+    setEditHairError(null);
+  };
+
+  const handleCancelEditHair = () => {
+    setEditingHairIndex(null);
+    setEditHairError(null);
+  };
+
+  const handleSaveEditHair = async (index: number) => {
+    const used = usedHairItems[index];
+    if (!used) return;
+
+    if (editGramsValue === "" || Number(editGramsValue) <= 0) {
+      setEditHairError("יש להזין כמות גרמים תקינה.");
+      return;
+    }
+
+    const hairItem = hairItems.find((h) => h.id === used.hairItemId);
+    if (!hairItem) {
+      setEditHairError("הקוקו המקורי לא נמצא במלאי - לא ניתן לערוך.");
+      return;
+    }
+
+    const newGrams = Number(editGramsValue);
+    const oldGrams = used.gramsUsed;
+    const diffGrams = newGrams - oldGrams;
+
+    // הכמות הזמינה לשיוך הזה כוללת בחזרה את מה ש"שייך" לו כרגע -
+    // בדיוק כמו gramsExceedsStock, רק שכאן משווים מול (מלאי נוכחי + הגרמים
+    // שכבר שויכו בשיוך הזה), לא מול המלאי הנוכחי בלבד.
+    const availableForThisAssignment = hairItem.currentWeight + oldGrams;
+    if (newGrams > availableForThisAssignment) {
+      setEditHairError(`הכמות עולה על המשקל הזמין (${availableForThisAssignment} גרם).`);
+      return;
+    }
+
+    setSavingEditHair(true);
+    setEditHairError(null);
+
+    try {
+      // עלות לגרם ננעלת מהשיוך המקורי (costAtTime/oldGrams) ולא מחושבת
+      // מחדש מהמחיר הדינמי הנוכחי של הפריט - כדי לשמור על "תמונת מצב"
+      // עקבית, בפרט בקופסת שאריות שהמחיר לגרם שלה משתנה עם הזמן.
+      const perGramRate = oldGrams > 0 ? used.costAtTime / oldGrams : 0;
+      const newCostAtTime = perGramRate * newGrams;
+      const diffCost = newCostAtTime - used.costAtTime;
+
+      const newCurrentWeight = Math.max(0, hairItem.currentWeight - diffGrams);
+      const newStatus = newCurrentWeight < DEPLETED_THRESHOLD_GRAMS ? "depleted" : "available";
+
+      const hairItemUpdate: { currentWeight: number; status: HairItem["status"]; remnantTotalValue?: number } = {
+        currentWeight: newCurrentWeight,
+        status: newStatus,
+      };
+      if (hairItem.isRemnantBox) {
+        hairItemUpdate.remnantTotalValue = Math.max(0, (hairItem.remnantTotalValue ?? 0) - diffCost);
+      }
+
+      await updateDoc(doc(db, "hairItems", hairItem.id), hairItemUpdate);
+
+      const newUsedHairItems = usedHairItems.map((u, i) =>
+        i === index ? { ...u, gramsUsed: newGrams, costAtTime: newCostAtTime } : u
+      );
+      await updateDoc(doc(db, "orders", order.id), { usedHairItems: newUsedHairItems });
+
+      setEditingHairIndex(null);
+      loadHairItems();
+    } catch (err) {
+      console.error("Error editing hair assignment:", err);
+      setEditHairError("שגיאה בעדכון השיוך. נסי שוב.");
+    } finally {
+      setSavingEditHair(false);
+    }
+  };
+
   const totalActualCost = usedHairItems.reduce((sum, item) => sum + item.costAtTime, 0);
 
   return (
+    <>
     <div className="assign-hair-overlay" onClick={onClose}>
       <div className="assign-hair-card" onClick={(e) => e.stopPropagation()}>
         <div className="assign-hair-header">
@@ -201,21 +302,53 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
         <div className="assign-hair-body">
           {usedHairItems.length > 0 && (
             <div className="bulk-item-list">
-              {usedHairItems.map((used, idx) => (
-                <div key={idx} className="bulk-item-row">
-                  <span>{used.hairItemLabel} · {used.gramsUsed} גרם</span>
-                  <span className="mono">₪{used.costAtTime.toFixed(0)}</span>
-                  <button
-                    type="button"
-                    className="bulk-item-remove-btn"
-                    onClick={() => handleRemove(idx)}
-                    disabled={saving}
-                    aria-label="ביטול שיוך"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+              {usedHairItems.map((used, idx) =>
+                editingHairIndex === idx ? (
+                  <div key={idx} className="bulk-item-row bulk-item-row--editing">
+                    <span>{used.hairItemLabel}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editGramsValue}
+                      onChange={(e) => setEditGramsValue(e.target.value === "" ? "" : Number(e.target.value))}
+                    />
+                    <div className="bulk-item-edit-actions">
+                      <button type="button" className="btn-secondary" onClick={handleCancelEditHair} disabled={savingEditHair}>
+                        ביטול
+                      </button>
+                      <button type="button" className="btn-primary" onClick={() => handleSaveEditHair(idx)} disabled={savingEditHair}>
+                        {savingEditHair ? "שומרת..." : "שמירה"}
+                      </button>
+                    </div>
+                    {editHairError && <div className="assign-hair-error">{editHairError}</div>}
+                  </div>
+                ) : (
+                  <div key={idx} className="bulk-item-row">
+                    <span>{used.hairItemLabel} · {used.gramsUsed} גרם</span>
+                    <span className="mono">₪{used.costAtTime.toFixed(0)}</span>
+                    <button
+                      type="button"
+                      className="bulk-item-edit-btn"
+                      onClick={() => handleStartEditHair(idx)}
+                      disabled={saving}
+                      aria-label="עריכת שיוך"
+                      title="עריכת שיוך"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      className="bulk-item-remove-btn"
+                      onClick={() => setDeletingHairIndex(idx)}
+                      disabled={saving}
+                      aria-label="ביטול שיוך"
+                      title="ביטול שיוך"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )
+              )}
               <div className="summary-row">
                 <span>סה״כ עלות שיער בפועל</span>
                 <span className="mono font-bold">₪{totalActualCost.toFixed(0)}</span>
@@ -283,11 +416,11 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
 
             <button
               type="button"
-              className="btn-secondary assign-hair-add-btn"
+              className={`assign-hair-add-btn ${selectedItem && gramsUsed !== "" && !gramsExceedsStock ? "btn-primary" : "btn-secondary"}`}
               onClick={handleAdd}
               disabled={saving || !selectedItem || gramsUsed === "" || gramsExceedsStock}
             >
-              {saving ? "משייכת..." : "+ הוסף שיוך קוקו"}
+              {saving ? "משייכת..." : "הוסף שיוך קוקו"}
             </button>
           </div>
 
@@ -301,5 +434,16 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
         </div>
       </div>
     </div>
+
+    <ConfirmDialog
+      isOpen={deletingHairIndex !== null}
+      title="ביטול שיוך קוקו"
+      message="לבטל את שיוך הקוקו הזה? המשקל יוחזר למלאי, והפעולה לא ניתנת לביטול."
+      variant="danger"
+      confirmLabel={saving ? "מבטלת..." : "כן, ביטול שיוך"}
+      onConfirm={handleConfirmRemove}
+      onCancel={() => setDeletingHairIndex(null)}
+    />
+    </>
   );
 }
