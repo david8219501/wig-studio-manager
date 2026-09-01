@@ -88,7 +88,6 @@ export default function QuickRetailSaleModal({ isOpen, item, onClose }: QuickRet
         orderType: "מוצר קמעונאי",
         totalPrice: total,
         dueDate: null,
-        paymentsCount: 1,
         usedBulkItems: [
           { itemId: item.id, itemName: item.name, quantity: qty, unitCostAtTime: item.unitCost },
         ],

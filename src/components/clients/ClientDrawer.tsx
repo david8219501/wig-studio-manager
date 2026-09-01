@@ -5,6 +5,7 @@ import type { Client } from "../../pages/Clients/Clients";
 import type { Order } from "../../pages/Sales/Sales";
 import NewOrderWizard, { type ClientOption } from "../orders/NewOrderWizard";
 import RepairOrderForm from "../orders/RepairOrderForm";
+import SellShowroomStockModal from "../../pages/Inventory/SellShowroomStockModal";
 import "./ClientDrawer.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -26,6 +27,7 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
   const [activeTab, setActiveTab] = useState<"orders" | "payments" | "specs" | "docs">("orders");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [repairFormClient, setRepairFormClient] = useState<ClientOption | null>(null);
+  const [sellingShowroomOrder, setSellingShowroomOrder] = useState<Order | null>(null);
 
   // State עבור מצב עריכת מידות ומפרט
   const [isEditingSpecs, setIsEditingSpecs] = useState(false);
@@ -301,6 +303,7 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
         onOrderCreated={() => {}}
         preselectedClient={{ id: client.id, name: client.name, phone: client.phone }}
         onOpenRepairForm={(repairClient) => setRepairFormClient(repairClient)}
+        onOpenSellShowroom={(order) => setSellingShowroomOrder(order)}
       />
 
       {/* טופס תיקונים/שירות נפרד ופשוט - נפתח מתוך בחירת "תיקון / שירות" באשף */}
@@ -309,6 +312,16 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
         client={repairFormClient}
         onClose={() => setRepairFormClient(null)}
         onCreated={() => {}}
+      />
+
+      {/* מכירת פאת תצוגה קיימת - נפתח מתוך בחירת "פאת תצוגה" באשף, עם הלקוחה
+          כבר ידועה מראש (מדלג על שלב בחירת לקוחה בתוך המודל עצמו) */}
+      <SellShowroomStockModal
+        isOpen={sellingShowroomOrder !== null}
+        order={sellingShowroomOrder}
+        preselectedClient={{ id: client.id, name: client.name, phone: client.phone }}
+        onClose={() => setSellingShowroomOrder(null)}
+        onSold={() => setSellingShowroomOrder(null)}
       />
     </>
   );

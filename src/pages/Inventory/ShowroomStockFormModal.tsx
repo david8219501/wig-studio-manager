@@ -106,7 +106,6 @@ export default function ShowroomStockFormModal({ isOpen, editingOrder, nextShowr
           orderType: "פאת תצוגה",
           totalPrice: 0,
           dueDate: null,
-          paymentsCount: 1,
           usedBulkItems: [],
           usedHairItems: [],
           hairCostEstimated,

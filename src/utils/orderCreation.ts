@@ -46,7 +46,6 @@ export interface NewOrderInput {
   orderType: string; // תווית מוצגת (כבר מתורגמת), למשל "פאה חדשה" / "תיקון / שירות"
   totalPrice: number;
   dueDate: string | null;
-  paymentsCount: number;
   usedBulkItems: UsedBulkItem[];
   usedHairItems: UsedHairItem[];
   hairCostEstimated: number;
@@ -91,7 +90,6 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
     paidAmount: input.paidAmount ?? 0,
     payments: input.payments ?? [],
     dueDate: input.dueDate,
-    paymentsCount: input.paymentsCount,
     usedBulkItems: input.usedBulkItems,
     usedHairItems: input.usedHairItems,
     hairCostEstimated: input.hairCostEstimated,

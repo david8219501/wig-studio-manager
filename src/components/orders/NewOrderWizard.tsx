@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { BulkItem, UsedBulkItem, UsedHairItem } from "../../types";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, type HairCostSettings } from "../../utils/hairCost";
-import { createOrder } from "../../utils/orderCreation";
+import { createOrder, isUnsoldShowroomStock } from "../../utils/orderCreation";
+import type { Order } from "../../pages/Sales/Sales";
 import DateInput from "../common/DateInput";
 import "./NewOrderWizard.css";
 
@@ -23,6 +24,10 @@ interface NewOrderWizardProps {
   // תיקון/שירות מטופל בטופס נפרד ופשוט יותר (RepairOrderForm) - האשף רק
   // מזהה את הבחירה ומעביר את הלקוחה שנבחרה הלאה, בלי לעבור את שלבי 3-4 שלו.
   onOpenRepairForm: (client: ClientOption) => void;
+  // "פאת תצוגה" מטופלת דומה - האשף רק מזהה איזו פאת תצוגה (מסמך orders עם
+  // isShowroomStock) נבחרה למכירה, ומעביר אותה הלאה ל-SellShowroomStockModal
+  // (הקיים, ב-Inventory.tsx) - לא בונה שום זרימת מכירה משלו.
+  onOpenSellShowroom: (order: Order) => void;
 }
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
@@ -30,17 +35,26 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   repair: "תיקון / שירות",
 };
 
-export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, preselectedClient = null, onOpenRepairForm }: NewOrderWizardProps) {
+export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, preselectedClient = null, onOpenRepairForm, onOpenSellShowroom }: NewOrderWizardProps) {
   const [step, setStep] = useState(1);
 
   // Step 1: סוג הזמנה
-  const [orderType, setOrderType] = useState<"new" | "repair" | "other">("new");
+  const [orderType, setOrderType] = useState<"new" | "repair" | "showroom" | "other">("new");
+  // הגנה מפני לחיצה כפולה מהירה על כרטיסיית הבחירה בשלב 1 (ראו handleNext) -
+  // חותמת הזמן של הבחירה האחרונה בסוג הזמנה.
+  const lastTypeSelectRef = useRef(0);
 
   // Step 2: לקוחה - נטענת בפועל מ-Firestore
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+
+  // Step 2 (פאת תצוגה): בחירת פאה קיימת מתוך המלאי למכירה - אותו תנאי בדיוק
+  // כמו בלשונית "פאות תצוגה" ב-Inventory.tsx (isUnsoldShowroomStock).
+  const [showroomOrders, setShowroomOrders] = useState<Order[]>([]);
+  const [showroomSearch, setShowroomSearch] = useState("");
+  const [selectedShowroomOrderId, setSelectedShowroomOrderId] = useState("");
 
   // Step 3: פרטי הפאה (Chips / Pills) - רלוונטי רק ל"פאה חדשה"
   const [size, setSize] = useState("M");
@@ -63,10 +77,9 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   const [bulkItemPickerQty, setBulkItemPickerQty] = useState<number | "">(1);
   const [bulkItemQtyError, setBulkItemQtyError] = useState<string | null>(null);
 
-  // Step 4: תמחיור ותשלומים
+  // Step 4: תמחיור (ניהול תשלומים בפועל נעשה אחרי היצירה, דרך OrderDetailsPanel)
   const [price, setPrice] = useState<number | "">(0);
   const [dueDate, setDueDate] = useState("");
-  const [paymentsCount, setPaymentsCount] = useState(1);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -91,9 +104,10 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     setBulkItemPickerId("");
     setBulkItemPickerQty(1);
     setBulkItemQtyError(null);
+    setShowroomSearch("");
+    setSelectedShowroomOrderId("");
     setPrice(0);
     setDueDate("");
-    setPaymentsCount(1);
     setSaveError(null);
 
     const businessId = auth.currentUser?.uid;
@@ -115,6 +129,16 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
           setBulkItemsCatalog(items);
         })
         .catch((err) => console.error("Error loading bulk items for wizard:", err));
+
+      getDocs(query(collection(db, "orders"), where("businessId", "==", businessId)))
+        .then((snapshot) => {
+          const items: Order[] = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<Order, "id">),
+          }));
+          setShowroomOrders(items.filter(isUnsoldShowroomStock));
+        })
+        .catch((err) => console.error("Error loading showroom stock for wizard:", err));
     }
 
     if (preselectedClient) {
@@ -146,6 +170,24 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       hairCostSettings
     ).hairCost;
   }, [hairLength, hairStructure, hairFullness, hairCostSettings]);
+
+  const filteredShowroomOrders = React.useMemo(
+    () =>
+      showroomOrders.filter(
+        (o) =>
+          showroomSearch.trim() === "" ||
+          (o.showroomCode || o.id).toLowerCase().includes(showroomSearch.toLowerCase()) ||
+          (o.notes || "").toLowerCase().includes(showroomSearch.toLowerCase())
+      ),
+    [showroomOrders, showroomSearch]
+  );
+
+  // כל בחירת סוג הזמנה בשלב 1 עוברת דרך כאן, כדי לתעד מתי בדיוק היא קרתה
+  // (ראו handleNext - הגנה מפני לחיצה כפולה מהירה).
+  const handleTypeSelect = (type: "new" | "repair" | "showroom") => {
+    lastTypeSelectRef.current = Date.now();
+    setOrderType(type);
+  };
 
   // וולידציה זהה לדפוס שכבר קיים ב-AssignHairModal.tsx (gramsExceedsStock),
   // OrderDetailsPanel.tsx (bulkQtyExceedsStock) ו-QuickRetailSaleModal.tsx -
@@ -186,7 +228,18 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   // כשהאשף נפתח עם preselectedClient (מתוך ClientDrawer של לקוחה ספציפית) -
   // הלקוחה כבר ידועה מההקשר, אז מדלגים על שלב 2 (בחירת לקוחה) לגמרי בשני
   // הכיוונים (הבא/חזור) - אין טעם לבקש לבחור/לאשר שוב לקוחה שכבר נבחרה.
+  // (לא רלוונטי ל"פאת תצוגה" - שם שלב 2 הוא תמיד רשימת פאות למכירה, לא
+  // בחירת לקוחה, אז אין מה לדלג עליו.)
   const handleNext = () => {
+    // הגנה מפני לחיצה כפולה מהירה על כרטיסיית הבחירה בשלב 1 (למשל דאבל-קליק
+    // בטעות בזמן שהיא רק רצתה לבחור סוג הזמנה) - אם "הבא" נלחץ תוך פחות
+    // מ-400ms מרגע שנבחר סוג הזמנה, זו כמעט בוודאות אותה מחווה פיזית ולא
+    // כוונה אמיתית להתקדם, אז מתעלמים מהלחיצה. לחיצה מודעת על "הבא" תמיד
+    // מגיעה יותר מאוחר מזה בפועל.
+    if (step === 1 && Date.now() - lastTypeSelectRef.current < 400) {
+      return;
+    }
+
     // תיקון/שירות מקבל טופס נפרד ופשוט - ברגע שהלקוחה ידועה (מ-preselectedClient
     // בשלב 1, או בסוף שלב 2 הרגיל כשאין preselectedClient), יוצאים מהאשף
     // לגמרי במקום להמשיך לשלבים 3-4 שלו.
@@ -203,7 +256,24 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         return;
       }
     }
+
+    // פאת תצוגה: שלב 2 הוא רשימת הפאות הזמינות למכירה (לא בחירת לקוחה) -
+    // ברגע שנבחרה אחת ונלחץ "הבא", יוצאים מהאשף לגמרי אל SellShowroomStockModal
+    // (הלקוחה כבר ידועה שם מ-preselectedClient, ראו ClientDrawer.tsx).
+    if (step === 2 && orderType === "showroom") {
+      const order = showroomOrders.find((o) => o.id === selectedShowroomOrderId);
+      if (order) {
+        onOpenSellShowroom(order);
+        onClose();
+        return;
+      }
+    }
+
     if (step === 1) {
+      if (orderType === "showroom") {
+        setStep(2);
+        return;
+      }
       setStep(preselectedClient ? 3 : 2);
       return;
     }
@@ -276,7 +346,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         orderType: ORDER_TYPE_LABELS[orderType] || orderType,
         totalPrice: Number(price) || 0,
         dueDate: dueDate || null,
-        paymentsCount,
         usedBulkItems,
         usedHairItems,
         hairCostEstimated,
@@ -323,7 +392,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 <button
                   type="button"
                   className={`type-card ${orderType === "new" ? "active" : ""}`}
-                  onClick={() => setOrderType("new")}
+                  onClick={() => handleTypeSelect("new")}
                 >
                   <span className="type-icon">✨</span>
                   <span className="type-title">פאה חדשה</span>
@@ -331,17 +400,51 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 <button
                   type="button"
                   className={`type-card ${orderType === "repair" ? "active" : ""}`}
-                  onClick={() => setOrderType("repair")}
+                  onClick={() => handleTypeSelect("repair")}
                 >
                   <span className="type-icon">🧵</span>
                   <span className="type-title">תיקון / שירות</span>
+                </button>
+                <button
+                  type="button"
+                  className={`type-card ${orderType === "showroom" ? "active" : ""}`}
+                  onClick={() => handleTypeSelect("showroom")}
+                >
+                  <span className="type-icon">📦</span>
+                  <span className="type-title">פאת תצוגה</span>
                 </button>
               </div>
             </div>
           )}
 
+          {/* Step 2 (פאת תצוגה): בחירת פאה קיימת למכירה - במקום בחירת לקוחה */}
+          {step === 2 && orderType === "showroom" && (
+            <div className="wizard-step">
+              <h3>בחירת פאת תצוגה למכירה</h3>
+              <input
+                type="text"
+                className="wizard-input"
+                placeholder="חיפוש לפי מזהה או מפרט..."
+                value={showroomSearch}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowroomSearch(e.target.value)}
+              />
+              <div className="client-list-preview">
+                {filteredShowroomOrders.length === 0 && <p>אין כרגע פאות תצוגה זמינות למכירה.</p>}
+                {filteredShowroomOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className={`client-item ${selectedShowroomOrderId === order.id ? "active" : ""}`}
+                    onClick={() => setSelectedShowroomOrderId(order.id)}
+                  >
+                    🪞 {order.showroomCode || order.id} — {order.notes || "—"} · ₪{(order.retailPrice ?? 0).toLocaleString()}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Step 2: בחירת לקוחה */}
-          {step === 2 && (
+          {step === 2 && orderType !== "showroom" && (
             <div className="wizard-step">
               <h3>בחירת לקוחה</h3>
               {preselectedClient ? (
@@ -526,8 +629,13 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                       setBulkItemQtyError(null);
                     }}
                   />
-                  <button type="button" className="btn-secondary" onClick={handleAddUsedBulkItem} disabled={!bulkItemPickerId}>
-                    + הוסף פריט מהמלאי
+                  <button
+                    type="button"
+                    className={bulkItemPickerId ? "btn-primary" : "btn-secondary"}
+                    onClick={handleAddUsedBulkItem}
+                    disabled={!bulkItemPickerId}
+                  >
+                    הוסף פריט מהמלאי
                   </button>
                 </div>
                 {bulkItemQtyError && <span className="field-error">{bulkItemQtyError}</span>}
@@ -545,10 +653,10 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
             </div>
           )}
 
-          {/* Step 4: תמחיור ותשלומים */}
+          {/* Step 4: תמחיור */}
           {step === 4 && (
             <div className="wizard-step">
-              <h3>תמחיור ותנאי תשלום</h3>
+              <h3>תמחיור</h3>
               <div className="form-row">
                 <div className="field">
                   <label>מחיר ללקוחה (₪)</label>
@@ -564,22 +672,6 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                 <div className="field">
                   <label>תאריך יעד מוכן</label>
                   <DateInput value={dueDate} onChange={setDueDate} />
-                </div>
-              </div>
-
-              <div className="pill-group">
-                <label>מספר תשלומים:</label>
-                <div className="pills">
-                  {[1, 2, 3, 4, 5, 6].map((num) => (
-                    <button
-                      type="button"
-                      key={num}
-                      className={`pill ${paymentsCount === num ? "active" : ""}`}
-                      onClick={() => setPaymentsCount(num)}
-                    >
-                      {num}
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>
@@ -604,7 +696,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
               type="button"
               className="btn-primary"
               onClick={handleNext}
-              disabled={step === 2 && !selectedClientId}
+              disabled={step === 2 && (orderType === "showroom" ? !selectedShowroomOrderId : !selectedClientId)}
             >
               הבא
             </button>

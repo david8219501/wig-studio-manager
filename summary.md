@@ -1,67 +1,87 @@
-# סיכום: 5 שינויים ל-NewOrderWizard.tsx / RepairOrderForm.tsx
+# סיכום: 5 תיקונים/שינויים לטפסי הזמנה
 
-## 1. הסרת שריד מודל "פאת תצוגה" הישן מ-NewOrderWizard - אושר מראש
+## 1. "קלאסי" חסר בשדה מבנה - נבדק, לא נמצא באג בקוד הנוכחי
 
-נבדק והוסבר למשתמשת לפני נגיעה: שלב 3 של האשף (`orderType==="inventory"`)
-עדיין הציג "בחירת פאת תצוגה למכירה" - רשימת `hairItems` עם
-`status==='showroom'`. מאז עיצוב מחדש של פאת תצוגה כמסמך `orders`
-נפרד (`isShowroomStock`), שום דבר במערכת כבר לא מגדיר `HairItem.status`
-כ-`'showroom'` - הרשימה תמיד ריקה בפועל, ואם בכל זאת נבחר פריט ישן
-כזה, הסיום היה יוצר הזמנה מקבילה ולא-תואמת (בלי `isShowroomStock`/
-`retailPrice`/`showroomCode`), עוקפת לגמרי את `SellShowroomStockModal.tsx`
-הייעודי. אושר כשריד קוד מת - הוסר לגמרי (לא הופנה לטאב אחר, כי אין
-יותר פעולה תקפה שהאשף הזה יכול לבצע עבור פאת תצוגה):
-- הוסרה כרטיסיית "פאת תצוגה" משלב 1 (נשארו רק "פאה חדשה"/"תיקון-שירות").
-- `orderType` צומצם ל-`"new" | "repair" | "other"`.
-- הוסר בלוק שלב 3 הייעודי + כל ה-state הנלווה (`showroomItems`,
-  `showroomSearch`, `selectedShowroomItemId`, `filteredShowroomItems`,
-  `selectedShowroomItem`) והטעינה שלהם (`getDocs` על `hairItems`).
-- `handleFinish` פושט: הוסרו כל ענפי ה-`isShowroomSale`, כולל עדכון
-  `hairItems/{id}` ל-`status:"sold"` שהיה ייחודי לזרימה הזו.
-- `ORDER_TYPE_LABELS.inventory` הוסר; `HairItem` הוסר מה-imports (כבר
-  לא בשימוש בקובץ).
+חיפוש יסודי בכל הפרויקט: `STRUCTURE_OPTIONS` (`hairCost.ts`,
+`["טופ","סקין","קלאסי","סרט"]`) מיובא ומוצג ישירות (`.map(...)`, בלי
+פילטור/חיתוך) בכל שלושת המקומות שמשתמשים בו - `NewOrderWizard.tsx`,
+`Calculators.tsx`, `ShowroomStockFormModal.tsx`. אין מערך מקומי כפול
+או לא-מסונכרן באף אחד מהם. `git log --follow` על `hairCost.ts` מראה
+קומיט יחיד אי-פעם - "קלאסי" היה שם תמיד. **לא בוצע שינוי קוד** - סביר
+שההבחנה המקורית התבססה על תצוגה ישנה/במטמון, או בלבול עם שדה "מלאות"
+(ש-`FULLNESS_OPTIONS` שלו כולל גם הוא "קלאסי"). אם הבעיה עדיין נראית
+בפועל בדפדפן - כדאי לרענן קשיח (Ctrl+Shift+R) ולבדוק שוב.
 
-## 2. דילוג על שלב בחירת לקוחה כשהיא כבר ידועה
+## 2. עיצוב כפתור "הוסף פריט מהמלאי"
 
-כשהאשף נפתח עם `preselectedClient` (תמיד המקרה בפועל - הוא נפתח רק
-מתוך `ClientDrawer.tsx`) - שלב 2 (בחירת לקוחה) מדולג לגמרי בשני
-הכיוונים: `handleNext` בשלב 1 קופץ ישר לשלב 3 (`setStep(preselectedClient
-? 3 : 2)`), ופונקציה חדשה `handleBack` (מחליפה `onClick={() => setStep(step-1)}`
-הישיר) קופצת משלב 3 ישר חזרה לשלב 1. "תיקון/שירות" (שיוצא מהאשף
-לגמרי ל-`RepairOrderForm`) מטופל עכשיו גם ביציאה משלב 1 (לא רק שלב
-2 כמו קודם), כדי שהיציאה עדיין תקרה נכון גם כששלב 2 מדולג.
+תוקן בכל 3 המקומות: `NewOrderWizard.tsx`, `RepairOrderForm.tsx`,
+`ShowroomStockDetailsPanel.tsx`. הוסר ה-"+" מהטקסט (נשאר "הוסף פריט"/
+"הוסף פריט מהמלאי"), ו-`className` הפך תלוי-מצב: `btn-secondary`/
+`showroom-details-btn-secondary` (אפור) כל עוד לא נבחר פריט,
+`btn-primary`/`showroom-details-btn-primary` (סגול/accent) ברגע
+שנבחר פריט מה-select (`bulkItemPickerId`/`selectedBulkCatalogItem`).
 
-## 3. פריטי מלאי (usedBulkItems) ב-RepairOrderForm
+## 3. הסרת paymentsCount
 
-נוספה בדיוק אותה יכולת שכבר קיימת ב-`NewOrderWizard.tsx`: state
-(`bulkItemsCatalog`/`usedBulkItems`/`bulkItemPickerId`/`bulkItemPickerQty`/
-`bulkItemQtyError`), טעינת קטלוג `bulkItems` בפתיחה, `handleAddUsedBulkItem`/
-`handleRemoveUsedBulkItem` עם אותה וולידציית מלאי מצטברת, ובדיקת הגנה
-נוספת (defense in depth) לפני היצירה + הורדת מלאי מקובצת אחרי היצירה -
-אותו דפוס בדיוק כמו `NewOrderWizard.handleFinish`. עלות הפריטים
-(`usedBulkItemsCost`) נכנסת ל-`mfgCost` (`calc`), ולכן משפיעה גם על
-מחיר ההצעה האוטומטי ללקוחה. JSX משתמש שוב ב-`.bulk-item-list`/
-`.bulk-item-add-row`/`.field-error` הקיימים כבר גלובלית (נטענים דרך
-`NewOrderWizard.css`, שממילא תמיד נטען יחד עם `RepairOrderForm.tsx`
-דרך `ClientDrawer.tsx`) - לא נדרש CSS חדש.
+שדה מת שלא נקרא בשום מקום (רק נכתב) - הוסר לגמרי: מ-`NewOrderInput`
+(`orderCreation.ts`) וממה שנכתב בפועל ב-`createOrder`, מה-state/UI
+("מספר תשלומים", 6 pills) ב-`NewOrderWizard.tsx`, ומכל שלוש נקודות
+הקריאה הנוספות שהעבירו `paymentsCount: 1` בלי סיבה
+(`QuickRetailSaleModal.tsx`, `RepairOrderForm.tsx`,
+`ShowroomStockFormModal.tsx`). אומת עם grep גלובלי שאין אף התייחסות
+שנותרה.
 
-## 4. ניהול תשלומים/חובות בתיקון - אומת, לא נדרש שינוי
+## 4. "פאת תצוגה" חוזרת לשלב 1 - מחוברת נכון למודל החדש
 
-`RepairOrderForm.tsx` כבר יוצר את ההזמנה דרך `createOrder()` המשותף
-(אותו helper כמו `NewOrderWizard`), עם `clientId` אמיתי ובלי
-`isShowroomStock` - כלומר זו כבר בדיוק הזמנת `orders` רגילה, לא
-מסוננת מ-Sales.tsx (לא `isUnsoldShowroomStock`), ונפתחת באותו
-`OrderDetailsPanel.tsx` עם ניהול התשלומים המובנה שכבר קיים שם. לא
-נבנה שום ניהול תשלומים נפרד בתוך `RepairOrderForm.tsx` - זה כבר
-מיותר לגמרי ברגע שההזמנה נוצרת.
+`NewOrderWizard.tsx`: נוספה כרטיסייה שלישית "פאת תצוגה" בשלב 1
+(`orderType` הורחב ל-`"new"|"repair"|"showroom"|"other"`). בבחירתה,
+שלב 2 מוחלף לגמרי (לא בחירת לקוחה - רשימת פאות תצוגה זמינות: orders
+עם `isShowroomStock` וללא `clientId`, נטענות בפתיחה ומסוננות עם
+`isUnsoldShowroomStock` המשותף מ-`orderCreation.ts` - אותו תנאי בדיוק
+כמו בלשונית "פאות תצוגה" ב-`Inventory.tsx`). בחירת פאה + "הבא" יוצאת
+מהאשף לגמרי (כמו "תיקון") וקוראת ל-prop חדש `onOpenSellShowroom(order)`.
+
+`SellShowroomStockModal.tsx` קיבל `preselectedClient?` אופציונלי -
+כשמועבר, מדלג על ה-dropdown של בחירת לקוחה (מציג שורת "לקוחה: X"
+קבועה במקום), בדיוק כמו הדפוס הקיים ב-`NewOrderWizard.tsx`.
+
+`ClientDrawer.tsx` (המקום היחיד שמרנדר את שני הרכיבים) מחבר ביניהם:
+`onOpenSellShowroom` שומר את הפאה שנבחרה ב-state, וסוגר את
+`NewOrderWizard`; מרנדר `SellShowroomStockModal` עם אותה פאה + אותו
+`preselectedClient` שכבר מועבר גם ל-`NewOrderWizard` - הלקוחה עוברת
+בין שני הרכיבים בלי לבקש שוב.
+
+## 5. באג לחיצה כפולה מדלגת שלב - נחקר, לא נמצא קוד שגוי, נוסף הגנה
+
+**מה נבדק:** `setStep`/`handleNext` נקראים אך ורק מ-onClick של כפתור
+"הבא" עצמו (`grep` מאשר - אין נתיב קוד נוסף). נבדקו ונשללו: `<form>`/
+`onSubmit` (אין בכלל בקובץ), מאזיני `click` גלובליים ב-`ClientDrawer.tsx`
+(אין), הזזת layout ב-CSS כתוצאה מבחירת כרטיסייה (`.type-card.active`
+משנה רק `border-color`/`background`, לא מידות - אין reflow), media
+queries שיכולות לגרום להיסט תגובתי (אין ב-`NewOrderWizard.css`
+בכלל), מאזיני `dblclick` בכל הפרויקט (אין אף אחד). **לא נמצא "עקבות
+אצבע" ברמת קוד היישום** לנתיב קריאה חלופי ל-`handleNext`.
+
+המסקנה הסבירה ביותר: כרטיסיית הבחירה וכפתור "הבא" נמצאים קרוב זה
+לזה במודל קומפקטי, וכפתור "הבא" **תמיד מאופשר כבר משלב 1** (כי
+`orderType` מתחיל עם ערך ברירת מחדל תקין - "new" - עוד לפני בחירה
+מפורשת) - כך שלחיצה כפולה מהירה על הכרטיסייה (למשל הרגל הנפוצה
+"ללחוץ שוב לאישור") עלולה, בתזמון/מיקום גבוליים, "לתפוס" גם את
+"הבא" בלי כוונה אמיתית להתקדם.
+
+**התיקון:** נוספה הגנת זמן (debounce guard) - `lastTypeSelectRef`
+(חותמת זמן) מתעדכנת בכל בחירת סוג הזמנה (`handleTypeSelect`, מחליף
+קריאה ישירה ל-`setOrderType`); `handleNext`, כשנקרא משלב 1, מתעלם
+לגמרי אם עברו פחות מ-400ms מהבחירה האחרונה - זמן קצר מדי לייצג לחיצה
+מודעת ונפרדת על "הבא". לחיצה אמיתית ומכוונת על "הבא" (שמגיעה תמיד
+זמן רב יותר אחרי הבחירה) לא מושפעת.
 
 ## בדיקות שבוצעו
 
 - `npm run build` (tsc -b + vite build) עובר נקי.
-- `npm run lint` - אין שגיאות/אזהרות חדשות; שתי השגיאות הקיימות
-  (`NewOrderWizard.tsx`/`RepairOrderForm.tsx`) הן `react-hooks/set-state-in-effect`
-  ו-`no-explicit-any` ישנות ולא קשורות - אומת עם `git diff` שהשורות
-  המדוברות לא נגעו בהן.
+- `npm run lint` - אין שגיאות/אזהרות חדשות בכל 8 הקבצים שנערכו; אומת
+  עם `git diff`/בדיקת שורות שכל השגיאות הקיימות הן `react-hooks/set-state-in-effect`/
+  `no-explicit-any` ישנות ולא קשורות.
 - לא בוצעה בדיקה ויזואלית בדפדפן בפועל - מומלץ לבדוק ידנית לפני
-  סמיכה מלאה, בפרט את דילוג השלבים (סעיף 2) ואת זרימת התיקון המלאה
-  מקצה לקצה (סעיף 3).
+  סמיכה מלאה, בפרט את זרימת "פאת תצוגה" המלאה מקצה לקצה (סעיף 4)
+  ואת האם הגנת ה-debounce (סעיף 5) אכן פותרת את הבעיה בפועל.

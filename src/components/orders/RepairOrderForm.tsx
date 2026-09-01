@@ -186,7 +186,6 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
         orderType: "תיקון / שירות",
         totalPrice: Number(price) || 0,
         dueDate: null,
-        paymentsCount: 1,
         usedBulkItems,
         usedHairItems: [],
         hairCostEstimated: calc.mfgCost,
@@ -298,8 +297,13 @@ export default function RepairOrderForm({ isOpen, client, onClose, onCreated }: 
                   setBulkItemQtyError(null);
                 }}
               />
-              <button type="button" className="btn-secondary" onClick={handleAddUsedBulkItem} disabled={!bulkItemPickerId}>
-                + הוסף פריט מהמלאי
+              <button
+                type="button"
+                className={bulkItemPickerId ? "btn-primary" : "btn-secondary"}
+                onClick={handleAddUsedBulkItem}
+                disabled={!bulkItemPickerId}
+              >
+                הוסף פריט מהמלאי
               </button>
             </div>
             {bulkItemQtyError && <span className="field-error">{bulkItemQtyError}</span>}

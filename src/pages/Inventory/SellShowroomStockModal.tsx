@@ -16,9 +16,13 @@ interface SellShowroomStockModalProps {
   order: Order | null;
   onClose: () => void;
   onSold: () => void;
+  // אם נפתח מתוך ClientDrawer של לקוחה ספציפית (דרך NewOrderWizard) - הלקוחה
+  // כבר ידועה מראש, אז מדלגים על ה-dropdown לגמרי, בדיוק כמו preselectedClient
+  // ב-NewOrderWizard.tsx.
+  preselectedClient?: ClientOption | null;
 }
 
-export default function SellShowroomStockModal({ isOpen, order, onClose, onSold }: SellShowroomStockModalProps) {
+export default function SellShowroomStockModal({ isOpen, order, onClose, onSold, preselectedClient = null }: SellShowroomStockModalProps) {
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [finalPrice, setFinalPrice] = useState<number | "">("");
@@ -28,9 +32,16 @@ export default function SellShowroomStockModal({ isOpen, order, onClose, onSold 
   useEffect(() => {
     if (!isOpen || !order) return;
 
-    setSelectedClientId("");
     setFinalPrice(order.retailPrice ?? "");
     setError(null);
+
+    if (preselectedClient) {
+      setSelectedClientId(preselectedClient.id);
+      setClients([preselectedClient]);
+      return;
+    }
+
+    setSelectedClientId("");
 
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -44,7 +55,7 @@ export default function SellShowroomStockModal({ isOpen, order, onClose, onSold 
       })
       .catch((err) => console.error("Error loading clients for showroom stock sale:", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, order?.id]);
+  }, [isOpen, order?.id, preselectedClient]);
 
   if (!isOpen || !order) return null;
 
@@ -100,12 +111,16 @@ export default function SellShowroomStockModal({ isOpen, order, onClose, onSold 
         <div className="modal-form-grid">
           <div className="form-field form-field-full">
             <label>לקוחה</label>
-            <select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)}>
-              <option value="">בחרי לקוחה...</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-              ))}
-            </select>
+            {preselectedClient ? (
+              <div className="restock-preview">👤 {preselectedClient.name} ({preselectedClient.phone})</div>
+            ) : (
+              <select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)}>
+                <option value="">בחרי לקוחה...</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="form-field form-field-full">

@@ -241,11 +241,11 @@ export default function ShowroomStockDetailsPanel({
                 />
                 <button
                   type="button"
-                  className="showroom-details-btn-primary"
+                  className={selectedBulkCatalogItem ? "showroom-details-btn-primary" : "showroom-details-btn-secondary"}
                   onClick={handleAddBulkItem}
                   disabled={savingBulkItem || !selectedBulkCatalogItem || bulkItemPickerQty === "" || bulkQtyExceedsStock}
                 >
-                  {savingBulkItem ? "מוסיפה..." : "+ הוסף פריט"}
+                  {savingBulkItem ? "מוסיפה..." : "הוסף פריט"}
                 </button>
               </div>
               {bulkQtyExceedsStock && (
