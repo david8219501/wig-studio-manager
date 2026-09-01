@@ -269,6 +269,58 @@
   .status-ready { background: var(--color-success-bg); color: var(--color-success); }
   .status-delivered { background: var(--color-surface-hover); color: var(--color-text-muted); }
 
+  /* סטטוס הזמנה כ-CustomSelect (לא <select> מובנה) - אותה צביעה לפי סטטוס
+     כמו .status-select הישן, רק בלי לגעת ב-width/padding/border-radius
+     (שכבר מגיעים מ-.custom-select-trigger ב-CustomSelect.css) - כדי לא
+     להתנגש עם הסגנון הבסיסי שלו. */
+  .order-status-trigger {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .order-status-trigger--new { background: var(--color-info-bg); color: var(--color-info); }
+  .order-status-trigger--in_progress { background: var(--color-warning-bg); color: var(--color-warning); }
+  .order-status-trigger--styling { background: var(--color-accent-bg); color: var(--color-accent); }
+  .order-status-trigger--ready { background: var(--color-success-bg); color: var(--color-success); }
+  .order-status-trigger--delivered { background: var(--color-surface-hover); color: var(--color-text-muted); }
+  .order-status-trigger--custom { background: var(--color-surface-hover); color: var(--color-text-muted); }
+
+  /* שדה טקסט חופשי לסטטוס מותאם אישית ("אחר / הוסף חדש") */
+  .status-custom-input {
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .status-custom-input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .status-custom-label {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-custom-label:hover {
+    text-decoration: underline;
+  }
+
   .sales-state {
     display: flex;
     flex-direction: column;

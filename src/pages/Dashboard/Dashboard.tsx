@@ -16,7 +16,7 @@ interface ClientRow {
   createdAt: Date | null;
 }
 
-const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
+const ORDER_STATUS_LABELS: Record<string, string> = {
   new: "חדשה",
   in_progress: "בטיפול",
   styling: "בסירוק",
@@ -24,15 +24,17 @@ const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
   delivered: "נמסרה",
 };
 
-function StatusBadge({ status }: { status: Order["status"] }) {
-  const classByStatus: Record<Order["status"], string> = {
+// status הוא string חופשי (ראו Sales.tsx - "אחר / הוסף חדש") - סטטוס לא-ידוע
+// מציג את הטקסט המקורי שלו + תג ניטרלי, במקום undefined.
+function StatusBadge({ status }: { status: string }) {
+  const classByStatus: Record<string, string> = {
     new: "badge-new",
     in_progress: "badge-progress",
     styling: "badge-styling",
     ready: "badge-ready",
     delivered: "badge-ready",
   };
-  return <span className={`dash-badge ${classByStatus[status]}`}>{ORDER_STATUS_LABELS[status]}</span>;
+  return <span className={`dash-badge ${classByStatus[status] ?? "badge-ready"}`}>{ORDER_STATUS_LABELS[status] ?? status}</span>;
 }
 
 // פונקציה לקבלת ברכה דינמית לפי השעה ביום

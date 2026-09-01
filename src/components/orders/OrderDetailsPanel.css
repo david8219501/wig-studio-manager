@@ -196,7 +196,8 @@
   color: var(--color-danger, #d33);
 }
 
-.order-details-remove-btn {
+.order-details-remove-btn,
+.order-details-edit-btn {
   background: none;
   border: none;
   color: var(--color-text-muted);
@@ -208,6 +209,24 @@
 
 .order-details-remove-btn:hover {
   color: var(--color-danger);
+}
+
+.order-details-edit-btn:hover {
+  color: var(--color-accent);
+}
+
+/* שורת תשלום במצב עריכה - נטענת ל-column כדי להכיל את טופס העריכה
+   המלא (סכום/אמצעי/תאריך/הערה), במקום שורת ה-flex הרגילה לתצוגה בלבד. */
+.order-details-row--editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.order-details-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* אזור "הוסף עוד" (פריט מלאי / בעתיד סוגי שיוך נוספים) - אותו דפוס בדיוק

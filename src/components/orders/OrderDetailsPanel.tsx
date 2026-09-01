@@ -5,6 +5,7 @@ import type { BulkItem, OrderPayment, UsedBulkItem } from "../../types";
 import type { Order } from "../../pages/Sales/Sales";
 import { formatDateIL } from "../../utils/formatDate";
 import DateInput from "../common/DateInput";
+import ConfirmDialog from "../common/ConfirmDialog";
 import "./OrderDetailsPanel.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -42,6 +43,19 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
   const [savingPayment, setSavingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  // עריכה/מחיקה של תשלום בודד מהיסטוריית התשלומים - אותו דפוס "לחיצה
+  // לעריכה בשורה" כמו הוספת/הסרת פריטי מלאי למעלה, פלוס ConfirmDialog
+  // למחיקה (במקום window.confirm).
+  const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
+  const [editPayAmount, setEditPayAmount] = useState<number | "">("");
+  const [editPayMethod, setEditPayMethod] = useState<OrderPayment["method"]>("cash");
+  const [editPayDate, setEditPayDate] = useState(todayStr);
+  const [editPayNote, setEditPayNote] = useState("");
+  const [savingEditPayment, setSavingEditPayment] = useState(false);
+  const [editPaymentError, setEditPaymentError] = useState<string | null>(null);
+  const [deletingPaymentIndex, setDeletingPaymentIndex] = useState<number | null>(null);
+  const [deletingPayment, setDeletingPayment] = useState(false);
+
   // הוספת פריט מלאי פשוט (רשת, ראש פאה וכו') להזמנה קיימת - אותו דפוס
   // "הוסף עוד" כמו ניהול שיוך שיער (AssignHairModal), רק בתוך הפאנל עצמו.
   const [bulkItemsCatalog, setBulkItemsCatalog] = useState<BulkItem[]>([]);
@@ -71,6 +85,9 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     setPayDate(todayStr);
     setPayNote("");
     setPaymentError(null);
+    setEditingPaymentIndex(null);
+    setEditPaymentError(null);
+    setDeletingPaymentIndex(null);
     setBulkItemPickerId("");
     setBulkItemPickerQty(1);
     setBulkItemError(null);
@@ -124,6 +141,77 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
       setPaymentError("שגיאה בהוספת התשלום. נסי שוב.");
     } finally {
       setSavingPayment(false);
+    }
+  };
+
+  const handleStartEditPayment = (idx: number) => {
+    const p = payments[idx];
+    if (!p) return;
+    setEditingPaymentIndex(idx);
+    setEditPayAmount(p.amount);
+    setEditPayMethod(p.method);
+    setEditPayDate(p.date);
+    setEditPayNote(p.note || "");
+    setEditPaymentError(null);
+  };
+
+  const handleCancelEditPayment = () => {
+    setEditingPaymentIndex(null);
+    setEditPaymentError(null);
+  };
+
+  const handleSaveEditPayment = async (idx: number) => {
+    if (editPayAmount === "" || Number(editPayAmount) <= 0) {
+      setEditPaymentError("יש להזין סכום תשלום תקין.");
+      return;
+    }
+
+    setSavingEditPayment(true);
+    setEditPaymentError(null);
+
+    const note = editPayNote.trim();
+    const updatedPayment: OrderPayment = note
+      ? { amount: Number(editPayAmount), method: editPayMethod, date: editPayDate || todayStr, note }
+      : { amount: Number(editPayAmount), method: editPayMethod, date: editPayDate || todayStr };
+
+    const newPayments = payments.map((p, i) => (i === idx ? updatedPayment : p));
+    const newPaidAmount = newPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    try {
+      await updateDoc(doc(db, "orders", order.id), {
+        payments: newPayments,
+        paidAmount: newPaidAmount,
+      });
+      setEditingPaymentIndex(null);
+    } catch (err) {
+      console.error("Error editing payment:", err);
+      setEditPaymentError("שגיאה בעדכון התשלום. נסי שוב.");
+    } finally {
+      setSavingEditPayment(false);
+    }
+  };
+
+  const handleConfirmDeletePayment = async () => {
+    if (deletingPaymentIndex === null) return;
+
+    setDeletingPayment(true);
+
+    const newPayments = payments.filter((_, i) => i !== deletingPaymentIndex);
+    const newPaidAmount = newPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    try {
+      await updateDoc(doc(db, "orders", order.id), {
+        payments: newPayments,
+        paidAmount: newPaidAmount,
+      });
+      setDeletingPaymentIndex(null);
+      if (editingPaymentIndex === deletingPaymentIndex) {
+        setEditingPaymentIndex(null);
+      }
+    } catch (err) {
+      console.error("Error deleting payment:", err);
+    } finally {
+      setDeletingPayment(false);
     }
   };
 
@@ -327,12 +415,67 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
 
             {payments.length > 0 && (
               <div className="order-details-list">
-                {payments.map((p, idx) => (
-                  <div key={idx} className="order-details-row">
-                    <span>{PAYMENT_METHOD_LABELS[p.method]} · <span className="mono">{formatDateIL(p.date)}</span>{p.note ? ` · ${p.note}` : ""}</span>
-                    <span className="mono font-bold">₪{p.amount.toLocaleString()}</span>
-                  </div>
-                ))}
+                {payments.map((p, idx) =>
+                  editingPaymentIndex === idx ? (
+                    <div key={idx} className="order-details-row order-details-row--editing">
+                      <div className="add-payment-row">
+                        <input
+                          type="number"
+                          placeholder="סכום (₪)"
+                          min={0}
+                          value={editPayAmount}
+                          onChange={(e) => setEditPayAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                        />
+                        <select value={editPayMethod} onChange={(e) => setEditPayMethod(e.target.value as OrderPayment["method"])}>
+                          <option value="cash">💵 מזומן</option>
+                          <option value="credit">💳 אשראי</option>
+                          <option value="transfer">🏦 העברה</option>
+                          <option value="check">📜 צ'ק</option>
+                        </select>
+                        <DateInput value={editPayDate} onChange={setEditPayDate} />
+                      </div>
+                      <input
+                        type="text"
+                        className="add-payment-note"
+                        placeholder="הערה (אופציונלי)"
+                        value={editPayNote}
+                        onChange={(e) => setEditPayNote(e.target.value)}
+                      />
+                      {editPaymentError && <div className="order-details-error">{editPaymentError}</div>}
+                      <div className="order-details-edit-actions">
+                        <button type="button" className="btn-secondary" onClick={handleCancelEditPayment} disabled={savingEditPayment}>
+                          ביטול
+                        </button>
+                        <button type="button" className="btn-primary" onClick={() => handleSaveEditPayment(idx)} disabled={savingEditPayment}>
+                          {savingEditPayment ? "שומרת..." : "שמירה"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={idx} className="order-details-row">
+                      <span>{PAYMENT_METHOD_LABELS[p.method]} · <span className="mono">{formatDateIL(p.date)}</span>{p.note ? ` · ${p.note}` : ""}</span>
+                      <span className="mono font-bold">₪{p.amount.toLocaleString()}</span>
+                      <button
+                        type="button"
+                        className="order-details-edit-btn"
+                        onClick={() => handleStartEditPayment(idx)}
+                        aria-label="עריכת תשלום"
+                        title="עריכת תשלום"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        type="button"
+                        className="order-details-remove-btn"
+                        onClick={() => setDeletingPaymentIndex(idx)}
+                        aria-label="מחיקת תשלום"
+                        title="מחיקת תשלום"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
             )}
 
@@ -369,6 +512,16 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={deletingPaymentIndex !== null}
+        title="מחיקת תשלום"
+        message="למחוק את התשלום הזה? הפעולה תעדכן את הסכום ששולם בפועל, ולא ניתנת לביטול."
+        variant="danger"
+        confirmLabel={deletingPayment ? "מוחקת..." : "כן, מחיקה"}
+        onConfirm={handleConfirmDeletePayment}
+        onCancel={() => setDeletingPaymentIndex(null)}
+      />
     </>
   );
 }

@@ -1,55 +1,65 @@
-# סיכום: תיקון באג - סך הכנסות בדשבורד לא עולה אחרי מכירת פאת תצוגה
+# סיכום: קבוצה א׳ - טבלת תשלומים בכרטיס לקוחה + סטטוס הזמנה
 
-## ההשערה שנבדקה - לא נמצאה נכונה
+## 1. תיקון יישור בטבלת "פירוט לפי הזמנה" (ClientDrawer.tsx)
 
-בדקתי את התנאי המדויק בשלושת המקומות לפני כל שינוי: `isUnsoldShowroomStock`
-(ב-`orderCreation.ts`) בודקת נכון את **שני** התנאים יחד:
+בדקתי לפני התיקון: `table-layout: fixed` **לא** קיים בכלל ב-CSS של
+`.payments-orders-table` - אז זו לא אותה סיבה בדיוק כמו שזוכר. הסיבה
+האמיתית שנמצאה: ל-`.expenses-table td` (שכבר תוקן בעבר) יש `text-align:
+right` מפורש, בעוד ל-`.payments-orders-table td` לא היה - הוא הסתמך על
+ברירת המחדל המשתמעת מ-`dir="rtl"`, פחות עקבי/אמין. תוקן ע"י הוספת
+`text-align: right` מפורש לכלל ה-`td`, בדיוק כמו ב-Expenses.tsx.
 
-```ts
-return order.isShowroomStock === true && !order.clientId;
-```
+**קובץ:** `src/components/clients/ClientDrawer.css`
 
-וכל שלושת הקבצים (`Sales.tsx:63`, `Dashboard.tsx:76`, `Reports.tsx:47`)
-קוראים לה נכון בתוך `.filter((order) => !isUnsoldShowroomStock(order))`.
-גם `SellShowroomStockModal.tsx` קובעת `clientId: client.id` אמיתי
-ב-`updateDoc` בזמן המכירה. כלומר ברגע שיש `clientId` אמיתי, הפילטר
-מפסיק לסנן את ההזמנה בכל שלושת המקומות - הבדיקה המקורית תקינה,
-**לא זה הבאג**.
+## 2. סטטוס הזמנה - ניתן לעריכה עם טקסט חופשי (Sales.tsx)
 
-## הבאג האמיתי שנמצא
+הוחלף ה-`<select>` הרגיל בעמודת הסטטוס ב-`CustomSelect`, עם אפשרות
+נוספת "אחר / הוסף חדש" - אותו דפוס בדיוק כמו `OTHER_APPOINTMENT_TYPE`
+ב-Calendar.tsx:
+- `Order.status` שונה מ-union סגור ל-`string` חופשי (עדיין עם
+  `KNOWN_STATUSES`/`STATUS_SELECT_OPTIONS` לסטטוסים הידועים).
+- בחירת "אחר" פותחת שדה טקסט חופשי inline; שמירה (Enter/blur) קוראת
+  ל-`handleStatusChange` עם הטקסט שהוזן.
+- עריכה חוזרת של הזמנה עם סטטוס טקסט-חופשי קיים מזהה אותו כ"לא ידוע"
+  (`!KNOWN_STATUSES.includes`) ומציגה את הטקסט כמו שהוא (לא "אחר" ריק).
 
-שלושת הקבצים מחשבים הכנסות לפי `monthKey(o.createdAt)`/
-`yearKey(o.createdAt)` - לפי **תאריך יצירת המסמך**. אצל פאת תצוגה,
-`createdAt` נקבע כשהפאה **נוצרה במלאי** (`ShowroomStockFormModal.tsx`),
-לא כשהיא **נמכרה בפועל**. אם הפאה נוצרה במלאי בחודש/שנה קודמים,
-מכירה שקורית היום עדיין "נספרת" תחת החודש/השנה הישנים - ולכן "הכנסות
-החודש" בדשבורד לא עולה גם אחרי מכירה אמיתית. זה תואם בדיוק לסימפטום
-שדווח.
+**תיקון נלווה שהיה נדרש:** `Dashboard.tsx`'s `StatusBadge` הניח סטטוס
+מתוך union סגור (`Record<Order["status"], string>`) - עם סטטוס טקסט-
+חופשי זה היה מציג `undefined`. תוקן: `ORDER_STATUS_LABELS` עם fallback
+לטקסט המקורי (`ORDER_STATUS_LABELS[status] ?? status`), ותג ניטרלי
+לסטטוסים לא-ידועים. נבדק גם `ClientDrawer.tsx`/`OrderDetailsPanel.tsx` -
+כבר היה להם fallback בטוח (`|| order.status`), לא נדרש שינוי שם.
 
-## התיקון
+**קבצים:** `src/pages/Sales/Sales.tsx`, `src/pages/Sales/Sales.css`,
+`src/pages/Dashboard/Dashboard.tsx`
 
-`SellShowroomStockModal.tsx`: ב-`updateDoc` של המכירה, נוסף גם
-`createdAt: today` (אותו משתנה `today` שכבר חושב עבור תאריך התשלום)
-- ברגע המכירה, ההזמנה "נהפכת" מבחינת התאריך הפונקציונלי שלה להזמנה
-רגילה שנוצרה היום, בדיוק כמו כל הזמנה אחרת (`QuickRetailSaleModal.tsx`/
-`RepairOrderForm.tsx`/`NewOrderWizard.tsx` כולן קובעות `createdAt`
-ברגע המכירה/היצירה עצמה - זה הדפוס הקיים בכל האתר). לא נדרש שום
-שינוי ב-`Dashboard.tsx`/`Sales.tsx`/`Reports.tsx` - לוגיקת קיבוץ
-ההכנסות לפי `createdAt` שם כבר נכונה ועקבית, הבעיה הייתה רק בערך
-השגוי שנשמר עבור פאות תצוגה.
+## 3. עריכה ומחיקה של תשלום בודד (OrderDetailsPanel.tsx)
 
-אומת שאין שום מקום אחר בקוד הנוכחי שמסתמך על תאריך היצירה המקורי
-של פאת תצוגה (למשל מדד "ימים במלאי") - לא קיים כזה בקוד, אז אין
-תופעת לוואי מהדריסה.
+לכל שורה בהיסטוריית התשלומים נוספו שני כפתורים:
+- **עריכה (✏️):** פותחת inline טופס (סכום/אמצעי/תאריך/הערה) עם ערכי
+  התשלום הקיים טעונים מראש. שמירה בונה מחדש את מערך `payments` (מחליפה
+  רק את האינדקס שנערך), מחשבת `paidAmount` כסכימת כל התשלומים מחדש,
+  וכותבת ל-Firestore. יש "ביטול" ליציאה בלי שמירה.
+- **מחיקה (✕):** פותחת `ConfirmDialog` (`variant="danger"`) במקום
+  `window.confirm` - אישור מסיר את התשלום מהמערך, מחשב מחדש `paidAmount`
+  מהשאר, וכותב ל-Firestore.
+
+state חדש נוסף לאיפוס בכל פתיחת פאנל/החלפת הזמנה (אותו useEffect
+הקיים שכבר מאפס את טופס "הוספת תשלום").
+
+**קבצים:** `src/components/orders/OrderDetailsPanel.tsx`,
+`src/components/orders/OrderDetailsPanel.css`
 
 ## בדיקות שבוצעו
 
 - `npm run build` (tsc -b + vite build) עובר נקי.
-- `npm run lint` - אין שגיאות/אזהרות חדשות ב-`SellShowroomStockModal.tsx`.
-- לא בוצעה בדיקה ויזואלית בדפדפן בפועל - מומלץ לבדוק ידנית: ליצור
-  פאת תצוגה, לחכות/לדמות שהיא "ישנה" (או פשוט למכור פאה שכבר קיימת
-  מחודש קודם אם יש כזו), למכור אותה, ולוודא שהדשבורד/דוחות/מכירות
-  מציגים את ההכנסה תחת החודש הנוכחי.
+- `npm run lint` - נבדקו כל הקבצים שנגעתי בהם: אין שגיאות/אזהרות חדשות.
+  השגיאה היחידה שהופיעה ב-`OrderDetailsPanel.tsx` (`react-hooks/set-
+  state-in-effect` בשורה 83) היא על אותו `useEffect` קיים מראש שכבר היה
+  מסומן לפני התיקון - רק עם עוד קריאות `setState` בגוף אותו effect
+  קיים, לא סוג אזהרה חדש. שאר השגיאות שהופיעו בהרצת lint שייכות לקבצים
+  שלא נגעתי בהם בקבוצה הזו (תבנית שיטתית קיימת מתועדת ב-REVIEW.md).
+- לא בוצעה בדיקה ויזואלית בדפדפן בפועל.
 
 ## הערה על git status
 

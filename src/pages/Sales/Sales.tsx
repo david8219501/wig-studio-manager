@@ -7,7 +7,22 @@ import AssignHairModal from "../../components/orders/AssignHairModal";
 import OrderDetailsPanel from "../../components/orders/OrderDetailsPanel";
 import { calculateOrderProfit } from "../../utils/orderProfit";
 import DateInput from "../../components/common/DateInput";
+import CustomSelect from "../../components/common/CustomSelect";
 import "./Sales.css";
+
+// ערך-סמן לבחירת "אחר / הוסף חדש" בסטטוס ההזמנה - אותו דפוס בדיוק כמו
+// OTHER_APPOINTMENT_TYPE ב-Calendar.tsx. לא נשמר בפועל כ-status - רק פותח
+// שדה טקסט חופשי (ראו editingCustomStatusValue).
+const OTHER_STATUS = "__other__";
+const KNOWN_STATUSES = ["new", "in_progress", "styling", "ready", "delivered"];
+const STATUS_SELECT_OPTIONS = [
+  { value: "new", label: "חדשה 🆕" },
+  { value: "in_progress", label: "בטיפול ⏳" },
+  { value: "styling", label: "בסירוק 💇‍♀️" },
+  { value: "ready", label: "מוכנה לאיסוף 🎁" },
+  { value: "delivered", label: "נמסרה ✅" },
+  { value: OTHER_STATUS, label: "אחר / הוסף חדש" },
+];
 
 export interface Order {
   id: string;
@@ -15,7 +30,10 @@ export interface Order {
   clientName: string;
   clientPhone: string;
   orderType: string;
-  status: "new" | "in_progress" | "styling" | "ready" | "delivered";
+  // string ולא union סגור - כדי לאפשר סטטוס טקסט-חופשי ("אחר / הוסף חדש"),
+  // אותו דפוס בדיוק כמו Appointment.type ב-Calendar.tsx. הערכים הידועים
+  // עדיין ב-KNOWN_STATUSES/STATUS_SELECT_OPTIONS למטה.
+  status: string;
   totalPrice: number;
   paidAmount: number;
   payments?: OrderPayment[];
@@ -40,6 +58,11 @@ export default function Sales() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+  // עריכת סטטוס טקסט-חופשי ("אחר / הוסף חדש") - שורה אחת בכל רגע נתון,
+  // אותו דפוס בדיוק כמו עריכת סכום הוצאה ב-Expenses.tsx (editingAmountId).
+  const [editingCustomStatusId, setEditingCustomStatusId] = useState<string | null>(null);
+  const [editingCustomStatusValue, setEditingCustomStatusValue] = useState("");
 
   // סינון לפי תאריכים
   const [timeRange, setTimeRange] = useState<"all" | "today" | "week" | "month" | "custom">("all");
@@ -75,13 +98,23 @@ export default function Sales() {
   }, []);
 
   // עדכון סטטוס - נכתב ישירות ל-Firestore, onSnapshot למעלה יעדכן את המסך אוטומטית
-  const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, "orders", orderId), { status: newStatus });
     } catch (err) {
       console.error("Error updating order status:", err);
       alert("שגיאה בעדכון הסטטוס. נסי שוב.");
     }
+  };
+
+  // שמירת סטטוס טקסט-חופשי שהוזן - אם נשאר ריק (למשל נבחר "אחר" בטעות
+  // ולא הוקלד כלום), פשוט סוגרים את מצב העריכה בלי לשנות כלום.
+  const commitCustomStatus = (orderId: string) => {
+    const text = editingCustomStatusValue.trim();
+    if (text) {
+      handleStatusChange(orderId, text);
+    }
+    setEditingCustomStatusId(null);
   };
 
   // סינון דינמי
@@ -222,24 +255,54 @@ export default function Sales() {
                 // קמעונאי/פאת תצוגה נשלחים עם hairCostEstimated: 0, העלות שלהם מדויקת מהרגע הראשון).
                 const isEstimatedProfit =
                   (ord.hairCostEstimated ?? 0) > 0 && (!ord.usedHairItems || ord.usedHairItems.length === 0);
+                const isCustomStatus = !KNOWN_STATUSES.includes(ord.status);
+                const statusSelectValue = isCustomStatus ? OTHER_STATUS : ord.status;
                 return (
                   <tr key={ord.id} className="sales-row" onClick={() => setSelectedOrderId(ord.id)}>
                     <td className="cell-client font-bold">{ord.clientName}</td>
                     <td className="cell-type">{ord.orderType || "פאה חדשה"}</td>
                     <td className="cell-status" onClick={(e) => e.stopPropagation()}>
-                      <select
-                        className={`status-select status-${ord.status}`}
-                        value={ord.status}
-                        onChange={(e) =>
-                          handleStatusChange(ord.id, e.target.value as Order["status"])
-                        }
-                      >
-                        <option value="new">חדשה 🆕</option>
-                        <option value="in_progress">בטיפול ⏳</option>
-                        <option value="styling">בסירוק 💇‍♀️</option>
-                        <option value="ready">מוכנה לאיסוף 🎁</option>
-                        <option value="delivered">נמסרה ✅</option>
-                      </select>
+                      <CustomSelect
+                        className={`order-status-trigger order-status-trigger--${isCustomStatus ? "custom" : ord.status}`}
+                        value={statusSelectValue}
+                        onChange={(value) => {
+                          if (value === OTHER_STATUS) {
+                            setEditingCustomStatusId(ord.id);
+                            setEditingCustomStatusValue(isCustomStatus ? ord.status : "");
+                          } else {
+                            setEditingCustomStatusId(null);
+                            handleStatusChange(ord.id, value);
+                          }
+                        }}
+                        options={STATUS_SELECT_OPTIONS}
+                      />
+                      {editingCustomStatusId === ord.id ? (
+                        <input
+                          type="text"
+                          className="status-custom-input"
+                          autoFocus
+                          placeholder="הקלידי סטטוס..."
+                          value={editingCustomStatusValue}
+                          onChange={(e) => setEditingCustomStatusValue(e.target.value)}
+                          onBlur={() => commitCustomStatus(ord.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitCustomStatus(ord.id);
+                          }}
+                        />
+                      ) : (
+                        isCustomStatus && (
+                          <span
+                            className="status-custom-label"
+                            title="לחצי לעריכת הסטטוס"
+                            onClick={() => {
+                              setEditingCustomStatusId(ord.id);
+                              setEditingCustomStatusValue(ord.status);
+                            }}
+                          >
+                            {ord.status}
+                          </span>
+                        )
+                      )}
                     </td>
                     <td className="cell-price mono font-bold">₪{(ord.totalPrice || 0).toLocaleString()}</td>
                     <td className="cell-profit mono text-profit">
