@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, addDoc, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
+import { formatDateIL } from "../../utils/formatDate";
 import "./Expenses.css";
 
 interface Expense {
@@ -270,7 +271,7 @@ export default function Expenses() {
               filtered.map((e) => (
                 <tr key={e.id}>
                   <td dir="ltr" title={e.id}>#{e.id.slice(-6)}</td>
-                  <td className="mono" dir="ltr">{e.date}</td>
+                  <td className="mono" dir="ltr">{formatDateIL(e.date)}</td>
                   <td className="font-bold">{e.supplier}</td>
                   <td>
                     <span className="category-tag">

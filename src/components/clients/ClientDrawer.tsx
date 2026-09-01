@@ -3,6 +3,7 @@ import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/f
 import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
 import type { Order } from "../../pages/Sales/Sales";
+import { formatDateIL } from "../../utils/formatDate";
 import NewOrderWizard, { type ClientOption } from "../orders/NewOrderWizard";
 import RepairOrderForm from "../orders/RepairOrderForm";
 import SellShowroomStockModal from "../../pages/Inventory/SellShowroomStockModal";
@@ -213,7 +214,7 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                       </div>
                       {ord.notes && <p className="order-specs">{ord.notes}</p>}
                       <div className="order-card-footer">
-                        <span className="mono">תאריך: {ord.createdAt}</span>
+                        <span className="mono">תאריך: {formatDateIL(ord.createdAt)}</span>
                         <span className="mono font-bold">₪{ord.totalPrice.toLocaleString()}</span>
                       </div>
                     </div>
@@ -266,7 +267,7 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                           const debt = (ord.totalPrice || 0) - (ord.paidAmount || 0);
                           return (
                             <tr key={ord.id} onClick={() => setSelectedOrderId(ord.id)}>
-                              <td className="mono">{ord.createdAt}</td>
+                              <td className="mono">{formatDateIL(ord.createdAt)}</td>
                               <td>{ord.orderType}</td>
                               <td className="mono">₪{(ord.totalPrice || 0).toLocaleString()}</td>
                               <td className="mono text-success">₪{(ord.paidAmount || 0).toLocaleString()}</td>

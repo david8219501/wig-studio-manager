@@ -3,6 +3,7 @@ import { collection, doc, getDocs, query, updateDoc, where } from "firebase/fire
 import { db, auth } from "../../services/firebase";
 import type { BulkItem, OrderPayment, UsedBulkItem } from "../../types";
 import type { Order } from "../../pages/Sales/Sales";
+import { formatDateIL } from "../../utils/formatDate";
 import DateInput from "../common/DateInput";
 import "./OrderDetailsPanel.css";
 
@@ -216,7 +217,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
               </div>
               <div className="order-detail-box">
                 <label>תאריך יצירה</label>
-                <p className="mono">{order.createdAt || "—"}</p>
+                <p className="mono">{order.createdAt ? formatDateIL(order.createdAt) : "—"}</p>
               </div>
             </div>
             {order.notes && (
@@ -328,7 +329,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
               <div className="order-details-list">
                 {payments.map((p, idx) => (
                   <div key={idx} className="order-details-row">
-                    <span>{PAYMENT_METHOD_LABELS[p.method]} · <span className="mono">{p.date}</span>{p.note ? ` · ${p.note}` : ""}</span>
+                    <span>{PAYMENT_METHOD_LABELS[p.method]} · <span className="mono">{formatDateIL(p.date)}</span>{p.note ? ` · ${p.note}` : ""}</span>
                     <span className="mono font-bold">₪{p.amount.toLocaleString()}</span>
                   </div>
                 ))}
