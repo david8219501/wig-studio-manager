@@ -303,6 +303,18 @@
     text-align: right;
   }
 
+  /* .mono (index.css) הוא class גלובלי משותף שמגדיר display: inline-flex -
+     מיועד לטקסט מונוספייס בתוך שורה רגילה, לא ל-<td> עצמו. חלק מהתאים
+     בטבלה הזו (תאריך/מחיר כולל/שולם/חוב) מקבלים mono ישירות על ה-<td>,
+     מה שדורס את table-cell המובנה שלהם וקורע את יישור העמודות - בדיוק
+     אותה התנגשות שכבר נפתרה ב-Sales.css (ULTIMATE TABLE LOCK FIX). כאן
+     נפתר באותה דרך אבל בלי !important - סלקטור ממוקד לטבלה הזו מספיק
+     ספציפי (2 מחלקות + type) כדי לנצח את .mono הגלובלי (מחלקה בודדת).
+     שאר 2 העמודות (סוג עבודה/סטטוס) לא נושאות mono ולא הושפעו. */
+  .payments-orders-table td.mono {
+    display: table-cell;
+  }
+
   .payments-orders-table tbody tr {
     cursor: pointer;
     transition: background var(--duration-fast) var(--easing);
