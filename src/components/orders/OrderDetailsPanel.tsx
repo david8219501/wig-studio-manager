@@ -75,6 +75,13 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
   const [cancelingOrder, setCancelingOrder] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
+  // עריכה inline של "מחיר כולל" והערות - אותו דפוס "לחיצה לעריכה,
+  // שמירה ב-blur/Enter" כמו הסטטוס הטקסט-חופשי ב-Sales.tsx.
+  const [editingTotalPrice, setEditingTotalPrice] = useState(false);
+  const [editTotalPriceValue, setEditTotalPriceValue] = useState<number | "">("");
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [editNotesValue, setEditNotesValue] = useState("");
+
   const loadBulkItemsCatalog = () => {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -104,6 +111,8 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     setBulkItemError(null);
     setCancelConfirmOpen(false);
     setCancelError(null);
+    setEditingTotalPrice(false);
+    setEditingNotes(false);
     loadBulkItemsCatalog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, order?.id]);
@@ -331,6 +340,30 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     }
   };
 
+  const commitTotalPrice = async () => {
+    setEditingTotalPrice(false);
+    if (editTotalPriceValue === "" || Number(editTotalPriceValue) < 0) return;
+    const newValue = Number(editTotalPriceValue);
+    if (newValue === (order.totalPrice || 0)) return;
+
+    try {
+      await updateDoc(doc(db, "orders", order.id), { totalPrice: newValue });
+    } catch (err) {
+      console.error("Error updating total price:", err);
+    }
+  };
+
+  const commitNotes = async () => {
+    setEditingNotes(false);
+    if (editNotesValue === (order.notes || "")) return;
+
+    try {
+      await updateDoc(doc(db, "orders", order.id), { notes: editNotesValue });
+    } catch (err) {
+      console.error("Error updating notes:", err);
+    }
+  };
+
   return (
     <>
       <div className="order-details-overlay" onClick={onClose} />
@@ -364,10 +397,29 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
                 <p className="mono">{order.createdAt ? formatDateIL(order.createdAt) : "—"}</p>
               </div>
             </div>
-            {order.notes && (
+            {editingNotes ? (
               <div className="order-detail-box">
                 <label>הערות</label>
-                <p>{order.notes}</p>
+                <textarea
+                  className="order-detail-notes-textarea"
+                  autoFocus
+                  rows={3}
+                  value={editNotesValue}
+                  onChange={(e) => setEditNotesValue(e.target.value)}
+                  onBlur={commitNotes}
+                />
+              </div>
+            ) : (
+              <div
+                className="order-detail-box order-detail-editable"
+                title="לחצי לעריכת ההערות"
+                onClick={() => {
+                  setEditNotesValue(order.notes || "");
+                  setEditingNotes(true);
+                }}
+              >
+                <label>הערות</label>
+                <p>{order.notes || "אין הערות - לחצי להוספה"}</p>
               </div>
             )}
           </div>
@@ -457,7 +509,29 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
             <div className="order-details-grid order-details-grid-3">
               <div className="order-detail-box">
                 <label>סה"כ מחיר</label>
-                <p className="mono font-bold">₪{(order.totalPrice || 0).toLocaleString()}</p>
+                {editingTotalPrice ? (
+                  <input
+                    type="number"
+                    className="order-detail-inline-input"
+                    autoFocus
+                    min={0}
+                    value={editTotalPriceValue}
+                    onChange={(e) => setEditTotalPriceValue(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={commitTotalPrice}
+                    onKeyDown={(e) => { if (e.key === "Enter") commitTotalPrice(); }}
+                  />
+                ) : (
+                  <p
+                    className="mono font-bold order-detail-editable"
+                    title="לחצי לעריכת המחיר"
+                    onClick={() => {
+                      setEditTotalPriceValue(order.totalPrice || 0);
+                      setEditingTotalPrice(true);
+                    }}
+                  >
+                    ₪{(order.totalPrice || 0).toLocaleString()}
+                  </p>
+                )}
               </div>
               <div className="order-detail-box">
                 <label>שולם בפועל</label>

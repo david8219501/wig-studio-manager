@@ -167,6 +167,46 @@
   margin: 0;
 }
 
+/* שדות "מחיר כולל"/"הערות" ניתנים לעריכה inline - לחיצה פותחת קלט,
+   שמירה ב-blur/Enter (אותו דפוס כמו הסטטוס הטקסט-חופשי ב-Sales.tsx). */
+.order-detail-editable {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--easing);
+}
+
+.order-detail-editable:hover {
+  background: var(--color-accent-bg);
+}
+
+.order-detail-inline-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.order-detail-notes-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
 .order-details-empty {
   font-size: 13px;
   color: var(--color-text-muted);
