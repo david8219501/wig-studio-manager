@@ -412,8 +412,10 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
               />
             </div>
 
-            {previewCost !== null && (
-              <div className="hair-cost-hint">עלות שיוך זה: ₪{previewCost.toFixed(0)}</div>
+            {previewCost !== null && !gramsExceedsStock && (
+              <div className="hair-cost-hint">
+                עלות שיוך זה: ₪{previewCost.toFixed(0)} - עדיין לא שויך בפועל, יש ללחוץ על הכפתור למטה כדי לאשר
+              </div>
             )}
             {gramsExceedsStock && (
               <div className="assign-hair-error">הכמות עולה על המשקל הזמין ({selectedItem?.currentWeight} גרם).</div>
@@ -425,7 +427,11 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
               onClick={handleAdd}
               disabled={saving || !selectedItem || gramsUsed === "" || gramsExceedsStock}
             >
-              {saving ? "משייכת..." : "הוסף שיוך קוקו"}
+              {saving
+                ? "משייכת..."
+                : selectedItem && gramsUsed !== "" && !gramsExceedsStock
+                  ? "✓ הוסף שיוך קוקו"
+                  : "הוסף שיוך קוקו"}
             </button>
           </div>
 
