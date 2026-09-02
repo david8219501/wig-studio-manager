@@ -148,6 +148,10 @@ export default function Sales() {
     return matchesSearch && matchesStatus && matchesTime;
   });
 
+  // מיון ברירת מחדל - מהזמנה חדשה לישנה לפי תאריך יצירה (createdAt הוא
+  // מחרוזת YYYY-MM-DD, אז השוואת מחרוזות פשוטה שומרת על סדר כרונולוגי נכון)
+  filteredOrders.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
   const totalRevenue = filteredOrders.reduce((sum, ord) => sum + (ord.totalPrice || 0), 0);
   const totalPaid = filteredOrders.reduce((sum, ord) => sum + (ord.paidAmount || 0), 0);
   const openDebt = totalRevenue - totalPaid;
