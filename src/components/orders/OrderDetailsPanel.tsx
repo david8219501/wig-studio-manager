@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
-import type { BulkItem, OrderPayment, UsedBulkItem } from "../../types";
+import type { BulkItem, HairItem, OrderPayment, UsedBulkItem } from "../../types";
 import type { Order } from "../../pages/Sales/Sales";
 import { formatDateIL } from "../../utils/formatDate";
 import DateInput from "../common/DateInput";
 import ConfirmDialog from "../common/ConfirmDialog";
 import "./OrderDetailsPanel.css";
+
+// סטטוס ייעודי לביטול הזמנה - לא נמחקת, נשארת בהיסטוריה מסומנת ככה.
+// לא ב-KNOWN_STATUSES של Sales.tsx בכוונה - אין לזה select ידני, רק
+// דרך כפתור "ביטול הזמנה" הייעודי כאן.
+const CANCELLED_STATUS = "בוטלה";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
   new: "חדשה",
@@ -64,6 +69,12 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
   const [savingBulkItem, setSavingBulkItem] = useState(false);
   const [bulkItemError, setBulkItemError] = useState<string | null>(null);
 
+  // ביטול הזמנה - מחזיר מלאי (פריטים פשוטים + שיוכי שיער) ומסמן את
+  // ההזמנה כמבוטלת, בלי למחוק אותה. ConfirmDialog (danger) לפני ביצוע.
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [cancelingOrder, setCancelingOrder] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
   const loadBulkItemsCatalog = () => {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -91,6 +102,8 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     setBulkItemPickerId("");
     setBulkItemPickerQty(1);
     setBulkItemError(null);
+    setCancelConfirmOpen(false);
+    setCancelError(null);
     loadBulkItemsCatalog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, order?.id]);
@@ -109,6 +122,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
   const usedBulkItems = order.usedBulkItems || [];
   const usedHairItems = order.usedHairItems || [];
   const payments = order.payments || [];
+  const isCancelled = order.status === CANCELLED_STATUS;
 
   const handleAddPayment = async () => {
     if (payAmount === "" || Number(payAmount) <= 0) {
@@ -272,6 +286,48 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
       setBulkItemError("שגיאה בהסרת הפריט. נסי שוב.");
     } finally {
       setSavingBulkItem(false);
+    }
+  };
+
+  // מחזיר לכל פריט מלאי פשוט שנוצל את הכמות שלו, ולכל שיוך שיער את
+  // המשקל/השווי שלו - אותה לוגיקה בדיוק כמו handleRemove ב-
+  // AssignHairModal.tsx, רק על כל הפריטים ברצף. ההזמנה עצמה לא נמחקת -
+  // רק מסומנת כמבוטלת, כדי שתישאר בהיסטוריה.
+  const handleCancelOrder = async () => {
+    setCancelingOrder(true);
+    setCancelError(null);
+
+    try {
+      for (const used of usedBulkItems) {
+        const bulkSnap = await getDoc(doc(db, "bulkItems", used.itemId));
+        if (bulkSnap.exists()) {
+          const currentQty = (bulkSnap.data() as Omit<BulkItem, "id">).quantity ?? 0;
+          await updateDoc(doc(db, "bulkItems", used.itemId), { quantity: currentQty + used.quantity });
+        }
+      }
+
+      for (const used of usedHairItems) {
+        const hairSnap = await getDoc(doc(db, "hairItems", used.hairItemId));
+        if (hairSnap.exists()) {
+          const hairItem = hairSnap.data() as Omit<HairItem, "id">;
+          const restoreUpdate: { currentWeight: number; status: HairItem["status"]; remnantTotalValue?: number } = {
+            currentWeight: hairItem.currentWeight + used.gramsUsed,
+            status: "available",
+          };
+          if (hairItem.isRemnantBox) {
+            restoreUpdate.remnantTotalValue = (hairItem.remnantTotalValue ?? 0) + used.costAtTime;
+          }
+          await updateDoc(doc(db, "hairItems", used.hairItemId), restoreUpdate);
+        }
+      }
+
+      await updateDoc(doc(db, "orders", order.id), { status: CANCELLED_STATUS });
+      setCancelConfirmOpen(false);
+    } catch (err) {
+      console.error("Error cancelling order:", err);
+      setCancelError("שגיאה בביטול ההזמנה. נסי שוב.");
+    } finally {
+      setCancelingOrder(false);
     }
   };
 
@@ -511,6 +567,19 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
             </div>
           </div>
         </div>
+
+        {!isCancelled && (
+          <div className="order-details-footer">
+            {cancelError && <div className="order-details-error">{cancelError}</div>}
+            <button
+              type="button"
+              className="order-details-btn-danger"
+              onClick={() => setCancelConfirmOpen(true)}
+            >
+              ביטול הזמנה
+            </button>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog
@@ -521,6 +590,16 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
         confirmLabel={deletingPayment ? "מוחקת..." : "כן, מחיקה"}
         onConfirm={handleConfirmDeletePayment}
         onCancel={() => setDeletingPaymentIndex(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={cancelConfirmOpen}
+        title="ביטול הזמנה"
+        message="לבטל את ההזמנה? כל פריטי המלאי ושיוכי השיער שנוצלו יוחזרו למלאי אוטומטית, וההזמנה תסומן כמבוטלת (לא תימחק). הפעולה לא ניתנת לביטול."
+        variant="danger"
+        confirmLabel={cancelingOrder ? "מבטלת..." : "כן, בטלי הזמנה"}
+        onConfirm={handleCancelOrder}
+        onCancel={() => setCancelConfirmOpen(false)}
       />
     </>
   );
