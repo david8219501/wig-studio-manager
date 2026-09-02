@@ -300,64 +300,69 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
         </div>
 
         <div className="assign-hair-body">
-          {usedHairItems.length > 0 && (
-            <div className="bulk-item-list">
-              {usedHairItems.map((used, idx) =>
-                editingHairIndex === idx ? (
-                  <div key={idx} className="bulk-item-row bulk-item-row--editing">
-                    <span>{used.hairItemLabel}</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={editGramsValue}
-                      onChange={(e) => setEditGramsValue(e.target.value === "" ? "" : Number(e.target.value))}
-                    />
-                    <div className="bulk-item-edit-actions">
-                      <button type="button" className="btn-secondary" onClick={handleCancelEditHair} disabled={savingEditHair}>
-                        ביטול
+          <div className="assign-hair-existing-section">
+            <h3 className="assign-hair-section-title">שיוכים קיימים</h3>
+            {usedHairItems.length === 0 ? (
+              <p className="assign-hair-empty">עדיין לא שויך קוקו בפועל לפאה זו.</p>
+            ) : (
+              <div className="bulk-item-list">
+                {usedHairItems.map((used, idx) =>
+                  editingHairIndex === idx ? (
+                    <div key={idx} className="bulk-item-row bulk-item-row--editing">
+                      <span>{used.hairItemLabel}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editGramsValue}
+                        onChange={(e) => setEditGramsValue(e.target.value === "" ? "" : Number(e.target.value))}
+                      />
+                      <div className="bulk-item-edit-actions">
+                        <button type="button" className="btn-secondary" onClick={handleCancelEditHair} disabled={savingEditHair}>
+                          ביטול
+                        </button>
+                        <button type="button" className="btn-primary" onClick={() => handleSaveEditHair(idx)} disabled={savingEditHair}>
+                          {savingEditHair ? "שומרת..." : "שמירה"}
+                        </button>
+                      </div>
+                      {editHairError && <div className="assign-hair-error">{editHairError}</div>}
+                    </div>
+                  ) : (
+                    <div key={idx} className="bulk-item-row">
+                      <span>{used.hairItemLabel} · {used.gramsUsed} גרם</span>
+                      <span className="mono">₪{used.costAtTime.toFixed(0)}</span>
+                      <button
+                        type="button"
+                        className="bulk-item-edit-btn"
+                        onClick={() => handleStartEditHair(idx)}
+                        disabled={saving}
+                        aria-label="עריכת שיוך"
+                        title="עריכת שיוך"
+                      >
+                        ✏️
                       </button>
-                      <button type="button" className="btn-primary" onClick={() => handleSaveEditHair(idx)} disabled={savingEditHair}>
-                        {savingEditHair ? "שומרת..." : "שמירה"}
+                      <button
+                        type="button"
+                        className="bulk-item-remove-btn"
+                        onClick={() => setDeletingHairIndex(idx)}
+                        disabled={saving}
+                        aria-label="ביטול שיוך"
+                        title="ביטול שיוך"
+                      >
+                        ✕
                       </button>
                     </div>
-                    {editHairError && <div className="assign-hair-error">{editHairError}</div>}
-                  </div>
-                ) : (
-                  <div key={idx} className="bulk-item-row">
-                    <span>{used.hairItemLabel} · {used.gramsUsed} גרם</span>
-                    <span className="mono">₪{used.costAtTime.toFixed(0)}</span>
-                    <button
-                      type="button"
-                      className="bulk-item-edit-btn"
-                      onClick={() => handleStartEditHair(idx)}
-                      disabled={saving}
-                      aria-label="עריכת שיוך"
-                      title="עריכת שיוך"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      type="button"
-                      className="bulk-item-remove-btn"
-                      onClick={() => setDeletingHairIndex(idx)}
-                      disabled={saving}
-                      aria-label="ביטול שיוך"
-                      title="ביטול שיוך"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )
-              )}
-              <div className="summary-row">
-                <span>סה״כ עלות שיער בפועל</span>
-                <span className="mono font-bold">₪{totalActualCost.toFixed(0)}</span>
+                  )
+                )}
+                <div className="summary-row">
+                  <span>סה״כ עלות שיער בפועל</span>
+                  <span className="mono font-bold">₪{totalActualCost.toFixed(0)}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="assign-hair-add-section">
-            <label className="assign-hair-add-label">הוספת שיוך קוקו נוסף</label>
+            <h3 className="assign-hair-section-title">הוספת שיוך חדש</h3>
             <input
               type="text"
               className="assign-hair-search"

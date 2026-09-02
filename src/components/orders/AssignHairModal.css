@@ -128,18 +128,37 @@
   flex-shrink: 0;
 }
 
+/* הפרדה ויזואלית ברורה בין "שיוכים קיימים" ל"הוספת שיוך חדש" - שני
+   אזורים נפרדים עם כותרת משנה משלהם וכרטיס-רקע עצמאי (במקום קו מקווקו
+   דק בין שני בלוקים לא-מסומנים), כדי שיהיה ברור מיד מה כבר משויך בפועל
+   ומה עדיין טופס להוספה. */
+.assign-hair-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.assign-hair-existing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assign-hair-empty {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
 .assign-hair-add-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 4px;
-  border-top: 1px dashed var(--color-border);
-}
-
-.assign-hair-add-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
 }
 
 .assign-hair-add-btn {
