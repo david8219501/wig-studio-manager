@@ -425,12 +425,12 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
           </div>
 
           {error && <div className="assign-hair-error">{error}</div>}
+        </div>
 
-          <div className="assign-hair-footer">
-            <button type="button" className="btn-primary" onClick={onClose} disabled={saving}>
-              סגור
-            </button>
-          </div>
+        <div className="assign-hair-footer">
+          <button type="button" className="btn-primary" onClick={onClose} disabled={saving}>
+            סגור
+          </button>
         </div>
       </div>
     </div>
