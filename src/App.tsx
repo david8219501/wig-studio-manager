@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { useState, useEffect, useRef } from 'react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getApps } from 'firebase/app';
 import twemoji from '@twemoji/api';
@@ -22,18 +22,39 @@ function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(false);
   const [businessName, setBusinessName] = useState('');
-  
+  const [userInitials, setUserInitials] = useState('');
+
   // ניהול הודעות שגיאה והצלחה שיוצגו בעיצוב בתוך כרטיס הלוגין
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // כותרת כרטיסיית הדפדפן דינמית לפי שם העסק המחובר (users/{uid}.businessName) -
-  // לפני התחברות (או בזמן טעינת השם) נשארת כותרת ברירת מחדל כללית.
+  // מסמן שכניסה/הרשמה בוצעה ידנית בסבב הזה (handleLogin/handleRegister) -
+  // ה-onAuthStateChanged למטה לא דורס את מעבר ה-isLoggedIn שלהן (עם השהיית
+  // הודעת ההצלחה) ומטפל רק במקרה שמעולם לא קרתה כניסה ידנית (למשל רענון
+  // דף עם סשן פיירבייס עדיין תקף - "התחברות חוזרת" אמורה לזהות ולדלג
+  // ישר למערכת, לא להציג שוב את מסך ההתחברות/הרשמה).
+  const manualAuthRef = useRef(false);
+
+  // זיהוי אוטומטי של סשן מחובר קיים (למשל אחרי רענון דף) - Firebase שומר
+  // את הסשן בעצמו גם בלי קוד נוסף, אבל isLoggedIn (state מקומי) התאפס
+  // בלי מאזין הזה, מה שגרם למסך ההתחברות להופיע שוב גם למי שכבר מחוברת.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (manualAuthRef.current) return; // כבר מטופל ע"י handleLogin/handleRegister עצמם
+      setIsLoggedIn(!!user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // כותרת כרטיסיית הדפדפן דינמית לפי שם העסק המחובר (users/{uid}.businessName),
+  // ואותיות פתיחה אמיתיות (שם פרטי+משפחה) לעיגול בסיידבר - לפני התחברות
+  // (או בזמן טעינת הנתונים) נשארת כותרת/אות ברירת מחדל כלליות.
   useEffect(() => {
     const DEFAULT_TITLE = 'מערכת ניהול סלון פאות';
     if (!isLoggedIn) {
       document.title = DEFAULT_TITLE;
       setBusinessName('');
+      setUserInitials('');
       return;
     }
 
@@ -42,11 +63,16 @@ function App() {
 
     getDoc(doc(db, 'users', businessId))
       .then((snap) => {
-        const name = (snap.data() as { businessName?: string } | undefined)?.businessName || '';
+        const data = snap.data() as { businessName?: string; firstName?: string; lastName?: string } | undefined;
+        const name = data?.businessName || '';
         setBusinessName(name);
         document.title = name || DEFAULT_TITLE;
+
+        const firstInitial = data?.firstName?.trim().charAt(0) || '';
+        const lastInitial = data?.lastName?.trim().charAt(0) || '';
+        setUserInitials(`${firstInitial}${lastInitial}` || 'אס');
       })
-      .catch((err) => console.error('Error loading business name for page title:', err));
+      .catch((err) => console.error('Error loading business/user profile for header:', err));
   }, [isLoggedIn]);
 
   // בדיקת תקינות חיבור לפיירבייס בעליית האפליקציה (מופיע ב-F12 Console)
@@ -108,6 +134,7 @@ function App() {
 
   // פונקציית התחברות
   const handleLogin = async (email: string, pass: string) => {
+    manualAuthRef.current = true;
     setIsLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
@@ -135,6 +162,7 @@ function App() {
 
   // פונקציית רישום משתמש חדש ושמירת נתוני עסק ב-Firestore
   const handleRegister = async (data: RegisterData) => {
+    manualAuthRef.current = true;
     setIsLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
@@ -208,7 +236,7 @@ function App() {
   // אם המשתמש מחובר - נציג את המערכת המלאה
   return (
     <div className="app-container">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} businessName={businessName} />
+      <Sidebar activePage={activePage} onNavigate={setActivePage} businessName={businessName} userInitials={userInitials} />
       <main className="main-content">
         <div className="content-area">
           {renderPage()}

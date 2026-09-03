@@ -101,6 +101,40 @@
   box-shadow: 0 0 0 3px var(--color-accent-bg);
 }
 
+/* עטיפת שדה סיסמה עם כפתור עין לצפייה - השדה עצמו dir="ltr" (תוכן
+   הסיסמה נכתב שמאל-לימין), אז הכפתור ממוקם בצד שמאל של השדה (הקצה
+   הטבעי לסיום הקלדה ב-LTR), לא לפי כיוון RTL של שאר העמוד. */
+.password-field-wrapper {
+  position: relative;
+}
+
+.form-group .password-field-wrapper input {
+  width: 100%;
+  padding-left: 44px;
+  box-sizing: border-box;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius-sm, 4px);
+  transition: color var(--duration-fast) var(--easing);
+}
+
+.password-toggle-btn:hover {
+  color: var(--color-accent);
+}
+
 .login-btn {
   width: 100%;
   padding: 12px;

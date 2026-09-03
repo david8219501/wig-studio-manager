@@ -4,6 +4,7 @@ interface SidebarProps {
   activePage: string;
   onNavigate: (page: string) => void;
   businessName?: string;
+  userInitials?: string;
 }
 
 const NAV_ITEMS = [
@@ -17,11 +18,11 @@ const NAV_ITEMS = [
   { label: "דוחות", icon: "📊", id: "reports" },
 ];
 
-export default function Sidebar({ activePage, onNavigate, businessName }: SidebarProps) {
+export default function Sidebar({ activePage, onNavigate, businessName, userInitials }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-avatar">אס</div>
+        <div className="sidebar-avatar">{userInitials || "אס"}</div>
         <div className="sidebar-logo-text">
           <div className="sidebar-logo-name">{businessName || "מערכת ניהול"}</div>
           <div className="sidebar-logo-sub">סלון פאות</div>

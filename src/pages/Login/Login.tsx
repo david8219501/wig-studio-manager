@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import "./Login.css";
 
 export interface RegisterData {
@@ -35,10 +36,17 @@ export default function Login({
   
   const [isRegistering, setIsRegistering] = useState(false);
   const [localError, setLocalError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError("");
+
+    if (isRegistering && password.length < 6) {
+      setLocalError("הסיסמה חייבת לכלול לפחות 6 תווים.");
+      return;
+    }
 
     if (isRegistering && password !== confirmPassword) {
       setLocalError("הסיסמאות אינן תואמות");
@@ -147,10 +155,10 @@ export default function Login({
           <div className="form-group">
             <label>כתובת אימייל</label>
             <input 
-              type="email" 
-              required 
+              type="email"
+              required
               dir="ltr"
-              placeholder="name@example.com"
+              placeholder="כתובת האימייל שלך"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -158,27 +166,49 @@ export default function Login({
 
           <div className="form-group">
             <label>סיסמה</label>
-            <input 
-              type="password" 
-              required 
-              dir="ltr"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="password-field-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                dir="ltr"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "הסתרת סיסמה" : "הצגת סיסמה"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {isRegistering && (
             <div className="form-group">
               <label>אימות סיסמה</label>
-              <input 
-                type="password" 
-                required 
-                dir="ltr"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
+              <div className="password-field-wrapper">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  dir="ltr"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  aria-label={showConfirmPassword ? "הסתרת סיסמה" : "הצגת סיסמה"}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           )}
 
