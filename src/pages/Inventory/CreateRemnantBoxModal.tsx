@@ -71,7 +71,7 @@ const CreateRemnantBoxModal: React.FC<CreateRemnantBoxModalProps> = ({ isOpen, o
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card restock-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>📦 קופסת שאריות חדשה</h2>
+          <h2>📦 קופסת איחוד שיער חדשה</h2>
           <button className="modal-close-btn" onClick={onClose} aria-label="סגור">
             ✕
           </button>
@@ -88,7 +88,7 @@ const CreateRemnantBoxModal: React.FC<CreateRemnantBoxModalProps> = ({ isOpen, o
               type="text"
               value={form.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="לדוגמה: קופסת שאריות - חום"
+              placeholder="לדוגמה: קופסת איחוד שיער - חום"
             />
             {errors.name && <span className="field-error">{errors.name}</span>}
           </div>

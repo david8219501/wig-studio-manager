@@ -298,6 +298,26 @@
   margin-inline-start: 6px;
 }
 
+/* כפתורי עריכה/מחיקה לכל שורה במלאי הפשוט - אותו מראה "כפתור-רפאים
+   מינימלי" כמו order-details-edit-btn/order-details-remove-btn
+   ב-OrderDetailsPanel.css, רק מוגדרים כאן עצמאית (הקובץ הזה לא טוען
+   CSS של קבצים אחרים). */
+.bulk-item-edit-icon-btn,
+.bulk-item-delete-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm, 4px);
+  transition: background var(--duration-fast) var(--easing);
+}
+
+.bulk-item-edit-icon-btn:hover,
+.bulk-item-delete-icon-btn:hover {
+  background: var(--color-surface-hover);
+}
+
 /* פילטר "במלאי"/"נמכרו"/"הכל" בראש לשונית "פאות תצוגה" - אותו מראה
    בדיוק כמו .tab-switch/.tab-btn למעלה, רק בקנה מידה קטן יותר כדי
    להשתלב בתוך .filter-bar לצד כפתור "יצירת פאת תצוגה". */
@@ -432,6 +452,7 @@
   max-width: 560px;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
   direction: rtl;
   box-shadow: var(--shadow-elevated);
   border: 1px solid var(--color-border);
@@ -484,6 +505,13 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
+  /* פריט grid/flex בלי min-width:0 מסרב להתכווץ מתחת לרוחב התוכן
+     המהותי שלו (ברירת מחדל min-width:auto) - select עם option ארוך
+     (למשל שם לקוח+טלפון ב-QuickRetailSaleModal) יכול לדחוף את התא הזה
+     רחב יותר מהעמודה שלו ב-.modal-form-grid, מה שגורם לגלישה אופקית
+     של הכרטיס כולו (קליטת קוקו חדש / הוספת מוצר למלאי / מכירה מהירה -
+     שלושתם חולקים את אותה תבנית .form-field/.modal-form-grid). */
+  min-width: 0;
 }
 
 .form-field-full {
@@ -533,6 +561,8 @@
 .form-field input,
 .form-field select,
 .form-field textarea {
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 11px 14px;

@@ -147,7 +147,7 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
         {
           hairItemId: selectedItem.id,
           hairItemLabel: selectedItem.isRemnantBox
-            ? `📦 ${selectedItem.id} · קופסת שאריות (${selectedItem.color})`
+            ? `📦 ${selectedItem.id} · קופסת איחוד שיער (${selectedItem.color})`
             : `${selectedItem.id} · ${selectedItem.color} · ${selectedItem.length} ס״מ`,
           gramsUsed: grams,
           costAtTime,
@@ -384,7 +384,7 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
                     {item.isRemnantBox ? (
                       <>
                         <span className="mono font-bold">📦 {item.id}</span>
-                        <span>קופסת שאריות · {item.color}</span>
+                        <span>קופסת איחוד שיער · {item.color}</span>
                         <span className="mono">
                           {item.currentWeight} גרם ·{" "}
                           ₪{item.currentWeight > 0 ? ((item.remnantTotalValue ?? 0) / item.currentWeight).toFixed(2) : "0.00"}/גרם

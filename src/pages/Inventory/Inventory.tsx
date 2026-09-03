@@ -41,7 +41,9 @@ const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [textureFilter, setTextureFilter] = useState<string>('all'); // סוג שיער / מקור
   const [hairTypeFilter, setHairTypeFilter] = useState<string>('all'); // מרקם
-  const [statusFilter, setStatusFilter] = useState<HairItem['status'] | 'all'>('all');
+  // ברירת מחדל 'available' - הצפייה השכיחה ביותר (מה זמין בפועל לשיוך),
+  // לא 'all' (שהיה מציג גם קוקוים שנוצלו/נמכרו/פאת תצוגה ללא סינון).
+  const [statusFilter, setStatusFilter] = useState<HairItem['status'] | 'all'>('available');
   const [lengthFilter, setLengthFilter] = useState<'all' | 'short' | 'medium' | 'long'>('all');
   const [isRemnantBoxModalOpen, setIsRemnantBoxModalOpen] = useState(false);
   const [mergeSourceItem, setMergeSourceItem] = useState<HairItem | null>(null);
@@ -51,6 +53,8 @@ const Inventory: React.FC = () => {
   // --- מלאי פשוט ---
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
   const [isAddBulkModalOpen, setIsAddBulkModalOpen] = useState(false);
+  const [editingBulkItemId, setEditingBulkItemId] = useState<string | null>(null);
+  const [deletingBulkItemId, setDeletingBulkItemId] = useState<string | null>(null);
   const [restockTarget, setRestockTarget] = useState<BulkItem | null>(null);
   const [quickSaleTarget, setQuickSaleTarget] = useState<BulkItem | null>(null);
 
@@ -163,14 +167,19 @@ const Inventory: React.FC = () => {
   // וחוקי העדכון דוחים אותו כי ה-businessId הקיים לא תואם - permission-denied.
   // כדי שהמזהה יהיה בטוח ייחודי גלובלית (ולא רק בתוך העסק), מוסיפים סיומת
   // הנגזרת מה-uid של העסק המחובר.
+  // מזהה מקוצר יותר להדפסה בפועל על מדבקה/תגית פיזית - "H-" (לא "HAIR-")
+  // + 3 תווים מה-uid (לא 4). הרגקס תואם גם פורמט ישן (HAIR-) כדי שהמספור
+  // יישאר רציף גם אחרי המעבר לפורמט הקצר, בלי סקריפט מיגרציה. הקיצור
+  // מקטין קלות (16³ במקום 16⁴ צירופים) את שטח מניעת ההתנגשות הבין-עסקית
+  // המתועדת למעלה - סביר לחלוטין למספר העסקים הריאלי במערכת כזו.
   const nextHairId = useMemo(() => {
     const maxNum = hairItems.reduce((max, item) => {
-      const match = item.id.match(/^HAIR-(\d+)/);
+      const match = item.id.match(/^H(?:AIR)?-(\d+)/);
       const num = match ? parseInt(match[1], 10) : NaN;
       return Number.isNaN(num) ? max : Math.max(max, num);
     }, 1000);
-    const businessSuffix = (auth.currentUser?.uid ?? '').slice(-4);
-    return `HAIR-${maxNum + 1}-${businessSuffix}`;
+    const businessSuffix = (auth.currentUser?.uid ?? '').slice(-3);
+    return `H-${maxNum + 1}-${businessSuffix}`;
   }, [hairItems]);
 
   // קופסאות שאריות פעילות - יעדים אפשריים למיזוג שארית קוקו קטן
@@ -225,6 +234,7 @@ const Inventory: React.FC = () => {
   const sellingShowroomOrder = orders.find((o) => o.id === sellingShowroomOrderId) || null;
   const deletingShowroomOrder = orders.find((o) => o.id === deletingShowroomOrderId) || null;
   const selectedSoldShowroomOrder = orders.find((o) => o.id === selectedSoldShowroomOrderId) || null;
+  const editingBulkItem = bulkItems.find((b) => b.id === editingBulkItemId) || null;
 
   // אפשרויות הפילטר נגזרות מהנתונים בפועל, כדי שהרשימה תישאר מסונכרנת עם מה שבאמת קיים במלאי
   const textureOptions = useMemo(
@@ -402,15 +412,31 @@ const Inventory: React.FC = () => {
     setUndoConfirm(null);
   };
 
-  const handleAddBulkItem = async (item: BulkItem) => {
-    const { id, ...data } = item;
-    await setDoc(doc(db, 'bulkItems', id), { ...data, businessId: auth.currentUser!.uid });
-    await createInventoryExpense({
-      description: `רכישת פריט חדש למלאי - ${item.name}`,
-      amount: item.quantity * item.unitCost,
-      supplier: item.name,
-    });
+  // יצירת פריט חדש - רושמת הוצאת רכישה (זו קנייה אמיתית). עריכת פריט
+  // קיים - רק מעדכנת שדות תיאוריים (שם/סף/עלות/מחיר מכירה), בלי לגעת
+  // בכמות (יש לזה נתיב ייעודי - "הוספת מלאי") ובלי לרשום הוצאה נוספת
+  // (זו לא רכישה חדשה, רק תיקון פרטים).
+  const handleSaveBulkItem = async (item: BulkItem) => {
+    if (editingBulkItemId) {
+      const { id, ...data } = item;
+      await updateDoc(doc(db, 'bulkItems', id), data);
+    } else {
+      const { id, ...data } = item;
+      await setDoc(doc(db, 'bulkItems', id), { ...data, businessId: auth.currentUser!.uid });
+      await createInventoryExpense({
+        description: `רכישת פריט חדש למלאי - ${item.name}`,
+        amount: item.quantity * item.unitCost,
+        supplier: item.name,
+      });
+    }
     setIsAddBulkModalOpen(false);
+    setEditingBulkItemId(null);
+  };
+
+  const handleConfirmDeleteBulkItem = async () => {
+    if (!deletingBulkItemId) return;
+    await deleteDoc(doc(db, 'bulkItems', deletingBulkItemId));
+    setDeletingBulkItemId(null);
   };
 
   // ירידה בכמות (צריכה שוטפת) - לא משנה את העלות הממוצעת, רק את הכמות
@@ -593,7 +619,7 @@ const Inventory: React.FC = () => {
               + קליטת קוקו חדש
             </button>
             <button className="btn-secondary add-hair-btn" onClick={() => setIsRemnantBoxModalOpen(true)}>
-              + צור קופסת שאריות
+              + צור קופסת איחוד שיער
             </button>
           </div>
 
@@ -675,7 +701,13 @@ const Inventory: React.FC = () => {
       {!loading && !loadError && activeTab === 'bulk' && (
         <div className="tab-content">
           <div className="filter-bar">
-            <button className="btn-primary add-hair-btn" onClick={() => setIsAddBulkModalOpen(true)}>
+            <button
+              className="btn-primary add-hair-btn"
+              onClick={() => {
+                setEditingBulkItemId(null);
+                setIsAddBulkModalOpen(true);
+              }}
+            >
               + מוצר חדש למלאי
             </button>
           </div>
@@ -729,6 +761,25 @@ const Inventory: React.FC = () => {
                               💰 מכירה
                             </button>
                           )}
+                          <button
+                            className="bulk-item-edit-icon-btn"
+                            onClick={() => {
+                              setEditingBulkItemId(item.id);
+                              setIsAddBulkModalOpen(true);
+                            }}
+                            aria-label="עריכת פריט"
+                            title="עריכת פריט"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="bulk-item-delete-icon-btn"
+                            onClick={() => setDeletingBulkItemId(item.id)}
+                            aria-label="מחיקת פריט"
+                            title="מחיקת פריט"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -847,8 +898,21 @@ const Inventory: React.FC = () => {
 
       <AddBulkItemModal
         isOpen={isAddBulkModalOpen}
-        onClose={() => setIsAddBulkModalOpen(false)}
-        onSave={handleAddBulkItem}
+        editingItem={editingBulkItem}
+        onClose={() => {
+          setIsAddBulkModalOpen(false);
+          setEditingBulkItemId(null);
+        }}
+        onSave={handleSaveBulkItem}
+      />
+
+      <ConfirmDialog
+        isOpen={deletingBulkItemId !== null}
+        title="מחיקת פריט מלאי"
+        message="למחוק את הפריט הזה מהמלאי הפשוט? הפעולה לא ניתנת לביטול."
+        variant="danger"
+        onConfirm={handleConfirmDeleteBulkItem}
+        onCancel={() => setDeletingBulkItemId(null)}
       />
 
       <RestockModal

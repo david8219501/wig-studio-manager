@@ -1,11 +1,14 @@
 // src/pages/Inventory/AddBulkItemModal.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { BulkItem } from '../../types';
 
 interface AddBulkItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (item: BulkItem) => Promise<void>;
+  // כשמוגדר - הטופס עובר למצב עריכה (טוען את הערכים הקיימים, שומר על
+  // אותו id, לא שדה כמות - לזה יש כבר נתיב ייעודי "הוספת מלאי").
+  editingItem?: BulkItem | null;
 }
 
 const emptyForm = {
@@ -16,11 +19,29 @@ const emptyForm = {
   retailPrice: '',
 };
 
-const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, onSave }) => {
+const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, onSave, editingItem = null }) => {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setForm(
+      editingItem
+        ? {
+            name: editingItem.name,
+            quantity: String(editingItem.quantity),
+            minThreshold: String(editingItem.minThreshold),
+            unitCost: String(editingItem.unitCost),
+            retailPrice: editingItem.retailPrice != null ? String(editingItem.retailPrice) : '',
+          }
+        : emptyForm
+    );
+    setErrors({});
+    setSaveError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editingItem?.id]);
 
   // רווח ליחידה חי - רק כשגם עלות וגם מחיר מכירה מלאים ותקינים, אותה
   // שפה עיצובית כמו "עלות שיער משוערת" באשף ההזמנה (hair-cost-hint).
@@ -56,7 +77,7 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
     if (!validate()) return;
 
     const newItem: BulkItem = {
-      id: `BULK-${Date.now()}`,
+      id: editingItem ? editingItem.id : `BULK-${Date.now()}`,
       name: form.name.trim(),
       quantity: Number(form.quantity),
       minThreshold: Number(form.minThreshold),
@@ -84,7 +105,7 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>מוצר חדש למלאי הפשוט</h2>
+          <h2>{editingItem ? 'עריכת פריט מלאי' : 'מוצר חדש למלאי הפשוט'}</h2>
           <button className="modal-close-btn" onClick={onClose} aria-label="סגור">
             ✕
           </button>
@@ -102,16 +123,21 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
             {errors.name && <span className="field-error">{errors.name}</span>}
           </div>
 
-          <div className="form-field">
-            <label>כמות התחלתית *</label>
-            <input
-              type="number"
-              value={form.quantity}
-              onChange={(e) => handleChange('quantity', e.target.value)}
-              placeholder="20"
-            />
-            {errors.quantity && <span className="field-error">{errors.quantity}</span>}
-          </div>
+          {/* כמות רלוונטית רק ביצירה - בעריכה יש נתיב ייעודי ("+ הוספת
+              מלאי") שגם מעדכן עלות ממוצעת משוקללת ורושם הוצאת רכישה;
+              לא רוצים לעקוף את זה משינוי כמות "שקט" דרך טופס העריכה. */}
+          {!editingItem && (
+            <div className="form-field">
+              <label>כמות התחלתית *</label>
+              <input
+                type="number"
+                value={form.quantity}
+                onChange={(e) => handleChange('quantity', e.target.value)}
+                placeholder="20"
+              />
+              {errors.quantity && <span className="field-error">{errors.quantity}</span>}
+            </div>
+          )}
 
           <div className="form-field">
             <label>סף מינימום להתראה *</label>
@@ -164,7 +190,7 @@ const AddBulkItemModal: React.FC<AddBulkItemModalProps> = ({ isOpen, onClose, on
             ביטול
           </button>
           <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? 'שומר...' : 'הוסף פריט'}
+            {saving ? 'שומר...' : editingItem ? 'שמירת שינויים' : 'הוסף פריט'}
           </button>
         </div>
       </div>

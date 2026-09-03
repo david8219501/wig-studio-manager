@@ -30,7 +30,7 @@ const MergeRemnantModal: React.FC<MergeRemnantModalProps> = ({ isOpen, sourceIte
 
   const handleConfirm = async () => {
     if (!selectedBoxId) {
-      setError('יש לבחור קופסת שאריות.');
+      setError('יש לבחור קופסת איחוד שיער.');
       return;
     }
     setSaving(true);
@@ -49,7 +49,7 @@ const MergeRemnantModal: React.FC<MergeRemnantModalProps> = ({ isOpen, sourceIte
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card restock-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>מיזוג לקופסת שאריות - {sourceItem.id}</h2>
+          <h2>מיזוג לקופסת איחוד שיער - {sourceItem.id}</h2>
           <button className="modal-close-btn" onClick={onClose} aria-label="סגור">
             ✕
           </button>
@@ -62,12 +62,12 @@ const MergeRemnantModal: React.FC<MergeRemnantModalProps> = ({ isOpen, sourceIte
 
         {remnantBoxes.length === 0 ? (
           <span className="field-error">
-            אין קופסאות שאריות פעילות - יש ליצור קופסה קודם (כפתור "+ צור קופסת שאריות").
+            אין קופסאות איחוד שיער פעילות - יש ליצור קופסה קודם (כפתור "+ צור קופסת איחוד שיער").
           </span>
         ) : (
           <div className="modal-form-grid">
             <div className="form-field form-field-full">
-              <label>קופסת שאריות יעד</label>
+              <label>קופסת איחוד שיער יעד</label>
               <select value={selectedBoxId} onChange={(e) => setSelectedBoxId(e.target.value)}>
                 {remnantBoxes.map((box) => (
                   <option key={box.id} value={box.id}>
