@@ -195,15 +195,15 @@ export default function Expenses() {
           <span className="summary-title">
             {viewMode === "monthly" ? "סה\"כ הוצאות החודש" : "סה\"כ הוצאות כללי"}
           </span>
-          <span className="summary-value danger">₪{totalExpenses.toLocaleString()}</span>
+          <span className="summary-value danger">₪{totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="summary-card">
           <span className="summary-title">הוצאות מלאי וספקים</span>
-          <span className="summary-value">₪{inventoryExpenses.toLocaleString()}</span>
+          <span className="summary-value">₪{inventoryExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="summary-card">
           <span className="summary-title">הוצאות תפעול ושיווק</span>
-          <span className="summary-value">₪{operationalExpenses.toLocaleString()}</span>
+          <span className="summary-value">₪{operationalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
 

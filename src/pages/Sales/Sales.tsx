@@ -158,15 +158,15 @@ export default function Sales() {
       <div className="financial-cards-grid">
         <div className="fin-card">
           <span className="fin-title">סה"כ מחזור הזמנות</span>
-          <span className="fin-value mono">₪{totalRevenue.toLocaleString()}</span>
+          <span className="fin-value mono">₪{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-success">
           <span className="fin-title">שולם בפועל</span>
-          <span className="fin-value mono">₪{totalPaid.toLocaleString()}</span>
+          <span className="fin-value mono">₪{totalPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-danger">
           <span className="fin-title">יתרת חובות פתוחים</span>
-          <span className="fin-value mono">₪{openDebt.toLocaleString()}</span>
+          <span className="fin-value mono">₪{openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-profit">
           <span className="fin-title">רווח בפועל (משוער)</span>

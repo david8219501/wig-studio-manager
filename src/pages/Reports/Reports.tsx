@@ -153,7 +153,7 @@ export default function Reports() {
       summaryStats: [
         {
           label: 'סה"כ הכנסות שנתי',
-          value: `₪${revenueThisYear.toLocaleString()}`,
+          value: `₪${Math.round(revenueThisYear).toLocaleString()}`,
           change: formatPct(revenueThisYear, revenueLastYear),
         },
         {
@@ -168,7 +168,7 @@ export default function Reports() {
         },
         {
           label: "רווח משוער",
-          value: `₪${profitThisYear.toLocaleString()}`,
+          value: `₪${Math.round(profitThisYear).toLocaleString()}`,
           change: formatPct(profitThisYear, profitLastYear),
         },
       ],
