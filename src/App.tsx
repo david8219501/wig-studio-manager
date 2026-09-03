@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getApps } from 'firebase/app';
 import twemoji from '@twemoji/api';
 import { auth, db } from './services/firebase';
@@ -21,10 +21,33 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activePage, setActivePage] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(false);
+  const [businessName, setBusinessName] = useState('');
   
   // ניהול הודעות שגיאה והצלחה שיוצגו בעיצוב בתוך כרטיס הלוגין
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // כותרת כרטיסיית הדפדפן דינמית לפי שם העסק המחובר (users/{uid}.businessName) -
+  // לפני התחברות (או בזמן טעינת השם) נשארת כותרת ברירת מחדל כללית.
+  useEffect(() => {
+    const DEFAULT_TITLE = 'מערכת ניהול סלון פאות';
+    if (!isLoggedIn) {
+      document.title = DEFAULT_TITLE;
+      setBusinessName('');
+      return;
+    }
+
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    getDoc(doc(db, 'users', businessId))
+      .then((snap) => {
+        const name = (snap.data() as { businessName?: string } | undefined)?.businessName || '';
+        setBusinessName(name);
+        document.title = name || DEFAULT_TITLE;
+      })
+      .catch((err) => console.error('Error loading business name for page title:', err));
+  }, [isLoggedIn]);
 
   // בדיקת תקינות חיבור לפיירבייס בעליית האפליקציה (מופיע ב-F12 Console)
   useEffect(() => {
@@ -185,7 +208,7 @@ function App() {
   // אם המשתמש מחובר - נציג את המערכת המלאה
   return (
     <div className="app-container">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar activePage={activePage} onNavigate={setActivePage} businessName={businessName} />
       <main className="main-content">
         <div className="content-area">
           {renderPage()}
