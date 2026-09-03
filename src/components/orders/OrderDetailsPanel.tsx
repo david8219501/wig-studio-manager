@@ -4,7 +4,9 @@ import { db, auth } from "../../services/firebase";
 import type { BulkItem, HairItem, OrderPayment, UsedBulkItem } from "../../types";
 import type { Order } from "../../pages/Sales/Sales";
 import { formatDateIL } from "../../utils/formatDate";
+import { OTHER_STATUS, KNOWN_STATUSES, STATUS_SELECT_OPTIONS } from "../../utils/orderStatus";
 import DateInput from "../common/DateInput";
+import CustomSelect from "../common/CustomSelect";
 import ConfirmDialog from "../common/ConfirmDialog";
 import "./OrderDetailsPanel.css";
 
@@ -82,6 +84,11 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
   const [editingNotes, setEditingNotes] = useState(false);
   const [editNotesValue, setEditNotesValue] = useState("");
 
+  // עריכת סטטוס - CustomSelect + "אחר / הוסף חדש" עם טקסט חופשי, אותו
+  // דפוס בדיוק כמו Sales.tsx (מקור משותף: src/utils/orderStatus.ts).
+  const [editingCustomStatus, setEditingCustomStatus] = useState(false);
+  const [editingCustomStatusValue, setEditingCustomStatusValue] = useState("");
+
   const loadBulkItemsCatalog = () => {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -113,6 +120,8 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     setCancelError(null);
     setEditingTotalPrice(false);
     setEditingNotes(false);
+    setEditingCustomStatus(false);
+    setEditingCustomStatusValue("");
     loadBulkItemsCatalog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, order?.id]);
@@ -132,6 +141,8 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
   const usedHairItems = order.usedHairItems || [];
   const payments = order.payments || [];
   const isCancelled = order.status === CANCELLED_STATUS;
+  const isCustomStatus = !KNOWN_STATUSES.includes(order.status);
+  const statusSelectValue = isCustomStatus ? OTHER_STATUS : order.status;
 
   const handleAddPayment = async () => {
     if (payAmount === "" || Number(payAmount) <= 0) {
@@ -353,6 +364,22 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      await updateDoc(doc(db, "orders", order.id), { status: newStatus });
+    } catch (err) {
+      console.error("Error updating order status:", err);
+    }
+  };
+
+  const commitCustomStatus = () => {
+    const text = editingCustomStatusValue.trim();
+    if (text) {
+      handleStatusChange(text);
+    }
+    setEditingCustomStatus(false);
+  };
+
   const commitNotes = async () => {
     setEditingNotes(false);
     if (editNotesValue === (order.notes || "")) return;
@@ -375,9 +402,53 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
             <p className="mono" dir="ltr">{order.clientPhone}</p>
           </div>
           <div className="order-details-header-left">
-            <span className={`badge order-status-badge status-${order.status}`}>
-              {ORDER_STATUS_LABELS[order.status] || order.status}
-            </span>
+            {isCancelled ? (
+              <span className={`badge order-status-badge status-${order.status}`}>
+                {ORDER_STATUS_LABELS[order.status] || order.status}
+              </span>
+            ) : (
+              <div className="order-details-status-editor" onClick={(e) => e.stopPropagation()}>
+                <CustomSelect
+                  className={`order-status-trigger order-status-trigger--${isCustomStatus ? "custom" : order.status}`}
+                  value={statusSelectValue}
+                  onChange={(value) => {
+                    if (value === OTHER_STATUS) {
+                      setEditingCustomStatus(true);
+                      setEditingCustomStatusValue(isCustomStatus ? order.status : "");
+                    } else {
+                      setEditingCustomStatus(false);
+                      handleStatusChange(value);
+                    }
+                  }}
+                  options={STATUS_SELECT_OPTIONS}
+                />
+                {editingCustomStatus ? (
+                  <input
+                    type="text"
+                    className="status-custom-input"
+                    autoFocus
+                    placeholder="הקלידי סטטוס..."
+                    value={editingCustomStatusValue}
+                    onChange={(e) => setEditingCustomStatusValue(e.target.value)}
+                    onBlur={commitCustomStatus}
+                    onKeyDown={(e) => { if (e.key === "Enter") commitCustomStatus(); }}
+                  />
+                ) : (
+                  isCustomStatus && (
+                    <span
+                      className="status-custom-label"
+                      title="לחצי לעריכת הסטטוס"
+                      onClick={() => {
+                        setEditingCustomStatus(true);
+                        setEditingCustomStatusValue(order.status);
+                      }}
+                    >
+                      {order.status}
+                    </span>
+                  )
+                )}
+              </div>
+            )}
             <button className="btn-close" onClick={onClose} title="סגירה" aria-label="סגירה">
               ✕
             </button>

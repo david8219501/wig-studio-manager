@@ -8,21 +8,8 @@ import OrderDetailsPanel from "../../components/orders/OrderDetailsPanel";
 import { calculateOrderProfit } from "../../utils/orderProfit";
 import DateInput from "../../components/common/DateInput";
 import CustomSelect from "../../components/common/CustomSelect";
+import { OTHER_STATUS, KNOWN_STATUSES, STATUS_SELECT_OPTIONS } from "../../utils/orderStatus";
 import "./Sales.css";
-
-// ערך-סמן לבחירת "אחר / הוסף חדש" בסטטוס ההזמנה - אותו דפוס בדיוק כמו
-// OTHER_APPOINTMENT_TYPE ב-Calendar.tsx. לא נשמר בפועל כ-status - רק פותח
-// שדה טקסט חופשי (ראו editingCustomStatusValue).
-const OTHER_STATUS = "__other__";
-const KNOWN_STATUSES = ["new", "in_progress", "styling", "ready", "delivered"];
-const STATUS_SELECT_OPTIONS = [
-  { value: "new", label: "חדשה 🆕" },
-  { value: "in_progress", label: "בטיפול ⏳" },
-  { value: "styling", label: "בסירוק 💇‍♀️" },
-  { value: "ready", label: "מוכנה לאיסוף 🎁" },
-  { value: "delivered", label: "נמסרה ✅" },
-  { value: OTHER_STATUS, label: "אחר / הוסף חדש" },
-];
 
 export interface Order {
   id: string;
@@ -32,7 +19,7 @@ export interface Order {
   orderType: string;
   // string ולא union סגור - כדי לאפשר סטטוס טקסט-חופשי ("אחר / הוסף חדש"),
   // אותו דפוס בדיוק כמו Appointment.type ב-Calendar.tsx. הערכים הידועים
-  // עדיין ב-KNOWN_STATUSES/STATUS_SELECT_OPTIONS למטה.
+  // ב-KNOWN_STATUSES/STATUS_SELECT_OPTIONS (src/utils/orderStatus.ts).
   status: string;
   totalPrice: number;
   paidAmount: number;

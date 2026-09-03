@@ -6,6 +6,7 @@ import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/fire
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import { isUnsoldShowroomStock } from "../../utils/orderCreation";
+import { calculateOrderProfit } from "../../utils/orderProfit";
 import type { BulkItem } from "../../types";
 import { formatDateIL, getMonthNameIL } from "../../utils/formatDate";
 import "./Dashboard.css";
@@ -134,12 +135,15 @@ export default function Dashboard() {
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
+    // רווח נטו (הכנסה פחות עלות ייצור בפועל - שיוך שיער/פריטי מלאי), לא
+    // הכנסה גולמית - אותו מקור אמת יחיד (calculateOrderProfit) שכבר
+    // משמש את "רווח" ב-Sales.tsx, כדי שהמספרים יהיו עקביים בין שני המסכים.
     const thisMonthRevenue = orders
       .filter((o) => monthKey(o.createdAt) === thisMonth)
-      .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      .reduce((sum, o) => sum + calculateOrderProfit(o), 0);
     const lastMonthRevenue = orders
       .filter((o) => monthKey(o.createdAt) === lastMonth)
-      .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      .reduce((sum, o) => sum + calculateOrderProfit(o), 0);
     const revenueTrendPct = lastMonthRevenue > 0
       ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
       : null;

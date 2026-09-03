@@ -79,6 +79,16 @@
 .order-status-badge.status-ready { background: var(--color-success-bg); color: var(--color-success); }
 .order-status-badge.status-delivered { background: var(--color-surface-hover); color: var(--color-text-muted); }
 
+/* עורך הסטטוס בכותרת - CustomSelect + שדה טקסט חופשי ("אחר / הוסף
+   חדש"), משתמש בחלק מהמחלקות הגלובליות של Sales.css (order-status-
+   trigger/status-custom-input/status-custom-label - הכל מתלכד ל-CSS
+   בונדל אחד גלובלי, ראו Sales.css). min-width קבוע כי .custom-select-
+   trigger הבסיסי הוא width:100% - בלי רוחב מפורש על ה-wrapper כאן
+   (שהוא flex item ללא flex-basis/grow), ה-100% עלול להתכווץ ל-0. */
+.order-details-status-editor {
+  min-width: 160px;
+}
+
 .order-details-panel .btn-close {
   background: var(--color-surface-hover);
   border: 1px solid var(--color-border);
