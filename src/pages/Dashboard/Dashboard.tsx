@@ -263,7 +263,7 @@ export default function Dashboard() {
         <div className="kpi-card">
           <div className="kpi-icon icon-purple">💰</div>
           <div className="kpi-content">
-            <span className="kpi-label">הכנסות החודש</span>
+            <span className="kpi-label">רווח החודש</span>
             <span className="kpi-value">₪{stats.thisMonthRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             {stats.revenueTrendPct !== null ? (
               <span className={`kpi-trend ${stats.revenueTrendPct >= 0 ? "trend-up" : "trend-down"}`}>
