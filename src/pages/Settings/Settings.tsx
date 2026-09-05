@@ -3,7 +3,14 @@ import { httpsCallable } from "firebase/functions";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, functions } from "../../services/firebase";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_APPOINTMENT_TYPES } from "../../utils/businessSettings";
+import TimeInput from "../../components/common/TimeInput";
+import {
+  DEFAULT_EXPENSE_CATEGORIES,
+  DEFAULT_APPOINTMENT_TYPES,
+  DEFAULT_WORKING_HOURS,
+  WEEK_DAYS,
+  type WorkingHours,
+} from "../../utils/businessSettings";
 import "./Settings.css";
 
 // חייבים להיות זהים בדיוק לערכים ב-functions/src/config.ts (project קבוע,
@@ -187,6 +194,46 @@ export default function Settings() {
       setPricingSaveMessage("error");
     } finally {
       setSavingPricing(false);
+    }
+  };
+
+  // שעות פעילות - businessSettings/{uid}.workingHours, אובייקט לכל יום.
+  // רק שמירת נתונים בשלב הזה (לא נאכף עדיין באף מקום אחר באתר, למשל
+  // ביומן) - כמו שהתבקש.
+  const [workingHours, setWorkingHours] = useState<WorkingHours>(DEFAULT_WORKING_HOURS);
+  const [hoursLoading, setHoursLoading] = useState(true);
+  const [savingHours, setSavingHours] = useState(false);
+  const [hoursSaveMessage, setHoursSaveMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    getDoc(doc(db, "businessSettings", businessId))
+      .then((snap) => {
+        const data = snap.data() as { workingHours?: WorkingHours } | undefined;
+        if (data?.workingHours) setWorkingHours({ ...DEFAULT_WORKING_HOURS, ...data.workingHours });
+      })
+      .catch((err) => console.error("שגיאה בטעינת שעות פעילות:", err))
+      .finally(() => setHoursLoading(false));
+  }, []);
+
+  const updateDayHours = (day: string, patch: Partial<WorkingHours[string]>) => {
+    setWorkingHours((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }));
+  };
+
+  const handleSaveWorkingHours = async () => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    setSavingHours(true);
+    setHoursSaveMessage(null);
+    try {
+      await setDoc(doc(db, "businessSettings", businessId), { workingHours }, { merge: true });
+      setHoursSaveMessage("success");
+    } catch (err) {
+      console.error("שגיאה בשמירת שעות פעילות:", err);
+      setHoursSaveMessage("error");
+    } finally {
+      setSavingHours(false);
     }
   };
 
@@ -453,6 +500,50 @@ export default function Settings() {
             )}
             <button type="button" className="btn-google-calendar" onClick={handleSavePricing} disabled={savingPricing}>
               {savingPricing ? "שומרת..." : "שמירה"}
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="placeholder-card">
+        <h2>🕒 שעות פעילות</h2>
+        {hoursLoading ? (
+          <p>טוענת שעות פעילות...</p>
+        ) : (
+          <>
+            <div className="settings-hours-table">
+              {WEEK_DAYS.map(({ key, label }) => {
+                const day = workingHours[key] ?? DEFAULT_WORKING_HOURS[key];
+                return (
+                  <div key={key} className="settings-hours-row">
+                    <span className="settings-hours-day">{label}</span>
+                    <label className="settings-hours-closed-toggle">
+                      <input
+                        type="checkbox"
+                        checked={day.closed}
+                        onChange={(e) => updateDayHours(key, { closed: e.target.checked })}
+                      />
+                      סגור ביום זה
+                    </label>
+                    {!day.closed && (
+                      <div className="settings-hours-times">
+                        <TimeInput value={day.open} onChange={(v) => updateDayHours(key, { open: v })} />
+                        <span>עד</span>
+                        <TimeInput value={day.close} onChange={(v) => updateDayHours(key, { close: v })} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {hoursSaveMessage === "success" && (
+              <div className="google-calendar-status google-calendar-status--success">שעות הפעילות נשמרו בהצלחה.</div>
+            )}
+            {hoursSaveMessage === "error" && (
+              <div className="google-calendar-status google-calendar-status--error">שגיאה בשמירה. נסי שוב.</div>
+            )}
+            <button type="button" className="btn-google-calendar" onClick={handleSaveWorkingHours} disabled={savingHours}>
+              {savingHours ? "שומרת..." : "שמירה"}
             </button>
           </>
         )}

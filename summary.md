@@ -93,3 +93,26 @@ Settings פתוח), `Calculators.tsx` נטען מחדש בכל מעבר אליו
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין - אין אזהרה חדשה, `Calculators.tsx` נקי לחלוטין.
+
+## קבוצה 4: שעות פעילות ✅ הושלמה
+
+שדה חדש `businessSettings/{uid}.workingHours` - אובייקט לכל יום בשבוע
+(`{ open, close, closed }`, מפתחות אנגליים יציבים - `sunday`..
+`saturday`). ברירת מחדל (`DEFAULT_WORKING_HOURS`,
+`src/utils/businessSettings.ts`): א'-ה' 09:00-19:00, שישי 09:00-14:00,
+שבת סגור - החלטתי לבד (לא צוין בבקשה) התאמה סבירה לסלון פאות ישראלי,
+ניתנת לעריכה מלאה.
+
+כרטיס "🕒 שעות פעילות" ב-Settings.tsx: שורה לכל יום - טוגל "סגור ביום
+זה" (checkbox), ואם לא סגור - שני `TimeInput` (הרכיב המשותף הקיים)
+לשעת פתיחה/סגירה. כפתור "שמירה" (`setDoc(merge:true)`).
+
+**רק שמירת נתונים בשלב הזה** - כפי שהתבקש: שום מקום אחר באתר (יומן,
+זמינות תורים וכו') לא קורא/אוכף את זה עדיין - זו תשתית בלבד לפיצ'ר
+עתידי.
+
+**קבצים:** `src/utils/businessSettings.ts`,
+`src/pages/Settings/Settings.tsx`, `src/pages/Settings/Settings.css`
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין - אין אזהרה חדשה.
