@@ -27,6 +27,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const [userInitials, setUserInitials] = useState('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   // ניהול הודעות שגיאה והצלחה שיוצגו בעיצוב בתוך כרטיס הלוגין
   const [errorMessage, setErrorMessage] = useState('');
@@ -56,16 +57,32 @@ function App() {
   }, []);
 
   // כותרת כרטיסיית הדפדפן דינמית לפי שם העסק המחובר (users/{uid}.businessName),
-  // ואותיות פתיחה אמיתיות (שם פרטי+משפחה) לעיגול בסיידבר - לפני התחברות
-  // (או בזמן טעינת הנתונים) נשארת כותרת/אות ברירת מחדל כלליות. מאזין חי
-  // (לא getDoc חד-פעמי) כדי שעריכת שם העסק במסך ההגדרות תשתקף מיד כאן
-  // בלי צורך ברענון/התחברות מחדש.
+  // אותיות פתיחה אמיתיות (שם פרטי+משפחה) לעיגול בסיידבר, ולוגו מותאם-אישית
+  // (users/{uid}.logoUrl, מועלה ב-Settings.tsx) - אם קיים, מוצג בסיידבר
+  // במקום העיגול עם האותיות, ומחליף גם את ה-favicon הכללי (ראו למטה).
+  // לפני התחברות (או בזמן טעינת הנתונים) נשארת כותרת/אות/favicon ברירת
+  // מחדל כלליות. מאזין חי (לא getDoc חד-פעמי) כדי שעריכה במסך ההגדרות
+  // תשתקף מיד כאן בלי צורך ברענון/התחברות מחדש.
   useEffect(() => {
     const DEFAULT_TITLE = 'מערכת ניהול סלון פאות';
+    const DEFAULT_FAVICON = '/favicon.svg';
+
+    const setFavicon = (href: string) => {
+      let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+
     if (!isLoggedIn) {
       document.title = DEFAULT_TITLE;
       setBusinessName('');
       setUserInitials('');
+      setLogoUrl(null);
+      setFavicon(DEFAULT_FAVICON);
       return;
     }
 
@@ -75,7 +92,9 @@ function App() {
     const unsubscribe = onSnapshot(
       doc(db, 'users', businessId),
       (snap) => {
-        const data = snap.data() as { businessName?: string; firstName?: string; lastName?: string } | undefined;
+        const data = snap.data() as
+          | { businessName?: string; firstName?: string; lastName?: string; logoUrl?: string }
+          | undefined;
         const name = data?.businessName || '';
         setBusinessName(name);
         document.title = name || DEFAULT_TITLE;
@@ -83,6 +102,9 @@ function App() {
         const firstInitial = data?.firstName?.trim().charAt(0) || '';
         const lastInitial = data?.lastName?.trim().charAt(0) || '';
         setUserInitials(`${firstInitial}${lastInitial}` || 'אס');
+
+        setLogoUrl(data?.logoUrl || null);
+        setFavicon(data?.logoUrl || DEFAULT_FAVICON);
       },
       (err) => console.error('Error loading business/user profile for header:', err)
     );
@@ -260,7 +282,13 @@ function App() {
   // אם המשתמש מחובר - נציג את המערכת המלאה
   return (
     <div className="app-container">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} businessName={businessName} userInitials={userInitials} />
+      <Sidebar
+        activePage={activePage}
+        onNavigate={setActivePage}
+        businessName={businessName}
+        userInitials={userInitials}
+        logoUrl={logoUrl}
+      />
       <main className="main-content">
         <div className="content-area">
           {renderPage()}

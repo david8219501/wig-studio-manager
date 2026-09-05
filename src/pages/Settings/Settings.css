@@ -64,6 +64,46 @@
   color: var(--color-on-primary);
 }
 
+/* העלאת לוגו העסק - תצוגה מקדימה (עיגול, כמו הסיידבר) + כפתור העלאה. */
+.settings-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.settings-logo-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-accent-bg);
+  border: 1px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.settings-logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-logo-placeholder {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.settings-logo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
 /* טופס עריכת שדות גנרי - משמש את כל כרטיסי ההגדרות (פרופיל עסק,
    תמחור, שעות פעילות וכו') כדי לא לשכפל את אותו CSS בכל קבוצה. */
 .settings-form-grid {

@@ -131,3 +131,75 @@ query), מאגד הכל לאובייקט JSON אחד (עם `exportedAt`), ומפ
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין - אין אזהרה חדשה. לא נבדק בפועל בדפדפן (הורדת קובץ) - מומלץ
 לבדוק ידנית שהקובץ באמת יורד ומכיל את כל הנתונים הצפויים.
+
+## קבוצה 6: העלאת לוגו + favicon דינמי - ⚠️ קוד מוכן, **חסום** בפריסה בפועל
+
+### הבדיקה שבוצעה - נמצא בדיוק הבלוק שהוזהר עליו
+
+בדקתי אם ה-bucket של Firebase Storage כבר קיים בפרויקט:
+```
+gsutil ls gs://esti-wigs-system.firebasestorage.app
+→ BucketNotFoundException: 404 bucket does not exist
+```
+ניסיתי לפרוס Storage Rules בפועל (`firebase deploy --only storage`,
+עם `storage.rules`+`firebase.json` שהוכנו) כדי לבדוק אם זה מקים את
+ה-bucket אוטומטית:
+```
+Error: Firebase Storage has not been set up on project 'esti-wigs-system'.
+Go to https://console.firebase.google.com/project/esti-wigs-system/storage
+and click 'Get Started' to set up Firebase Storage.
+```
+
+**זו פעולה חד-פעמית שחייבת קליק ידני בקונסולה** - אין דרך להקים
+Storage bucket ראשוני דרך ה-CLI/SDK (בניגוד לפריסת Cloud Functions,
+ששתיהן כבר עשינו הצלחה בעבר). `gcloud`/`gsutil` בסביבה הזו גם לא
+מאומתים (`gcloud auth list` → "No credentialed accounts") אז גם דרך
+עוקפת לא זמינה.
+
+### מה כן בוצע (מוכן, ממתין להקמת Storage)
+
+- **`storage.rules`** (חדש, בשורש) - כלל: `logos/{businessId}/*` -
+  קריאה פתוחה (לוגו מוצג גם למי שלא מחוברת, בסיידבר/favicon), כתיבה
+  רק ל-uid התואם; כל השאר חסום כברירת מחדל.
+- **`firebase.json`** - נוסף `"storage": { "rules": "storage.rules" }`.
+  **אחרי** שתלחצי "Get Started" בקונסולה (הקישור למעלה), `firebase
+  deploy --only storage` יפרוס את הכלל הזה ישירות - **לא** צריך את
+  תהליך ה"הדבקה ידנית" שהיה נדרש עם Firestore private rules; זה
+  ההבדל בין Storage ל-Firestore rules מבחינת ה-CLI.
+- **`src/services/firebase.ts`** - `export const storage = getStorage(app)`.
+- **`Settings.tsx`** (כרטיס "פרופיל העסק"): אזור העלאת תמונה - תצוגה
+  מקדימה (עיגול) + כפתור "העלאת לוגו"/"החלפת לוגו". מעלה ל-Storage
+  תחת `logos/{businessId}/logo.{ext}`, שומר את ה-URL בשדה `logoUrl`
+  על `users/{uid}`. שגיאת העלאה (כולל אם Storage עדיין לא מוקם) מוצגת
+  בבירור למשתמשת, לא נכשלת בשקט.
+- **`Sidebar.tsx`**: אם קיים `logoUrl` - מציג אותו במקום העיגול עם
+  האותיות (`fallback` לאותיות אם אין לוגו, בדיוק כמו שהתבקש).
+- **`App.tsx`**: אותו מאזין חי שכבר טוען `businessName`/`userInitials`
+  (`onSnapshot` על `users/{uid}`) מורחב לטעון גם `logoUrl` - **וגם
+  לעדכן דינמית את ה-favicon** (`<link rel="icon">` ב-`<head>`, דרך
+  JS) לאותה תמונה, כשקיים. אם אין `logoUrl` - נשאר ה-favicon הכללי
+  (`/favicon.svg` שכבר נוצר בסבב קודם).
+
+### מה עדיין לא ניתן לבדוק
+
+כל הקוד למעלה **קומפל בהצלחה** (`npm run build`+`npm run lint` נקיים),
+אבל **לא ניתן לבדוק בפועל** (העלאת קובץ אמיתית) עד שה-Storage bucket
+יוקם. ברגע שתלחצי "Get Started" בקישור למעלה - תגידי לי, ואוכל להריץ
+`firebase deploy --only storage` ולוודא שההעלאה עובדת בפועל.
+
+**קבצים:** `firebase.json`, `storage.rules` (חדש),
+`src/services/firebase.ts`, `src/pages/Settings/Settings.tsx`,
+`src/pages/Settings/Settings.css`, `src/components/Sidebar/Sidebar.tsx`,
+`src/components/Sidebar/Sidebar.css`, `src/App.tsx`
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין - אין אזהרה חדשה בשום קובץ.
+
+---
+
+## סיכום כולל - 6/6 קבוצות טופלו
+
+קבוצות 1-5: הושלמו ונפרסו במלואן, נבדקות (build+lint) בכל שלב.
+קבוצה 6: **כל הקוד מוכן ונבדק** (build+lint), אבל **חסום מבדיקה/
+הרצה בפועל** עד להקמה ידנית חד-פעמית של Firebase Storage בקונסולה
+(קישור למעלה) - חסימה מתועדת, לא "תקיעה" שקטה.

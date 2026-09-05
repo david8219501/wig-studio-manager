@@ -40,6 +40,11 @@
   box-shadow: var(--shadow-elevated);
 }
 
+.sidebar-avatar-logo {
+  object-fit: cover;
+  background: var(--color-surface);
+}
+
 .sidebar-logo-text {
   display: flex;
   flex-direction: column;

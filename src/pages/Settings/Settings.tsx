@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
-import { auth, db, functions } from "../../services/firebase";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { auth, db, functions, storage } from "../../services/firebase";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import TimeInput from "../../components/common/TimeInput";
 import {
@@ -35,9 +36,18 @@ export default function Settings() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState<string | null>(null);
+
+  // העלאת לוגו - Firebase Storage תחת logos/{businessId}/logo.{ext},
+  // ה-URL נשמר על users/{uid}.logoUrl. דורש שה-Storage bucket כבר קיים
+  // בפרויקט (ראו הערה ב-services/firebase.ts) - אם עדיין לא הוקם, ההעלאה
+  // תיכשל עם שגיאה ברורה (מטופלת למטה), לא תיתקע בשקט.
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const businessId = auth.currentUser?.uid;
@@ -45,16 +55,44 @@ export default function Settings() {
     getDoc(doc(db, "users", businessId))
       .then((snap) => {
         const data = snap.data() as
-          | { businessName?: string; phone?: string; address?: string; email?: string }
+          | { businessName?: string; phone?: string; address?: string; email?: string; logoUrl?: string }
           | undefined;
         setBusinessName(data?.businessName || "");
         setPhone(data?.phone || "");
         setAddress(data?.address || "");
         setEmail(data?.email || "");
+        setLogoUrl(data?.logoUrl || null);
       })
       .catch((err) => console.error("שגיאה בטעינת פרופיל העסק:", err))
       .finally(() => setProfileLoading(false));
   }, []);
+
+  const handleLogoFileSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // מאפשר לבחור שוב את אותו קובץ אם רוצים להעלות מחדש
+    if (!file) return;
+
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    setUploadingLogo(true);
+    setLogoError(null);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const logoRef = ref(storage, `logos/${businessId}/logo.${ext}`);
+      await uploadBytes(logoRef, file);
+      const url = await getDownloadURL(logoRef);
+      await updateDoc(doc(db, "users", businessId), { logoUrl: url });
+      setLogoUrl(url);
+    } catch (err) {
+      console.error("שגיאה בהעלאת לוגו:", err);
+      setLogoError(
+        "שגיאה בהעלאת הלוגו - ייתכן ש-Firebase Storage עדיין לא הוקם לפרויקט הזה (דורש הפעלה חד-פעמית בקונסולת Firebase). פני לתמיכה הטכנית."
+      );
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     const businessId = auth.currentUser?.uid;
@@ -405,6 +443,30 @@ export default function Settings() {
           <p>טוענת פרטי עסק...</p>
         ) : (
           <>
+            <div className="settings-logo-row">
+              <div className="settings-logo-preview">
+                {logoUrl ? <img src={logoUrl} alt="לוגו העסק" /> : <span className="settings-logo-placeholder">אין לוגו</span>}
+              </div>
+              <div className="settings-logo-actions">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleLogoFileSelected}
+                />
+                <button
+                  type="button"
+                  className="btn-google-calendar"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                >
+                  {uploadingLogo ? "מעלה..." : logoUrl ? "החלפת לוגו" : "העלאת לוגו"}
+                </button>
+                {logoError && <div className="google-calendar-status google-calendar-status--error">{logoError}</div>}
+              </div>
+            </div>
+
             <div className="settings-form-grid">
               <div className="settings-field">
                 <label>שם העסק</label>
