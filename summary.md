@@ -82,15 +82,16 @@ Database → `users/{ה-uid שלך}/private/googleCalendar`), לא דרכי.
 `functions/src/index.ts`, `src/pages/Settings/Settings.tsx`,
 `src/pages/Settings/Settings.css`
 
-## ⚠️ חשוב - נדרשת פריסה נפרדת של ה-Cloud Functions
+## ✅ הפריסה בוצעה (לפי בקשה מפורשת)
 
-השינויים ב-`functions/` **לא ייכנסו לתוקף בפרודקשן רק מ-git push** - הם
-צריכים פריסה נפרדת: `firebase deploy --only functions`. זו פעולה על
-תשתית חיה (לא רק קוד בריפו), אז **לא הרצתי אותה** - לפי ההנחיה הכללית
-לא לגעת בפעולות עם טווח השפעה מעבר לסביבה המקומית בלי אישור מפורש.
-עד שהפריסה תתבצע (על ידך או על ידי דרישה מפורשת ממני), הכפתור ימשיך
-להתנהג כמו היום גם אחרי ה-git push הזה - כל הקוד החדש (callables,
-כתיבת הדגל) עדיין לא רץ בפועל.
+`firebase deploy --only functions` הורץ ל-project `esti-wigs-system`
+והסתיים בהצלחה: `getGoogleCalendarStatus`/`disconnectGoogleCalendar`
+נוצרו, `googleCalendarOAuthCallback` עודכן (עם כתיבת השיקוף החדש),
+ושאר הפונקציות (`onAppointmentCreated/Updated/Deleted`,
+`syncExistingAppointments`) עודכנו (redeploy בלבד, בלי שינוי לוגי).
+הפיצ'ר פעיל עכשיו בפרודקשן. שתי אזהרות לא-קריטיות בלוג הפריסה (Node
+20 runtime deprecation ב-2026-10-30, גרסת `firebase-functions` מיושנת)
+- לא קשורות לשינוי הזה, מחוץ לתחום המשימה.
 
 ## בדיקות שבוצעו
 
