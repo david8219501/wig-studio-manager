@@ -13,3 +13,4 @@ export {
   onAppointmentDeleted,
 } from "./googleCalendarSync";
 export { syncExistingAppointments } from "./syncExistingAppointments";
+export { getGoogleCalendarStatus, disconnectGoogleCalendar } from "./googleCalendarStatus";

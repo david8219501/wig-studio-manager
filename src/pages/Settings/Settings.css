@@ -53,3 +53,13 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.btn-google-calendar--disconnect {
+  background: var(--color-danger-bg, #fef2f2);
+  color: var(--color-danger, #d33);
+}
+
+.btn-google-calendar--disconnect:hover:not(:disabled) {
+  background: var(--color-danger, #d33);
+  color: var(--color-on-primary);
+}

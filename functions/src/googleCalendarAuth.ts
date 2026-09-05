@@ -76,6 +76,16 @@ export const googleCalendarOAuthCallback = functionsV1
           { merge: true }
         );
 
+      // שיקוף לא-רגיש (בוליאני בלבד, לא ה-refresh_token עצמו) על מסמך
+      // users/{businessId} הרגיל - כדי שהלקוח (Settings.tsx) יוכל להאזין
+      // לו חי (onSnapshot) בלי שום גישה ל-path הפרטי החסום. ראו
+      // getGoogleCalendarStatus.ts לתיקון רטרואקטיבי לחשבונות שהתחברו
+      // לפני שהשדה הזה נוסף.
+      await admin
+        .firestore()
+        .doc(`users/${businessId}`)
+        .set({ googleCalendarConnected: true }, { merge: true });
+
       res.redirect(`${APP_BASE_URL}/?googleCalendar=connected`);
     } catch (err) {
       console.error("שגיאה בהחלפת קוד ה-OAuth של Google Calendar:", err);

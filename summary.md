@@ -1,74 +1,108 @@
-# סיכום: 2 תיקונים - הבהוב מסך התחברות + פישוט מזהה hairItems
+# סיכום: אבחון + תיקון - כפתור חיבור Google Calendar לא משקף חיבור קיים
 
-## 1. הבהוב מסך התחברות לפני מעבר אוטומטי
+## מה מצאתי (לפני התיקון)
 
-**הבעיה:** `onAuthStateChanged` (מהלילה) מזהה נכון סשן קיים, אבל יש רגע
-קצר עד שהוא מסיים לבדוק - באותו רגע `isLoggedIn` עדיין `false`, אז מסך
-Login מהבהב לפני שקופצים אוטומטית למערכת.
+### 1. האם קריאה חד-פעמית או מאזין חי?
+**אף אחת מהשתיים** - `Settings.tsx` **לא קורא/מאזין ל-Firestore בכלל**
+לגבי סטטוס החיבור. ה-state `status` ("connected"/"error"/"unknown")
+נגזר **אך ורק** מ-URL query param חד-פעמי (`?googleCalendar=connected`)
+שה-OAuth callback מוסיף כשחוזרים מגוגל - ברגע שה-URL מנוקה
+(`window.history.replaceState`) או שהדף נטען מחדש בביקור מאוחר יותר,
+אין שום דרך לדעת שהחיבור עדיין קיים.
 
-**התיקון:** נוסף `checkingAuth` state (ברירת מחדל `true`) ב-`App.tsx`.
-כל עוד `true` - מוצג מסך טעינה ריק (`.auth-checking-screen` + spinner,
-משתמש ב-`.spinner-large` הקיים מ-`Login.css`) במקום Login. ה-callback
-של `onAuthStateChanged` מסמן `setCheckingAuth(false)` **תמיד** (גם אם
-יש משתמש וגם אם אין) - רק אחרי זה מחליטים אם להציג Login או את
-המערכת. `manualAuthRef` (מהלילה) לא הושפע - עד שהוא בכלל נהיה `true`
-(לחיצה ידנית על התחברות/הרשמה), `checkingAuth` כבר `false` מזמן,
-כי המשתמשת הייתה צריכה לראות את מסך ה-Login כדי ללחוץ עליו מלכתחילה.
+**חשוב עוד יותר:** הכפתור עצמו (טקסט "התחבר ל-Google Calendar") היה
+**קבוע לגמרי** - שום `{isConnected ? ... : ...}`, שום תלות ב-`status`.
+גם אם הייתה בדיקה תקינה, הכפתור לא היה משתנה כי אף קוד לא ניסה בכלל.
 
-**קבצים:** `src/App.tsx`, `src/App.css`
+### 2. האם בודק את הנתיב/שדה הנכון?
+לא בודק שום נתיב - כאמור, אין קריאת Firestore כלל בצד הלקוח.
 
-## 2. פישוט מזהה hairItems - HAIR-01, HAIR-02...
+**אבל - ממצא קריטי שמשנה את כל גישת התיקון:** מצאתי קובץ
+`firestore-rules-google-calendar-addition.txt` בשורש הריפו שמתעד
+**בכוונה מפורשת**: `users/{uid}/private/**` **חסום לגמרי** לקריאה/כתיבה
+מצד לקוח (`allow read, write: if false`) - ה-refresh_token נגיש **רק**
+ל-Admin SDK (Cloud Functions). זה גם מתועד בהערה ב-`config.ts` (שורה
+28-29: "Admin SDK בלבד, לקוח לא אמור לגשת ישירות ל-path הזה").
 
-**למה לא בוצע בדיוק כמו שהתבקש (חשוב):** הפורמט המבוקש (HAIR-01 בלי
-שום סיומת, כ-**Firestore document id בפועל**) היה מחזיר בדיוק את הבאג
-שכבר תוקן פעם - ה-collection `hairItems` **גלובלי** (משותף לכל
-העסקים, לא subcollection לכל עסק), אז "המספר הבא" שמחושב נכון ומבודד
-לפי `businessId` (וזה כבר היה תקין - `hairItems` בקוד כבר מסונן
-ל-businessId הנוכחי בלבד) **עדיין** יכול להיות זהה בין שני עסקים שונים
-(שניהם יגיעו ל-"HAIR-01" כראשון שלהם) - ואם זה היה ה-document id
-עצמו, זו התנגשות אמיתית על אותו מפתח ב-collection המשותף.
+המשמעות: **גם אם הייתי פשוט מוסיף `onSnapshot` על `users/{uid}/private/
+googleCalendar` כמו שהוצע** - זה היה נכשל (permission-denied) או, גרוע
+יותר, אם משום מה כן עבד - זה היה חושף בפועל את קיום ה-refresh_token
+ללקוח, בניגוד מפורש לכוונת האבטחה המתועדת. **לא זו הדרך הנכונה לתקן.**
 
-**הפתרון שיישמתי:** אותו עיקרון שכבר קיים ומוכח בקוד הזה בדיוק
-ל-`showroomCode` (פאת תצוגה) - **הפרדה בין המזהה הטכני להצגה
-הידידותית**:
-- `HairItem` קיבל שדה חדש אופציונלי `hairCode` - התווית הידידותית
-  (`HAIR-01`, `HAIR-02`...) שהמשתמשת רואה בכל מקום, מחושבת **רק** לפי
-  הקוקוים הקיימים של העסק המחובר (`nextHairCode` ב-`Inventory.tsx`) -
-  בדיוק כמו שביקשת.
-- ה-Firestore document id בפועל עכשיו **auto-generated** (`doc(collection(db,
-  'hairItems')))`) - לא נבנה יותר ידנית מהמספר+סיומת. זה מבטל **לחלוטין**
-  את סיכון ההתנגשות הבין-עסקית (המזהה הטכני תמיד ייחודי גלובלית
-  מהמנגנון של Firestore עצמו, בלי שום סיומת אקראית נראית-לעין).
-- כל מקום שהמשתמשת רואה מזהה קוקו (טבלת מלאי, רשימת בחירה ב-
-  AssignHairModal, תוויות שיוך, מודל מיזוג שאריות, חיפוש) עודכן להציג
-  `item.hairCode || item.id` - נפילה ל-`id` הישן רק לפריטים שנוצרו
-  **לפני** השינוי (אין להם `hairCode` בכלל).
+### 3. בדיקה ישירה ב-Firestore
+**לא ביצעתי** - אין לי גישת Admin/MCP ל-Firestore מהסביבה הזו, ובדיקה
+דרך ה-CLI (`firebase firestore:...`) לא כוללת פקודת קריאה גנרית (רק
+delete/backups/indexes). ממילא זה כבר לא רלוונטי לאבחון - **מצאתי את
+הבאג האמיתי בקוד עצמו** (העדר בדיקה + כפתור קבוע), לא צריך לאמת מול
+production כדי לדעת שזה הגורם. אם בכל זאת תרצי לוודא שה-refresh_token
+קיים בפועל אצלך - הדרך הבטוחה היא Firebase Console ידנית (Firestore
+Database → `users/{ה-uid שלך}/private/googleCalendar`), לא דרכי.
 
-**לא בוצעה מיגרציה** לפריטים ישנים (עם ה-id הישן `H-{num}-{3 תווים}`
-או הישן-יותר `HAIR-{num}-{4 תווים}`) - הם ימשיכו להציג את ה-id הארוך
-שלהם (נפילה ל-`item.id`) עד שייערכו/יומרו ידנית, אם בכלל. פריטים
-חדשים מקבלים `hairCode` נקי מהיום.
+## התיקון שבוצע (בהתאם לממצא #2 - לא חושף את ה-private path ללקוח)
 
-**קבצים:** `src/types/index.ts`, `src/pages/Inventory/Inventory.tsx`,
-`src/pages/Inventory/AddHairModal.tsx`,
-`src/pages/Inventory/CreateRemnantBoxModal.tsx`,
-`src/pages/Inventory/MergeRemnantModal.tsx`,
-`src/components/orders/AssignHairModal.tsx`
+אותו עיקרון בדיוק שכבר קיים בקוד הזה ל-`showroomCode`/`hairCode` -
+**הפרדה בין הנתון הרגיש (רק Admin SDK) לשיקוף לא-רגיש שהלקוח יכול
+להאזין לו חי:**
+
+1. **`functions/src/googleCalendarAuth.ts`** - כשההתחברות מצליחה
+   (כותב את ה-refresh_token ל-path הפרטי), נוסף גם כתיבת
+   `googleCalendarConnected: true` (בוליאני בלבד) על `users/{businessId}`
+   **הרגיל** - מסמך שהלקוח כבר קורא ממנו נתונים אחרים (businessName
+   וכו', ב-App.tsx) ולכן לא חושף שום דבר חדש.
+
+2. **`functions/src/googleCalendarStatus.ts` (קובץ חדש)** - שני
+   callables חדשים:
+   - `getGoogleCalendarStatus` - קוראת (Admin SDK) אם יש refresh_token,
+     **ומתקנת רטרואקטיבית** (`self-heal`) את הדגל על `users/{uid}` אם
+     הוא עדיין חסר - כך שגם חשבונות שהתחברו **לפני** התיקון הזה (בדיוק
+     כמו שלך) מקבלים תשובה נכונה מיד בקריאה הראשונה, בלי מיגרציה ידנית.
+   - `disconnectGoogleCalendar` - מוחקת את ה-refresh_token השמור
+     ומאפסת את הדגל. **הערה:** זו רק "ניתוק מהצד שלנו" (מפסיקה סנכרון) -
+     לא מבטלת את ההרשאה בפועל מול גוגל; אם רוצים לבטל גם שם, יש לעשות
+     את זה ידנית ב-myaccount.google.com/permissions. לא היה כפתור/
+     יכולת ניתוק בכלל לפני התיקון הזה - הוספתי אותה כי כפתור שקוראים
+     לו "התנתק מגוגל" חייב לעשות משהו אמיתי בלחיצה.
+
+3. **`functions/src/index.ts`** - שני ה-callables החדשים מיוצאים.
+
+4. **`Settings.tsx`** - state חדש `isConnected` (נפרד מה-`status`
+   הישן, שנשאר כמו שהוא להודעות הזמניות אחרי חזרה מגוגל):
+   - קריאה חד-פעמית ל-`getGoogleCalendarStatus` ב-mount (מפעילה גם
+     self-heal לחשבון שלך).
+   - **מאזין חי** (`onSnapshot`) על `users/{uid}` עצמו (לא ה-path
+     הפרטי!) שעוקב אחרי `googleCalendarConnected` - זה ה"מאזין חי"
+     שהתבקש, רק על הנתיב הבטוח.
+   - כפתור: `isConnected → "התנתק מגוגל"` (danger-styled, עם
+     `ConfirmDialog` לפני ביצוע בפועל) / `!isConnected → "התחבר ל-
+     Google Calendar"` (כמו היום). מוצג גם תג "✓ מחובר ל-Google
+     Calendar" קבוע כשמחוברת.
+
+**קבצים:** `functions/src/googleCalendarAuth.ts`,
+`functions/src/googleCalendarStatus.ts` (חדש),
+`functions/src/index.ts`, `src/pages/Settings/Settings.tsx`,
+`src/pages/Settings/Settings.css`
+
+## ⚠️ חשוב - נדרשת פריסה נפרדת של ה-Cloud Functions
+
+השינויים ב-`functions/` **לא ייכנסו לתוקף בפרודקשן רק מ-git push** - הם
+צריכים פריסה נפרדת: `firebase deploy --only functions`. זו פעולה על
+תשתית חיה (לא רק קוד בריפו), אז **לא הרצתי אותה** - לפי ההנחיה הכללית
+לא לגעת בפעולות עם טווח השפעה מעבר לסביבה המקומית בלי אישור מפורש.
+עד שהפריסה תתבצע (על ידך או על ידי דרישה מפורשת ממני), הכפתור ימשיך
+להתנהג כמו היום גם אחרי ה-git push הזה - כל הקוד החדש (callables,
+כתיבת הדגל) עדיין לא רץ בפועל.
 
 ## בדיקות שבוצעו
 
-- `npm run build` (tsc -b + vite build) עובר נקי.
-- `npm run lint` - האזהרה החדשה היחידה (`App.tsx` שורה 65) היא על אותו
-  effect קיים מראש עם `react-hooks/set-state-in-effect` (לא נגעתי
-  בגוף ה-effect עצמו, רק בקטע נפרד אחר בקובץ) - לא סוג אזהרה חדש.
-  אין שום אזהרה/שגיאה ב-`Inventory.tsx`/`AddHairModal.tsx`/
-  `CreateRemnantBoxModal.tsx`.
-- לא בוצעה בדיקה ויזואלית בדפדפן - מומלץ לבדוק: לרענן דף כשמחוברת
-  ולוודא שאין הבהוב Login; ליצור קוקו חדש ולוודא שהמזהה המוצג הוא
-  `HAIR-01`/`HAIR-02` וכו' (רציף לפי העסק), ושפריטים ישנים ממשיכים
-  להיראות תקינים (עם ה-id הארוך הישן שלהם).
+- `npm run build` בשורש (SPA) עובר נקי.
+- `cd functions && npm run build` (tsc) עובר נקי - שני ה-callables
+  החדשים מתקמפלים תקין.
+- `npm run lint` (SPA) - אין אזהרות/שגיאות חדשות ב-`Settings.tsx`
+  (האזהרה שכבר הייתה שם, על ה-effect הישן של ניתוח ה-URL, לא נגעתי
+  בו). functions/ אין lint script מוגדר - הסתמכתי על `tsc` בלבד.
+- **לא נבדק בפועל מול production** - צריך את הפריסה הנ"ל קודם.
 
 ## הערה על git status
 
-`summary2.md`/`summary3.md`/`summary4.md` נוקו בסבב קודם - אין יותר
-קבצי summary ישנים מיותרים בשורש.
+`summary2.md`/`summary3.md`/`summary4.md` נוקו בסבב קודם - אין קבצי
+summary ישנים מיותרים בשורש.
