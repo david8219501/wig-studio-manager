@@ -248,7 +248,7 @@ function App() {
       case 'clients': return <Clients />;
       case 'calendar': return <Calendar />;
       case 'inventory': return <Inventory />;
-      case 'calculators': return <Calculators />;
+      case 'calculators': return <Calculators onNavigateToSettings={() => setActivePage('settings')} />;
       case 'sales': return <Sales />;
       case 'expenses': return <Expenses />;
       case 'reports': return <Reports />;

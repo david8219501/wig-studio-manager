@@ -312,13 +312,19 @@ function RepairsCalculator({ settings }: { settings: Settings }) {
   );
 }
 
-export default function CalculatorsPage() {
+interface CalculatorsPageProps {
+  onNavigateToSettings?: () => void;
+}
+
+export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPageProps) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [showSettings, setShowSettings] = useState(false);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // טעינת ההגדרות הגלובליות של העסק מ-Firestore (ואם עדיין אין - שמירת ברירת המחדל)
+  // טעינת הגדרות התמחור של העסק מ-Firestore (ואם עדיין אין - שמירת ברירת
+  // המחדל). העריכה עצמה עברה למסך ההגדרות (Settings.tsx, כרטיס "הגדרות
+  // תמחור") - כאן רק קוראים כדי להזין את המחשבונים. getDoc חד-פעמי מספיק
+  // (לא מאזין חי): זה עמוד נפרד שנטען מחדש בכל מעבר אליו, אז שינוי
+  // שנשמר במסך ההגדרות כבר יתפוס בטעינה הבאה של העמוד הזה.
   useEffect(() => {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -337,27 +343,15 @@ export default function CalculatorsPage() {
       .catch((err) => {
         console.error("Error loading business settings:", err);
         setLoadError("שגיאה בטעינת הגדרות התמחור - מוצגים ערכי ברירת מחדל. בדקי את החיבור ונסי לרענן את הדף.");
-      })
-      .finally(() => setSettingsLoaded(true));
+      });
   }, []);
-
-  // שמירת ההגדרות ל-Firestore בכל שינוי, כדי שלא יתאפסו ברענון
-  useEffect(() => {
-    if (!settingsLoaded) return;
-    const businessId = auth.currentUser?.uid;
-    if (!businessId) return;
-
-    setDoc(doc(db, "businessSettings", businessId), settings, { merge: true }).catch((err) =>
-      console.error("Error saving business settings:", err)
-    );
-  }, [settings, settingsLoaded]);
 
   return (
     <div className="calc-page">
       <div className="calc-top-row">
         <h1 className="calc-page-title">מחשבונים</h1>
-        <button className="calc-settings-btn" onClick={()=>setShowSettings(p=>!p)}>
-          ⚙️ הגדרות גלובליות
+        <button className="calc-settings-btn" onClick={onNavigateToSettings}>
+          ⚙️ לעריכת הגדרות תמחור - לחצי כאן
         </button>
       </div>
 
@@ -365,26 +359,6 @@ export default function CalculatorsPage() {
         <div className="calc-state calc-state--error">
           <span className="calc-state__icon">⚠️</span>
           <p>{loadError}</p>
-        </div>
-      )}
-
-      {showSettings && (
-        <div className="calc-global-settings">
-          <div className="calc-setting-row">
-            <label className="calc-setting-label">מחיר לק״ג ($)</label>
-            <input type="number" className="calc-setting-input" value={settings.pricePerKgUsd}
-              onChange={e=>setSettings(p=>({...p,pricePerKgUsd:Number(e.target.value)}))} />
-          </div>
-          <div className="calc-setting-row">
-            <label className="calc-setting-label">שער יציג</label>
-            <input type="number" className="calc-setting-input" value={settings.exchangeRate}
-              onChange={e=>setSettings(p=>({...p,exchangeRate:Number(e.target.value)}))} />
-          </div>
-          <div className="calc-setting-row">
-            <label className="calc-setting-label">% רווח (לדוגמה: 100 עבור 100%)</label>
-            <input type="number" className="calc-setting-input" value={settings.profitMargin}
-              onChange={e=>setSettings(p=>({...p,profitMargin:Number(e.target.value)}))} />
-          </div>
         </div>
       )}
 

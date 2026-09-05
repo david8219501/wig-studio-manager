@@ -142,6 +142,54 @@ export default function Settings() {
     persistCategoryList("appointmentTypes", updated);
   };
 
+  // הגדרות תמחור - הועברו לכאן מ-Calculators.tsx (שנשאר צרכן קורא-בלבד
+  // עכשיו). אותו מסמך businessSettings/{uid} בדיוק (מיזוג עם
+  // expenseCategories/appointmentTypes למעלה - setDoc(merge:true) בכל
+  // מקום לא דורס שדות אחרים). כפתור "שמירה" מפורש (לא auto-save בכל
+  // הקלדה כמו שהיה ב-Calculators.tsx) - עקבי עם שאר כרטיסי ההגדרות כאן.
+  const [pricePerKgUsd, setPricePerKgUsd] = useState(4700);
+  const [exchangeRate, setExchangeRate] = useState(3.0);
+  const [profitMargin, setProfitMargin] = useState(100);
+  const [pricingLoading, setPricingLoading] = useState(true);
+  const [savingPricing, setSavingPricing] = useState(false);
+  const [pricingSaveMessage, setPricingSaveMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    getDoc(doc(db, "businessSettings", businessId))
+      .then((snap) => {
+        const data = snap.data() as
+          | { pricePerKgUsd?: number; exchangeRate?: number; profitMargin?: number }
+          | undefined;
+        if (data?.pricePerKgUsd != null) setPricePerKgUsd(data.pricePerKgUsd);
+        if (data?.exchangeRate != null) setExchangeRate(data.exchangeRate);
+        if (data?.profitMargin != null) setProfitMargin(data.profitMargin);
+      })
+      .catch((err) => console.error("שגיאה בטעינת הגדרות תמחור:", err))
+      .finally(() => setPricingLoading(false));
+  }, []);
+
+  const handleSavePricing = async () => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    setSavingPricing(true);
+    setPricingSaveMessage(null);
+    try {
+      await setDoc(
+        doc(db, "businessSettings", businessId),
+        { pricePerKgUsd, exchangeRate, profitMargin },
+        { merge: true }
+      );
+      setPricingSaveMessage("success");
+    } catch (err) {
+      console.error("שגיאה בשמירת הגדרות תמחור:", err);
+      setPricingSaveMessage("error");
+    } finally {
+      setSavingPricing(false);
+    }
+  };
+
   const [status, setStatus] = useState<ConnectionStatus>("unknown");
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
@@ -362,6 +410,51 @@ export default function Settings() {
               </div>
             </div>
           </div>
+        )}
+      </div>
+
+      <div className="placeholder-card">
+        <h2>💰 הגדרות תמחור</h2>
+        {pricingLoading ? (
+          <p>טוענת הגדרות תמחור...</p>
+        ) : (
+          <>
+            <div className="settings-form-grid">
+              <div className="settings-field">
+                <label>מחיר לק"ג ($)</label>
+                <input
+                  type="number"
+                  value={pricePerKgUsd}
+                  onChange={(e) => setPricePerKgUsd(Number(e.target.value))}
+                />
+              </div>
+              <div className="settings-field">
+                <label>שער יציג</label>
+                <input
+                  type="number"
+                  value={exchangeRate}
+                  onChange={(e) => setExchangeRate(Number(e.target.value))}
+                />
+              </div>
+              <div className="settings-field">
+                <label>% רווח (לדוגמה: 100 עבור 100%)</label>
+                <input
+                  type="number"
+                  value={profitMargin}
+                  onChange={(e) => setProfitMargin(Number(e.target.value))}
+                />
+              </div>
+            </div>
+            {pricingSaveMessage === "success" && (
+              <div className="google-calendar-status google-calendar-status--success">הגדרות התמחור נשמרו בהצלחה.</div>
+            )}
+            {pricingSaveMessage === "error" && (
+              <div className="google-calendar-status google-calendar-status--error">שגיאה בשמירה. נסי שוב.</div>
+            )}
+            <button type="button" className="btn-google-calendar" onClick={handleSavePricing} disabled={savingPricing}>
+              {savingPricing ? "שומרת..." : "שמירה"}
+            </button>
+          </>
         )}
       </div>
 
