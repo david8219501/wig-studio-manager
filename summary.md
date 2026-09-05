@@ -116,3 +116,18 @@ Settings פתוח), `Calculators.tsx` נטען מחדש בכל מעבר אליו
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין - אין אזהרה חדשה.
+
+## קבוצה 5: יצוא/גיבוי נתונים ✅ הושלמה
+
+כרטיס "💾 יצוא וגיבוי נתונים" עם כפתור "הורד גיבוי מלא" - שולף
+(`getDocs`, מסונן `businessId`) את כל 6 ה-collections של העסק
+(`clients`/`orders`/`appointments`/`hairItems`/`bulkItems`/`expenses`)
++ מסמכי `users/{uid}` ו-`businessSettings/{uid}` עצמם (לפי id, לא
+query), מאגד הכל לאובייקט JSON אחד (עם `exportedAt`), ומפעיל הורדה
+בדפדפן (`Blob` + `<a download>` זמני). שם קובץ: `גיבוי-YYYY-MM-DD.json`.
+
+**קובץ:** `src/pages/Settings/Settings.tsx`
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין - אין אזהרה חדשה. לא נבדק בפועל בדפדפן (הורדת קובץ) - מומלץ
+לבדוק ידנית שהקובץ באמת יורד ומכיל את כל הנתונים הצפויים.

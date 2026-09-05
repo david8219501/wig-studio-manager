@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { auth, db, functions } from "../../services/firebase";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import TimeInput from "../../components/common/TimeInput";
@@ -234,6 +234,53 @@ export default function Settings() {
       setHoursSaveMessage("error");
     } finally {
       setSavingHours(false);
+    }
+  };
+
+  // יצוא/גיבוי מלא - שולפת את כל הנתונים של העסק (businessId) מכל
+  // ה-collections הרלוונטיים, מאגדת ל-JSON אחד ומורידה כקובץ. חד-פעמי,
+  // בלחיצת כפתור - לא נשמר/מועלה לשום מקום, רק Blob מקומי בדפדפן.
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupError, setBackupError] = useState<string | null>(null);
+
+  const handleDownloadBackup = async () => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    setBackupLoading(true);
+    setBackupError(null);
+    try {
+      const collectionsToExport = ["clients", "orders", "appointments", "hairItems", "bulkItems", "expenses"];
+      const backup: Record<string, unknown> = {};
+
+      for (const collectionName of collectionsToExport) {
+        const snap = await getDocs(query(collection(db, collectionName), where("businessId", "==", businessId)));
+        backup[collectionName] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+
+      const [userSnap, settingsSnap] = await Promise.all([
+        getDoc(doc(db, "users", businessId)),
+        getDoc(doc(db, "businessSettings", businessId)),
+      ]);
+      backup.businessProfile = userSnap.exists() ? userSnap.data() : null;
+      backup.businessSettings = settingsSnap.exists() ? settingsSnap.data() : null;
+      backup.exportedAt = new Date().toISOString();
+
+      const json = JSON.stringify(backup, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `גיבוי-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("שגיאה בהורדת גיבוי:", err);
+      setBackupError("שגיאה בהורדת הגיבוי. נסי שוב.");
+    } finally {
+      setBackupLoading(false);
     }
   };
 
@@ -547,6 +594,20 @@ export default function Settings() {
             </button>
           </>
         )}
+      </div>
+
+      <div className="placeholder-card">
+        <h2>💾 יצוא וגיבוי נתונים</h2>
+        <p>
+          מוריד קובץ JSON אחד עם כל הנתונים של העסק (לקוחות, הזמנות, פגישות,
+          מלאי שיער, מלאי פשוט, הוצאות, פרופיל והגדרות) - שמור לעצמך כגיבוי.
+        </p>
+        {backupError && (
+          <div className="google-calendar-status google-calendar-status--error">{backupError}</div>
+        )}
+        <button type="button" className="btn-google-calendar" onClick={handleDownloadBackup} disabled={backupLoading}>
+          {backupLoading ? "מכינה גיבוי..." : "הורד גיבוי מלא"}
+        </button>
       </div>
 
       <div className="placeholder-card google-calendar-card">
