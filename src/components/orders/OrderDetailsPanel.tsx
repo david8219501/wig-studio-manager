@@ -309,39 +309,57 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     }
   };
 
-  // מחזיר לכל פריט מלאי פשוט שנוצל את הכמות שלו, ולכל שיוך שיער את
-  // המשקל/השווי שלו - אותה לוגיקה בדיוק כמו handleRemove ב-
-  // AssignHairModal.tsx, רק על כל הפריטים ברצף. ההזמנה עצמה לא נמחקת -
+  // הזמנה רגילה: מחזיר לכל פריט מלאי פשוט שנוצל את הכמות שלו, ולכל שיוך
+  // שיער את המשקל/השווי שלו - אותה לוגיקה בדיוק כמו handleRemove ב-
+  // AssignHairModal.tsx, רק על כל הפריטים ברצף (המוצר עוד לא נבנה בפועל,
+  // אז "מפרקים" אותו בחזרה לחומרי גלם הגיוני). ההזמנה עצמה לא נמחקת -
   // רק מסומנת כמבוטלת, כדי שתישאר בהיסטוריה.
+  //
+  // פאת תצוגה שכבר נמכרה (isShowroomStock) - ענף שונה לגמרי: הפאה כבר
+  // קיימת פיזית ושלמה, "ביטול המכירה" לא אמור לגעת בשיוך השיער/החומרים
+  // שלה בכלל - רק להחזיר אותה למלאי (clientId/clientName null, בדיוק
+  // כמו לפני שנמכרה) כדי שתופיע שוב תחת "פאות תצוגה" -> "במלאי"
+  // (isUnsoldShowroomStock בודק רק clientId, לא נוגע ב-usedHairItems).
   const handleCancelOrder = async () => {
     setCancelingOrder(true);
     setCancelError(null);
 
     try {
-      for (const used of usedBulkItems) {
-        const bulkSnap = await getDoc(doc(db, "bulkItems", used.itemId));
-        if (bulkSnap.exists()) {
-          const currentQty = (bulkSnap.data() as Omit<BulkItem, "id">).quantity ?? 0;
-          await updateDoc(doc(db, "bulkItems", used.itemId), { quantity: currentQty + used.quantity });
-        }
-      }
-
-      for (const used of usedHairItems) {
-        const hairSnap = await getDoc(doc(db, "hairItems", used.hairItemId));
-        if (hairSnap.exists()) {
-          const hairItem = hairSnap.data() as Omit<HairItem, "id">;
-          const restoreUpdate: { currentWeight: number; status: HairItem["status"]; remnantTotalValue?: number } = {
-            currentWeight: hairItem.currentWeight + used.gramsUsed,
-            status: "available",
-          };
-          if (hairItem.isRemnantBox) {
-            restoreUpdate.remnantTotalValue = (hairItem.remnantTotalValue ?? 0) + used.costAtTime;
+      if (order.isShowroomStock) {
+        await updateDoc(doc(db, "orders", order.id), {
+          clientId: null,
+          clientName: null,
+          totalPrice: 0,
+          showroomStatus: "מוכנה",
+          status: "new",
+        });
+      } else {
+        for (const used of usedBulkItems) {
+          const bulkSnap = await getDoc(doc(db, "bulkItems", used.itemId));
+          if (bulkSnap.exists()) {
+            const currentQty = (bulkSnap.data() as Omit<BulkItem, "id">).quantity ?? 0;
+            await updateDoc(doc(db, "bulkItems", used.itemId), { quantity: currentQty + used.quantity });
           }
-          await updateDoc(doc(db, "hairItems", used.hairItemId), restoreUpdate);
         }
+
+        for (const used of usedHairItems) {
+          const hairSnap = await getDoc(doc(db, "hairItems", used.hairItemId));
+          if (hairSnap.exists()) {
+            const hairItem = hairSnap.data() as Omit<HairItem, "id">;
+            const restoreUpdate: { currentWeight: number; status: HairItem["status"]; remnantTotalValue?: number } = {
+              currentWeight: hairItem.currentWeight + used.gramsUsed,
+              status: "available",
+            };
+            if (hairItem.isRemnantBox) {
+              restoreUpdate.remnantTotalValue = (hairItem.remnantTotalValue ?? 0) + used.costAtTime;
+            }
+            await updateDoc(doc(db, "hairItems", used.hairItemId), restoreUpdate);
+          }
+        }
+
+        await updateDoc(doc(db, "orders", order.id), { status: CANCELLED_STATUS });
       }
 
-      await updateDoc(doc(db, "orders", order.id), { status: CANCELLED_STATUS });
       setCancelConfirmOpen(false);
     } catch (err) {
       console.error("Error cancelling order:", err);
@@ -721,7 +739,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
               className="order-details-btn-danger"
               onClick={() => setCancelConfirmOpen(true)}
             >
-              ביטול הזמנה
+              {order.isShowroomStock ? "ביטול מכירה" : "ביטול הזמנה"}
             </button>
           </div>
         )}
@@ -739,10 +757,14 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
 
       <ConfirmDialog
         isOpen={cancelConfirmOpen}
-        title="ביטול הזמנה"
-        message="לבטל את ההזמנה? כל פריטי המלאי ושיוכי השיער שנוצלו יוחזרו למלאי אוטומטית, וההזמנה תסומן כמבוטלת (לא תימחק). הפעולה לא ניתנת לביטול."
+        title={order.isShowroomStock ? "ביטול מכירה" : "ביטול הזמנה"}
+        message={
+          order.isShowroomStock
+            ? "לבטל את המכירה? הפאה עצמה נשארת שלמה בדיוק כמו שהיא (שיוך השיער/החומרים לא נפגע) - היא רק תחזור להופיע כ'במלאי' בלשונית פאות תצוגה, מוכנה למכירה הבאה. הפעולה לא ניתנת לביטול."
+            : "לבטל את ההזמנה? כל פריטי המלאי ושיוכי השיער שנוצלו יוחזרו למלאי אוטומטית, וההזמנה תסומן כמבוטלת (לא תימחק). הפעולה לא ניתנת לביטול."
+        }
         variant="danger"
-        confirmLabel={cancelingOrder ? "מבטלת..." : "כן, בטלי הזמנה"}
+        confirmLabel={cancelingOrder ? "מבטלת..." : order.isShowroomStock ? "כן, בטלי מכירה" : "כן, בטלי הזמנה"}
         onConfirm={handleCancelOrder}
         onCancel={() => setCancelConfirmOpen(false)}
       />
