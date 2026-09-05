@@ -197,9 +197,47 @@ Storage bucket ראשוני דרך ה-CLI/SDK (בניגוד לפריסת Cloud F
 
 ---
 
+## עדכון - Storage הוקם, storage.rules נפרס בהצלחה ✅
+
+לאחר שה-Storage bucket הוקם ידנית בקונסולה (Get Started + Production
+mode), הרצתי `firebase deploy --only storage`:
+```
+✔  firebase.storage: rules file storage.rules compiled successfully
+✔  storage: released rules storage.rules to firebase.storage
+✔  Deploy complete!
+```
+הכלל שהוכן מראש (`logos/{businessId}/*` - קריאה פתוחה, כתיבה רק
+ל-uid התואם) פעיל עכשיו בפועל בפרודקשן.
+
+**אימות שבוצע (בלי גישת admin/browser אמיתית):**
+- `gsutil ls gs://esti-wigs-system.firebasestorage.app` - עבר מ-`404
+  bucket does not exist` (לפני ההקמה) ל-`401 Anonymous caller does
+  not have storage.objects.list access` (עכשיו) - שינוי משמעותי: ה-
+  bucket **קיים** עכשיו בפועל (401 = "קיים אבל אין הרשאה לרשימה
+  אנונימית", לא "לא קיים"). ה-401 עצמו דווקא **תקין ומצופה** - זה
+  Production mode, גישה אנונימית ל-listing אמורה להיחסם; `gsutil`/
+  `gcloud` בסביבה הזו לא מאומתים כלל (`gcloud auth list` → "No
+  credentialed accounts", אין גם Application Default Credentials) -
+  אין לי דרך CLI/API עם הרשאות אמיתיות לבדוק העלאה אמיתית מכאן.
+- **התאמת path בין הקוד לחוקים - נבדקה ואומתה ידנית, תואמת בדיוק:**
+  `Settings.tsx` מעלה ל-`logos/${businessId}/logo.${ext}` (כש-
+  `businessId = auth.currentUser.uid`), והחוק שנפרס מתיר כתיבה בדיוק
+  ל-`logos/{businessId}/{fileName}` כש-`request.auth.uid == businessId` -
+  זהה תואם.
+- `npm run build`/`npm run lint` הורצו שוב - נקיים (24 בעיות, זהה
+  לבייסליין הקבוע, שום שגיאת קומפילציה/קונפיגורציה).
+
+**מה עדיין לא אומת (ולמה לא):** העלאה אמיתית מקצה לקצה (משתמשת
+מחוברת בפועל לוחצת "העלאת לוגו" בדפדפן) - זה דורש סשן דפדפן מאומת
+אמיתי או service account key ל-Admin SDK, ששניהם לא זמינים לי בסביבה
+הזו. **המלצה:** תתחברי בפועל למערכת, תיכנסי להגדרות ותנסי להעלות
+תמונת לוגו אמיתית - אם זה נכשל, השגיאה תוצג בבירור במסך (כבר מטופלת
+ב-`logoError`) ותוכלי להעתיק לי אותה לאבחון נוסף.
+
 ## סיכום כולל - 6/6 קבוצות טופלו
 
 קבוצות 1-5: הושלמו ונפרסו במלואן, נבדקות (build+lint) בכל שלב.
-קבוצה 6: **כל הקוד מוכן ונבדק** (build+lint), אבל **חסום מבדיקה/
-הרצה בפועל** עד להקמה ידנית חד-פעמית של Firebase Storage בקונסולה
-(קישור למעלה) - חסימה מתועדת, לא "תקיעה" שקטה.
+קבוצה 6: **כל הקוד מוכן, נבדק (build+lint), ו-storage.rules נפרס
+בהצלחה** לפרודקשן. אימות path-matching בין הקוד לחוקים בוצע ידנית
+ותואם. בדיקת קצה-לקצה אמיתית (העלאת קובץ בפועל) עדיין ממתינה לבדיקה
+ידנית שלך בדפדפן - אין לי גישת admin/API מאומתת לבצע אותה מכאן.
