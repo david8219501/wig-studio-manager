@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getApps } from 'firebase/app';
 import twemoji from '@twemoji/api';
 import { auth, db } from './services/firebase';
@@ -57,7 +57,9 @@ function App() {
 
   // כותרת כרטיסיית הדפדפן דינמית לפי שם העסק המחובר (users/{uid}.businessName),
   // ואותיות פתיחה אמיתיות (שם פרטי+משפחה) לעיגול בסיידבר - לפני התחברות
-  // (או בזמן טעינת הנתונים) נשארת כותרת/אות ברירת מחדל כלליות.
+  // (או בזמן טעינת הנתונים) נשארת כותרת/אות ברירת מחדל כלליות. מאזין חי
+  // (לא getDoc חד-פעמי) כדי שעריכת שם העסק במסך ההגדרות תשתקף מיד כאן
+  // בלי צורך ברענון/התחברות מחדש.
   useEffect(() => {
     const DEFAULT_TITLE = 'מערכת ניהול סלון פאות';
     if (!isLoggedIn) {
@@ -70,8 +72,9 @@ function App() {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
 
-    getDoc(doc(db, 'users', businessId))
-      .then((snap) => {
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', businessId),
+      (snap) => {
         const data = snap.data() as { businessName?: string; firstName?: string; lastName?: string } | undefined;
         const name = data?.businessName || '';
         setBusinessName(name);
@@ -80,8 +83,10 @@ function App() {
         const firstInitial = data?.firstName?.trim().charAt(0) || '';
         const lastInitial = data?.lastName?.trim().charAt(0) || '';
         setUserInitials(`${firstInitial}${lastInitial}` || 'אס');
-      })
-      .catch((err) => console.error('Error loading business/user profile for header:', err));
+      },
+      (err) => console.error('Error loading business/user profile for header:', err)
+    );
+    return () => unsubscribe();
   }, [isLoggedIn]);
 
   // בדיקת תקינות חיבור לפיירבייס בעליית האפליקציה (מופיע ב-F12 Console)

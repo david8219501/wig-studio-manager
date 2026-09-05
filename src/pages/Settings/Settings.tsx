@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { httpsCallable } from "firebase/functions";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db, functions } from "../../services/firebase";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import "./Settings.css";
@@ -19,6 +19,56 @@ type ConnectionStatus = "unknown" | "connected" | "error";
 type SyncStatus = "idle" | "syncing" | "done" | "error";
 
 export default function Settings() {
+  // פרופיל העסק - נטען פעם אחת (getDoc, לא מאזין חי) לתוך state עריכה
+  // מקומי, כמו כל טופס עריכה אחר באתר (ClientDrawer וכו') - מאזין חי
+  // כאן היה דורס את מה שהמשתמשת מקלידה תוך כדי עריכה. שינוי שנשמר
+  // (updateDoc) כן משתקף מיד בסיידבר/בכותרת - שם יש מאזין חי (App.tsx).
+  const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [email, setEmail] = useState("");
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaveMessage, setProfileSaveMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    getDoc(doc(db, "users", businessId))
+      .then((snap) => {
+        const data = snap.data() as
+          | { businessName?: string; phone?: string; address?: string; email?: string }
+          | undefined;
+        setBusinessName(data?.businessName || "");
+        setPhone(data?.phone || "");
+        setAddress(data?.address || "");
+        setEmail(data?.email || "");
+      })
+      .catch((err) => console.error("שגיאה בטעינת פרופיל העסק:", err))
+      .finally(() => setProfileLoading(false));
+  }, []);
+
+  const handleSaveProfile = async () => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    setSavingProfile(true);
+    setProfileSaveMessage(null);
+    try {
+      await updateDoc(doc(db, "users", businessId), {
+        businessName: businessName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        email: email.trim(),
+      });
+      setProfileSaveMessage("success");
+    } catch (err) {
+      console.error("שגיאה בשמירת פרופיל העסק:", err);
+      setProfileSaveMessage("error");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   const [status, setStatus] = useState<ConnectionStatus>("unknown");
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
@@ -135,8 +185,40 @@ export default function Settings() {
   return (
     <div className="settings-page">
       <div className="placeholder-card">
-        <h2>⚙️ הגדרות מערכת</h2>
-        <p>כאן תוכל לנהל בהמשך את הגדרות העסק, פרטי פרופיל, צבעי ממשק והגדרות חיבור ל-Firebase של גוגל.</p>
+        <h2>🏢 פרופיל העסק</h2>
+        {profileLoading ? (
+          <p>טוענת פרטי עסק...</p>
+        ) : (
+          <>
+            <div className="settings-form-grid">
+              <div className="settings-field">
+                <label>שם העסק</label>
+                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+              </div>
+              <div className="settings-field">
+                <label>טלפון</label>
+                <input type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <div className="settings-field">
+                <label>כתובת</label>
+                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} />
+              </div>
+              <div className="settings-field">
+                <label>אימייל</label>
+                <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+            </div>
+            {profileSaveMessage === "success" && (
+              <div className="google-calendar-status google-calendar-status--success">הפרטים נשמרו בהצלחה.</div>
+            )}
+            {profileSaveMessage === "error" && (
+              <div className="google-calendar-status google-calendar-status--error">שגיאה בשמירה. נסי שוב.</div>
+            )}
+            <button type="button" className="btn-google-calendar" onClick={handleSaveProfile} disabled={savingProfile}>
+              {savingProfile ? "שומרת..." : "שמירה"}
+            </button>
+          </>
+        )}
       </div>
 
       <div className="placeholder-card google-calendar-card">
