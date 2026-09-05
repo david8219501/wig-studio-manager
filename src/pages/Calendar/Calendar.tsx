@@ -5,14 +5,17 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   query,
+  setDoc,
   where,
   getDocs,
 } from "firebase/firestore";
 import { Plus } from "lucide-react";
 import { db, auth } from "../../services/firebase";
 import { formatDateIL } from "../../utils/formatDate";
+import { DEFAULT_APPOINTMENT_TYPES } from "../../utils/businessSettings";
 import DateInput from "../../components/common/DateInput";
 import TimeInput from "../../components/common/TimeInput";
 import CustomSelect from "../../components/common/CustomSelect";
@@ -22,14 +25,6 @@ import "./Calendar.css";
 // ערך-סמן לבחירת "אחר / הוסף חדש" ב-CustomSelect של מטרת הפגישה - לא
 // נשמר בפועל כ-type של הפגישה, רק פותח שדה טקסט חופשי (ראו customAptType).
 const OTHER_APPOINTMENT_TYPE = "__other__";
-
-const APPOINTMENT_TYPE_OPTIONS = [
-  { value: "מדידת פאה חדשה", label: "מדידת פאה חדשה" },
-  { value: "תיקון רשת", label: "תיקון רשת" },
-  { value: "סירוק והחלקה", label: "סירוק והחלקה" },
-  { value: "מסירת פאה מוכנה", label: "מסירת פאה מוכנה" },
-  { value: OTHER_APPOINTMENT_TYPE, label: "אחר / הוסף חדש" },
-];
 
 // טיפוס הלקוחה תואם בדיוק למבנה האמיתי ב-collection "clients" (ראו Clients.tsx)
 interface Client {
@@ -77,6 +72,37 @@ export default function Calendar() {
   const [formError, setFormError] = useState<string | null>(null);
   const [overlapConfirmOpen, setOverlapConfirmOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // רשימת מטרות פגישה של העסק - נטענת מ-businessSettings/{uid}
+  // (אותו מסמך תמחור/קטגוריות), עם אתחול לברירת המחדל הקיימת אם השדה
+  // עדיין לא קיים בפועל.
+  const [appointmentTypeList, setAppointmentTypeList] = useState<string[]>(DEFAULT_APPOINTMENT_TYPES);
+
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    const settingsRef = doc(db, "businessSettings", businessId);
+    getDoc(settingsRef)
+      .then((snap) => {
+        const data = snap.data() as { appointmentTypes?: string[] } | undefined;
+        if (data?.appointmentTypes && data.appointmentTypes.length > 0) {
+          setAppointmentTypeList(data.appointmentTypes);
+        } else {
+          setDoc(settingsRef, { appointmentTypes: DEFAULT_APPOINTMENT_TYPES }, { merge: true }).catch((err) =>
+            console.error("Error seeding appointment types:", err)
+          );
+        }
+      })
+      .catch((err) => console.error("Error loading appointment types:", err));
+  }, []);
+
+  const APPOINTMENT_TYPE_OPTIONS = useMemo(
+    () => [
+      ...appointmentTypeList.map((t) => ({ value: t, label: t })),
+      { value: OTHER_APPOINTMENT_TYPE, label: "אחר / הוסף חדש" },
+    ],
+    [appointmentTypeList]
+  );
 
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
   const [newFirstName, setNewFirstName] = useState("");

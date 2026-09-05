@@ -1,14 +1,36 @@
 import React, { useEffect, useState } from "react";
-import { collection, addDoc, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { collection, addDoc, doc, getDoc, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import { formatDateIL } from "../../utils/formatDate";
+import { DEFAULT_EXPENSE_CATEGORIES, LEGACY_EXPENSE_CATEGORY_LABELS } from "../../utils/businessSettings";
 import "./Expenses.css";
+
+// ערך-סמן ל"אחר / הוסף חדש" בקטגוריה - אותו דפוס בדיוק כמו OTHER_STATUS
+// (Sales.tsx)/OTHER_APPOINTMENT_TYPE (Calendar.tsx). קטגוריות עצמן הן
+// string חופשי לפי עסק (businessSettings/{uid}.expenseCategories), לא
+// union סגור יותר - כדי לאפשר לכל עסק להתאים אישית את הרשימה שלו.
+const OTHER_CATEGORY = "__other__";
+
+// אימוג'ים לתצוגה בלבד עבור קטגוריות ברירת המחדל (לא נשמרים בערך עצמו) -
+// קטגוריה מותאמת-אישית שהוזנה ידנית פשוט לא מקבלת אימוג'י.
+const DEFAULT_CATEGORY_EMOJI: Record<string, string> = {
+  "מלאי ושיער": "📦",
+  "שכירות ומבנה": "🏢",
+  "שיווק ופרסום": "📣",
+  "שכר עובדות": "👥",
+  "ייצור הזמנות": "🧵",
+  "שונות": "🛠️",
+};
 
 interface Expense {
   id: string;
   date: string; // YYYY-MM-DD
   supplier: string;
-  category: "inventory" | "rent" | "marketing" | "salaries" | "production" | "other";
+  // string ולא union סגור - כדי לאפשר קטגוריות מותאמות-אישית לפי עסק
+  // (businessSettings/{uid}.expenseCategories). הוצאות ישנות עדיין
+  // מחזיקות מפתחות אנגליים קבועים (inventory/rent/...) - ראו
+  // LEGACY_EXPENSE_CATEGORY_LABELS לתאימות לאחור בתצוגה.
+  category: string;
   description: string;
   amount: number;
   paymentMethod: "credit" | "transfer" | "cash" | "check";
@@ -29,9 +51,33 @@ export default function Expenses() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // רשימת קטגוריות ההוצאות של העסק - נטענת מ-businessSettings/{uid}
+  // (אותו מסמך שכבר משמש הגדרות תמחור ב-Calculators.tsx), עם אתחול
+  // לברירת המחדל הקיימת אם השדה עדיין לא קיים בפועל.
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
+
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    const settingsRef = doc(db, "businessSettings", businessId);
+    getDoc(settingsRef)
+      .then((snap) => {
+        const data = snap.data() as { expenseCategories?: string[] } | undefined;
+        if (data?.expenseCategories && data.expenseCategories.length > 0) {
+          setCategoryOptions(data.expenseCategories);
+        } else {
+          setDoc(settingsRef, { expenseCategories: DEFAULT_EXPENSE_CATEGORIES }, { merge: true }).catch((err) =>
+            console.error("Error seeding expense categories:", err)
+          );
+        }
+      })
+      .catch((err) => console.error("Error loading expense categories:", err));
+  }, []);
+
   // טופס הוספה
   const [newSupplier, setNewSupplier] = useState("");
-  const [newCategory, setNewCategory] = useState<Expense["category"]>("inventory");
+  const [newCategory, setNewCategory] = useState<string>(DEFAULT_EXPENSE_CATEGORIES[0]);
+  const [customCategory, setCustomCategory] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newAmount, setNewAmount] = useState<number | "">("");
   const [newMethod, setNewMethod] = useState<Expense["paymentMethod"]>("credit");
@@ -87,7 +133,11 @@ export default function Expenses() {
   // חישובים דינמיים בהתאם לזמן שנבחר
   const totalExpenses = timeFilteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const inventoryExpenses = timeFilteredExpenses
-    .filter((e) => e.category === "inventory")
+    // "inventory" - מפתח אנגלי ישן (תאימות לאחור); "מלאי ושיער" - הערך
+    // החדש (ברירת המחדל של expenseCategories, אבל גם ניתן לשינוי לפי עסק -
+    // אם עסק מסוים שינה/מחק את הקטגוריה הזו, ההוצאות שלו פשוט ייכנסו
+    // ל"הוצאות תפעול ושיווק" הכלליות, לא לפילוח שגוי).
+    .filter((e) => e.category === "inventory" || e.category === "מלאי ושיער")
     .reduce((sum, e) => sum + e.amount, 0);
   const operationalExpenses = totalExpenses - inventoryExpenses;
 
@@ -98,13 +148,16 @@ export default function Expenses() {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
 
+    const finalCategory = newCategory === OTHER_CATEGORY ? customCategory.trim() : newCategory;
+    if (!finalCategory) return;
+
     setSaving(true);
     setSaveError(null);
     try {
       await addDoc(collection(db, "expenses"), {
         date: new Date().toISOString().split("T")[0],
         supplier: newSupplier,
-        category: newCategory,
+        category: finalCategory,
         description: newDescription,
         amount: Number(newAmount),
         paymentMethod: newMethod,
@@ -116,6 +169,7 @@ export default function Expenses() {
       setNewSupplier("");
       setNewDescription("");
       setNewAmount("");
+      setCustomCategory("");
     } catch (err) {
       console.error("Error adding expense:", err);
       setSaveError("שגיאה בשמירת ההוצאה. בדקי את החיבור ונסי שוב.");
@@ -222,12 +276,11 @@ export default function Expenses() {
           onChange={(e) => setCategoryFilter(e.target.value)}
         >
           <option value="all">כל הקטגוריות</option>
-          <option value="inventory">📦 מלאי ושיער</option>
-          <option value="rent">🏢 שכירות ומבנה</option>
-          <option value="marketing">📣 שיווק ופרסום</option>
-          <option value="salaries">👥 שכר עובדות</option>
-          <option value="production">🧵 ייצור הזמנות</option>
-          <option value="other">🛠️ שונות</option>
+          {categoryOptions.map((cat) => (
+            <option key={cat} value={cat}>
+              {DEFAULT_CATEGORY_EMOJI[cat] ? `${DEFAULT_CATEGORY_EMOJI[cat]} ${cat}` : cat}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -275,12 +328,8 @@ export default function Expenses() {
                   <td className="font-bold">{e.supplier}</td>
                   <td>
                     <span className="category-tag">
-                      {e.category === "inventory" && "📦 מלאי"}
-                      {e.category === "rent" && "🏢 שכירות"}
-                      {e.category === "marketing" && "📣 שיווק"}
-                      {e.category === "salaries" && "👥 שכר"}
-                      {e.category === "production" && "🧵 ייצור"}
-                      {e.category === "other" && "🛠️ שונות"}
+                      {DEFAULT_CATEGORY_EMOJI[e.category] ? `${DEFAULT_CATEGORY_EMOJI[e.category]} ` : ""}
+                      {LEGACY_EXPENSE_CATEGORY_LABELS[e.category] || e.category}
                     </span>
                   </td>
                   <td>
@@ -348,17 +397,23 @@ export default function Expenses() {
 
               <div className="form-group">
                 <label>קטגוריה</label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value as Expense["category"])}
-                >
-                  <option value="inventory">📦 מלאי ושיער</option>
-                  <option value="rent">🏢 שכירות ומבנה</option>
-                  <option value="marketing">📣 שיווק ופרסום</option>
-                  <option value="salaries">👥 שכר עובדות</option>
-                  <option value="production">🧵 ייצור הזמנות</option>
-                  <option value="other">🛠️ שונות</option>
+                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+                  {categoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {DEFAULT_CATEGORY_EMOJI[cat] ? `${DEFAULT_CATEGORY_EMOJI[cat]} ${cat}` : cat}
+                    </option>
+                  ))}
+                  <option value={OTHER_CATEGORY}>אחר / הוסף חדש</option>
                 </select>
+                {newCategory === OTHER_CATEGORY && (
+                  <input
+                    type="text"
+                    placeholder="הקלידי קטגוריה חדשה..."
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    required
+                  />
+                )}
               </div>
 
               <div className="form-group">

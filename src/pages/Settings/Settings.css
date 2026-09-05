@@ -111,3 +111,83 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* כרטיס "ניהול קטגוריות" - שתי עמודות (הוצאות/מטרות פגישה), כל אחת
+   רשימת "צ'יפים" ניתנים למחיקה + שורת הוספה. */
+.settings-category-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.settings-category-column h3 {
+  font-size: 14px;
+  color: var(--color-primary);
+  margin: 0 0 10px;
+}
+
+.settings-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  min-height: 20px;
+}
+
+.settings-category-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.settings-category-chip button {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
+.settings-category-chip button:hover {
+  color: var(--color-danger);
+}
+
+.settings-category-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-category-add-row input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.settings-category-add-row input:focus {
+  border-color: var(--color-accent);
+}
+
+.settings-category-add-row .btn-google-calendar {
+  padding: 8px 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .settings-category-columns {
+    grid-template-columns: 1fr;
+  }
+}

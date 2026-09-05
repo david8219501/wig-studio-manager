@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, functions } from "../../services/firebase";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_APPOINTMENT_TYPES } from "../../utils/businessSettings";
 import "./Settings.css";
 
 // חייבים להיות זהים בדיוק לערכים ב-functions/src/config.ts (project קבוע,
@@ -67,6 +68,78 @@ export default function Settings() {
     } finally {
       setSavingProfile(false);
     }
+  };
+
+  // ניהול קטגוריות - שני מערכים ב-businessSettings/{uid}: expenseCategories
+  // (Expenses.tsx) ו-appointmentTypes (Calendar.tsx). נטענים פעם אחת עם
+  // אתחול לברירת המחדל אם עדיין לא קיימים בפועל - אותו דפוס בדיוק כמו
+  // הגדרות התמחור (Calculators.tsx). כל הוספה/מחיקה נשמרת מיד (בלי כפתור
+  // שמירה נפרד לכרטיס הזה).
+  const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
+  const [appointmentTypes, setAppointmentTypes] = useState<string[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [newExpenseCategory, setNewExpenseCategory] = useState("");
+  const [newAppointmentType, setNewAppointmentType] = useState("");
+
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    const settingsRef = doc(db, "businessSettings", businessId);
+    getDoc(settingsRef)
+      .then((snap) => {
+        const data = snap.data() as { expenseCategories?: string[]; appointmentTypes?: string[] } | undefined;
+        const categories = data?.expenseCategories?.length ? data.expenseCategories : DEFAULT_EXPENSE_CATEGORIES;
+        const types = data?.appointmentTypes?.length ? data.appointmentTypes : DEFAULT_APPOINTMENT_TYPES;
+        setExpenseCategories(categories);
+        setAppointmentTypes(types);
+        if (!data?.expenseCategories?.length || !data?.appointmentTypes?.length) {
+          setDoc(settingsRef, { expenseCategories: categories, appointmentTypes: types }, { merge: true }).catch(
+            (err) => console.error("שגיאה באתחול קטגוריות ברירת מחדל:", err)
+          );
+        }
+      })
+      .catch((err) => console.error("שגיאה בטעינת קטגוריות:", err))
+      .finally(() => setCategoriesLoading(false));
+  }, []);
+
+  const persistCategoryList = async (field: "expenseCategories" | "appointmentTypes", list: string[]) => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+    try {
+      await setDoc(doc(db, "businessSettings", businessId), { [field]: list }, { merge: true });
+    } catch (err) {
+      console.error(`שגיאה בשמירת ${field}:`, err);
+    }
+  };
+
+  const handleAddExpenseCategory = () => {
+    const value = newExpenseCategory.trim();
+    if (!value || expenseCategories.includes(value)) return;
+    const updated = [...expenseCategories, value];
+    setExpenseCategories(updated);
+    setNewExpenseCategory("");
+    persistCategoryList("expenseCategories", updated);
+  };
+
+  const handleRemoveExpenseCategory = (category: string) => {
+    const updated = expenseCategories.filter((c) => c !== category);
+    setExpenseCategories(updated);
+    persistCategoryList("expenseCategories", updated);
+  };
+
+  const handleAddAppointmentType = () => {
+    const value = newAppointmentType.trim();
+    if (!value || appointmentTypes.includes(value)) return;
+    const updated = [...appointmentTypes, value];
+    setAppointmentTypes(updated);
+    setNewAppointmentType("");
+    persistCategoryList("appointmentTypes", updated);
+  };
+
+  const handleRemoveAppointmentType = (type: string) => {
+    const updated = appointmentTypes.filter((t) => t !== type);
+    setAppointmentTypes(updated);
+    persistCategoryList("appointmentTypes", updated);
   };
 
   const [status, setStatus] = useState<ConnectionStatus>("unknown");
@@ -218,6 +291,77 @@ export default function Settings() {
               {savingProfile ? "שומרת..." : "שמירה"}
             </button>
           </>
+        )}
+      </div>
+
+      <div className="placeholder-card">
+        <h2>🗂️ ניהול קטגוריות</h2>
+        {categoriesLoading ? (
+          <p>טוענת קטגוריות...</p>
+        ) : (
+          <div className="settings-category-columns">
+            <div className="settings-category-column">
+              <h3>קטגוריות הוצאות</h3>
+              <div className="settings-category-list">
+                {expenseCategories.map((cat) => (
+                  <div key={cat} className="settings-category-chip">
+                    <span>{cat}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExpenseCategory(cat)}
+                      aria-label="מחיקת קטגוריה"
+                      title="מחיקת קטגוריה"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="settings-category-add-row">
+                <input
+                  type="text"
+                  placeholder="קטגוריה חדשה..."
+                  value={newExpenseCategory}
+                  onChange={(e) => setNewExpenseCategory(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddExpenseCategory(); }}
+                />
+                <button type="button" className="btn-google-calendar" onClick={handleAddExpenseCategory}>
+                  הוספה
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-category-column">
+              <h3>מטרות פגישה ביומן</h3>
+              <div className="settings-category-list">
+                {appointmentTypes.map((type) => (
+                  <div key={type} className="settings-category-chip">
+                    <span>{type}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAppointmentType(type)}
+                      aria-label="מחיקת מטרת פגישה"
+                      title="מחיקת מטרת פגישה"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="settings-category-add-row">
+                <input
+                  type="text"
+                  placeholder="מטרת פגישה חדשה..."
+                  value={newAppointmentType}
+                  onChange={(e) => setNewAppointmentType(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddAppointmentType(); }}
+                />
+                <button type="button" className="btn-google-calendar" onClick={handleAddAppointmentType}>
+                  הוספה
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
