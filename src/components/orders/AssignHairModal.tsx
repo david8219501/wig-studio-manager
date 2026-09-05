@@ -88,7 +88,7 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
         (h) =>
           h.status === "available" &&
           (search.trim() === "" ||
-            h.id.toLowerCase().includes(search.toLowerCase()) ||
+            (h.hairCode || h.id).toLowerCase().includes(search.toLowerCase()) ||
             h.color.toLowerCase().includes(search.toLowerCase()))
       ),
     [hairItems, search]
@@ -147,8 +147,8 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
         {
           hairItemId: selectedItem.id,
           hairItemLabel: selectedItem.isRemnantBox
-            ? `📦 ${selectedItem.id} · קופסת איחוד שיער (${selectedItem.color})`
-            : `${selectedItem.id} · ${selectedItem.color} · ${selectedItem.length} ס״מ`,
+            ? `📦 ${selectedItem.hairCode || selectedItem.id} · קופסת איחוד שיער (${selectedItem.color})`
+            : `${selectedItem.hairCode || selectedItem.id} · ${selectedItem.color} · ${selectedItem.length} ס״מ`,
           gramsUsed: grams,
           costAtTime,
         },
@@ -383,7 +383,7 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
                   >
                     {item.isRemnantBox ? (
                       <>
-                        <span className="mono font-bold">📦 {item.id}</span>
+                        <span className="mono font-bold">📦 {item.hairCode || item.id}</span>
                         <span>קופסת איחוד שיער · {item.color}</span>
                         <span className="mono">
                           {item.currentWeight} גרם ·{" "}
@@ -392,7 +392,7 @@ export default function AssignHairModal({ isOpen, order, onClose }: AssignHairMo
                       </>
                     ) : (
                       <>
-                        <span className="mono font-bold">{item.id}</span>
+                        <span className="mono font-bold">{item.hairCode || item.id}</span>
                         <span>{item.color} · {item.length} ס״מ</span>
                         <span className="mono">{item.currentWeight} גרם במלאי</span>
                       </>

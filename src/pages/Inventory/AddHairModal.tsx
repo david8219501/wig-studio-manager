@@ -6,7 +6,7 @@ interface AddHairModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (item: HairItem) => Promise<void>;
-  nextId: string; // ה-ID הבא שנוצר אוטומטית, למשל HAIR-1004
+  nextId: string; // התווית הידידותית הבאה לתצוגה, למשל HAIR-05 - לא ה-Firestore document id בפועל (זה auto-generated ב-Inventory.tsx, ראו nextHairCode שם)
 }
 
 // אלו הצעות ברירת מחדל בלבד - השדות הם string חופשי בטיפוס, כך שאפשר גם להקליד ערך אחר

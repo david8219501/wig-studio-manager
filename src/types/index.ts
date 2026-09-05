@@ -2,7 +2,8 @@
 
 // 1. סוגי מלאי
 export interface HairItem {
-    id: string; // ברקוד / ID ייחודי
+    id: string; // Firestore document id - מזהה טכני אטום (auto-generated), לא מוצג למשתמשת
+    hairCode?: string; // תווית ידידותית לתצוגה/הדפסה (HAIR-01, HAIR-02...) - סידורית לפי עסק, לא ה-id עצמו (בדיוק כמו showroomCode לפאת תצוגה) - כדי שלא יהיה סיכון התנגשות בין עסקים ב-collection הגלובלי המשותף. פריטים ישנים (מלפני הפיצ'ר) לא יחזיקו את זה - יש ליפול חזרה ל-id בתצוגה
     supplier: string; // שם הספק
     initialWeight: number; // משקל התחלתי בגרמים
     currentWeight: number; // משקל נוכחי בפועל (במקרה של שימוש חלקי)

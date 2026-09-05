@@ -10,7 +10,7 @@ interface CreateRemnantBoxModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (item: HairItem) => Promise<void>;
-  nextId: string;
+  nextId: string; // התווית הידידותית הבאה לתצוגה (HAIR-05 וכו') - לא ה-Firestore document id בפועל, ראו nextHairCode ב-Inventory.tsx
 }
 
 const emptyForm = { name: '', color: '' };

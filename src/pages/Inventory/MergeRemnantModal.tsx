@@ -49,7 +49,7 @@ const MergeRemnantModal: React.FC<MergeRemnantModalProps> = ({ isOpen, sourceIte
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card restock-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>מיזוג לקופסת איחוד שיער - {sourceItem.id}</h2>
+          <h2>מיזוג לקופסת איחוד שיער - {sourceItem.hairCode || sourceItem.id}</h2>
           <button className="modal-close-btn" onClick={onClose} aria-label="סגור">
             ✕
           </button>
@@ -71,7 +71,7 @@ const MergeRemnantModal: React.FC<MergeRemnantModalProps> = ({ isOpen, sourceIte
               <select value={selectedBoxId} onChange={(e) => setSelectedBoxId(e.target.value)}>
                 {remnantBoxes.map((box) => (
                   <option key={box.id} value={box.id}>
-                    {box.id} - {box.supplier} ({box.currentWeight} גרם, ₪{(box.remnantTotalValue ?? 0).toFixed(0)})
+                    {box.hairCode || box.id} - {box.supplier} ({box.currentWeight} גרם, ₪{(box.remnantTotalValue ?? 0).toFixed(0)})
                   </option>
                 ))}
               </select>

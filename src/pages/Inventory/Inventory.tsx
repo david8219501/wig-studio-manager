@@ -158,28 +158,25 @@ const Inventory: React.FC = () => {
       });
   }, [orders]);
 
-  // ה-hairItems כאן כבר מסונן ל-businessId הנוכחי בלבד (דרך ה-query ב-
-  // onSnapshot למעלה), כך שהמספור הסידורי (maxNum) תמיד עצמאי לעסק. אבל
-  // ה-collection 'hairItems' עצמו גלובלי (משותף לכל העסקים, לא subcollection
-  // לכל עסק) - אז שני עסקים שונים עדיין יכולים להגיע ל"מספר הבא" הזהה
-  // (למשל שני עסקים חדשים שכל אחד מתחיל מ-HAIR-1001). מזהה כזה שכבר קיים
-  // כמסמך בפועל (של עסק אחר) הופך את ה-setDoc ל"עדכון" מבחינת Firestore,
-  // וחוקי העדכון דוחים אותו כי ה-businessId הקיים לא תואם - permission-denied.
-  // כדי שהמזהה יהיה בטוח ייחודי גלובלית (ולא רק בתוך העסק), מוסיפים סיומת
-  // הנגזרת מה-uid של העסק המחובר.
-  // מזהה מקוצר יותר להדפסה בפועל על מדבקה/תגית פיזית - "H-" (לא "HAIR-")
-  // + 3 תווים מה-uid (לא 4). הרגקס תואם גם פורמט ישן (HAIR-) כדי שהמספור
-  // יישאר רציף גם אחרי המעבר לפורמט הקצר, בלי סקריפט מיגרציה. הקיצור
-  // מקטין קלות (16³ במקום 16⁴ צירופים) את שטח מניעת ההתנגשות הבין-עסקית
-  // המתועדת למעלה - סביר לחלוטין למספר העסקים הריאלי במערכת כזו.
-  const nextHairId = useMemo(() => {
+  // מזהה פשוט וסדרתי לתצוגה/הדפסה - HAIR-01, HAIR-02... עולה לפי
+  // הקוקוים הקיימים של העסק הזה בלבד (hairItems כאן כבר מסונן ל-
+  // businessId הנוכחי דרך ה-query ב-onSnapshot למעלה). זה hairCode -
+  // שדה תצוגה נפרד לגמרי מה-Firestore document id בפועל (ראו
+  // handleSaveHairItem/handleCreateRemnantBox למטה) - בדיוק כמו
+  // showroomCode לפאת תצוגה. הפרדה כזו הכרחית כי ה-collection
+  // 'hairItems' עצמו גלובלי (משותף לכל העסקים, לא subcollection לכל
+  // עסק): אם ה-hairCode הידידותי (מחושב רק לפי העסק הזה) היה משמש
+  // גם כ-document id בפועל, שני עסקים שונים שכל אחד מגיע ל"מספר הבא"
+  // הזהה (למשל שניהם מתחילים מ-HAIR-01) היו מתנגשים על אותו מפתח -
+  // בדיוק הבאג שכבר תוקן פעם. עם auto-generated id (למטה) אין יותר
+  // שום סיכון כזה, גם בלי סיומת אקראית על התווית הידידותית.
+  const nextHairCode = useMemo(() => {
     const maxNum = hairItems.reduce((max, item) => {
-      const match = item.id.match(/^H(?:AIR)?-(\d+)/);
+      const match = (item.hairCode || '').match(/^HAIR-(\d+)/);
       const num = match ? parseInt(match[1], 10) : NaN;
       return Number.isNaN(num) ? max : Math.max(max, num);
-    }, 1000);
-    const businessSuffix = (auth.currentUser?.uid ?? '').slice(-3);
-    return `H-${maxNum + 1}-${businessSuffix}`;
+    }, 0);
+    return `HAIR-${String(maxNum + 1).padStart(2, '0')}`;
   }, [hairItems]);
 
   // קופסאות שאריות פעילות - יעדים אפשריים למיזוג שארית קוקו קטן
@@ -213,8 +210,9 @@ const Inventory: React.FC = () => {
   // מזהה ידידותי לפאת תצוגה חדשה (SHOWROOM-1001 וכו') - מחושב מכל ה-orders
   // עם isShowroomStock (כולל כאלה שכבר נמכרו!) לא רק showroomOrders, כדי
   // שהמספור לעולם לא יתאפס/יתנגש אחרי שפריט נמכר ונעלם מרשימת הלא-נמכרות.
-  // בשונה מ-nextHairId, אין כאן סיכון התנגשות בין-עסקית - זה רק שדה מידע
-  // (showroomCode), לא ה-ID של המסמך עצמו שנוצר תמיד אוטומטית ע"י Firestore.
+  // אין כאן סיכון התנגשות בין-עסקית - זה רק שדה מידע (showroomCode),
+  // לא ה-ID של המסמך עצמו שנוצר תמיד אוטומטית ע"י Firestore (אותו
+  // עיקרון בדיוק כמו nextHairCode למעלה).
   const nextShowroomCode = useMemo(() => {
     const maxNum = orders.reduce((max, o) => {
       if (!o.isShowroomStock) return max;
@@ -250,7 +248,7 @@ const Inventory: React.FC = () => {
     return hairItems.filter((item) => {
       const matchesSearch =
         searchTerm.trim() === '' ||
-        item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.hairCode || item.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.color.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -286,11 +284,14 @@ const Inventory: React.FC = () => {
     });
   };
 
-  // שומרים ל-Firestore עם ה-ID הידידותי שכבר נוצר בטופס (HAIR-1004 וכו'),
-  // ומתייגים ב-businessId כדי שהפריט ישויך לעסק המחובר בלבד.
+  // ה-Firestore document id נוצר אוטומטית (doc(collection(...))) - לא
+  // ה-hairCode הידידותי שהטופס הציג (item.id כאן, ראו הסבר ב-nextHairCode
+  // למעלה) - ה-hairCode נשמר בנפרד כשדה תצוגה בלבד. מתייגים ב-businessId
+  // כדי שהפריט ישויך לעסק המחובר בלבד.
   const handleSaveHairItem = async (item: HairItem) => {
-    const { id, ...data } = item;
-    await setDoc(doc(db, 'hairItems', id), { ...data, businessId: auth.currentUser!.uid });
+    const { id: hairCode, ...data } = item;
+    const newDocRef = doc(collection(db, 'hairItems'));
+    await setDoc(newDocRef, { ...data, hairCode, businessId: auth.currentUser!.uid });
     await createInventoryExpense({
       description: `רכישת קוקו - ${item.supplier} - ${item.color}, ${item.length}ס״מ`,
       amount: item.costPrice,
@@ -302,8 +303,9 @@ const Inventory: React.FC = () => {
   // קופסת שאריות לא נרכשת - היא נוצרת ריקה ומתמלאת ממיזוג שאריות קוקוים
   // שכבר נרכשו (ונרשמו כהוצאה) בעבר, אז אין כאן הוצאה נוספת ליצור.
   const handleCreateRemnantBox = async (item: HairItem) => {
-    const { id, ...data } = item;
-    await setDoc(doc(db, 'hairItems', id), { ...data, businessId: auth.currentUser!.uid });
+    const { id: hairCode, ...data } = item;
+    const newDocRef = doc(collection(db, 'hairItems'));
+    await setDoc(newDocRef, { ...data, hairCode, businessId: auth.currentUser!.uid });
     setIsRemnantBoxModalOpen(false);
   };
 
@@ -656,7 +658,7 @@ const Inventory: React.FC = () => {
                       : 0;
                     return (
                       <tr key={item.id}>
-                        <td className="mono">{item.id}</td>
+                        <td className="mono">{item.hairCode || item.id}</td>
                         <td>{isRemnant && '📦 '}{item.supplier}</td>
                         <td>{isRemnant ? '—' : `${item.length} ס"מ`}</td>
                         <td>{isRemnant ? '—' : `${item.initialWeight} גרם`}</td>
@@ -893,7 +895,7 @@ const Inventory: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleSaveHairItem}
-        nextId={nextHairId}
+        nextId={nextHairCode}
       />
 
       <AddBulkItemModal
@@ -932,7 +934,7 @@ const Inventory: React.FC = () => {
         isOpen={isRemnantBoxModalOpen}
         onClose={() => setIsRemnantBoxModalOpen(false)}
         onSave={handleCreateRemnantBox}
-        nextId={nextHairId}
+        nextId={nextHairCode}
       />
 
       <MergeRemnantModal

@@ -19,6 +19,10 @@ import './App.css';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // true עד ש-onAuthStateChanged מסיים את הבדיקה הראשונית (יש/אין סשן
+  // קיים) - כל עוד true, מוצג מסך טעינה ריק במקום מסך Login, כדי למנוע
+  // הבהוב של Login לרגע לפני שקופצים אוטומטית למערכת (ראו למטה).
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [activePage, setActivePage] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(false);
   const [businessName, setBusinessName] = useState('');
@@ -40,8 +44,13 @@ function App() {
   // בלי מאזין הזה, מה שגרם למסך ההתחברות להופיע שוב גם למי שכבר מחוברת.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (manualAuthRef.current) return; // כבר מטופל ע"י handleLogin/handleRegister עצמם
-      setIsLoggedIn(!!user);
+      if (!manualAuthRef.current) {
+        setIsLoggedIn(!!user);
+      }
+      // מסיים את בדיקת הסשן הראשונית בכל מקרה (יש משתמש או אין) - גם
+      // כשמדלגים על setIsLoggedIn כי handleLogin/handleRegister כבר
+      // מטפלות בזה, כדי שמסך הטעינה לא יישאר תקוע.
+      setCheckingAuth(false);
     });
     return () => unsubscribe();
   }, []);
@@ -203,6 +212,16 @@ function App() {
       setIsLoading(false);
     }
   };
+
+  // עוד לא ידוע אם יש סשן מחובר קיים - מסך טעינה ריק במקום להבהב את
+  // Login לרגע ואז לקפוץ מיד למערכת.
+  if (checkingAuth) {
+    return (
+      <div className="auth-checking-screen">
+        <div className="spinner-large" />
+      </div>
+    );
+  }
 
   // אם המשתמש לא מחובר - נציג את מסך הלוגין/הרשמה המעוצב עם השגיאות וההצלחות
   if (!isLoggedIn) {

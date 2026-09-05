@@ -1,3 +1,15 @@
+/* מסך טעינה ריק בזמן בדיקת onAuthStateChanged הראשונית (App.tsx) - לפני
+   שידוע אם יש סשן מחובר קיים, כדי למנוע הבהוב של מסך ה-Login. .spinner-
+   large מגיע מ-Login.css (מבנדל יחד לקובץ CSS גלובלי אחד, כמו כל האתר). */
+.auth-checking-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background);
+}
+
 /* ==========================================================================
    1. המכולה הראשית (Main App Container)
    ========================================================================== */
