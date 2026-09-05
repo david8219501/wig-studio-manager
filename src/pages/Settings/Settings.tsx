@@ -248,8 +248,19 @@ export default function Settings() {
     if (!businessId) return;
     getDoc(doc(db, "businessSettings", businessId))
       .then((snap) => {
-        const data = snap.data() as { workingHours?: WorkingHours } | undefined;
-        if (data?.workingHours) setWorkingHours({ ...DEFAULT_WORKING_HOURS, ...data.workingHours });
+        const data = snap.data() as { workingHours?: Partial<WorkingHours> } | undefined;
+        if (data?.workingHours) {
+          // מיזוג עמוק לכל יום בנפרד (לא רק ברמת המפתח העליון) - אם
+          // Firestore אי-פעם מחזיק יום חלקי (חסר open/close/closed),
+          // זה ממלא את מה שחסר מברירת המחדל במקום להשאיר undefined
+          // שיישלח בחזרה ב-setDoc הבא ויידחה ("Unsupported field value:
+          // undefined") - זה בדיוק הבאג שכבר תוקן פעם עם הערת תשלום.
+          const merged: WorkingHours = {};
+          for (const { key } of WEEK_DAYS) {
+            merged[key] = { ...DEFAULT_WORKING_HOURS[key], ...data.workingHours?.[key] };
+          }
+          setWorkingHours(merged);
+        }
       })
       .catch((err) => console.error("שגיאה בטעינת שעות פעילות:", err))
       .finally(() => setHoursLoading(false));
@@ -265,11 +276,25 @@ export default function Settings() {
     setSavingHours(true);
     setHoursSaveMessage(null);
     try {
-      await setDoc(doc(db, "businessSettings", businessId), { workingHours }, { merge: true });
+      // סניטציה הגנתית ממש לפני השמירה - מבטיחה שכל יום נשלח עם 3
+      // השדות מלאים (לא undefined), בלי קשר למה שהיה ב-state, כדי
+      // לחסום את משפחת הבאג הזו סופית מכל כיוון אפשרי.
+      const sanitized: WorkingHours = {};
+      for (const { key } of WEEK_DAYS) {
+        const day = workingHours[key] ?? DEFAULT_WORKING_HOURS[key];
+        sanitized[key] = {
+          open: day.open || DEFAULT_WORKING_HOURS[key].open,
+          close: day.close || DEFAULT_WORKING_HOURS[key].close,
+          closed: !!day.closed,
+        };
+      }
+      await setDoc(doc(db, "businessSettings", businessId), { workingHours: sanitized }, { merge: true });
+      setWorkingHours(sanitized);
       setHoursSaveMessage("success");
     } catch (err) {
       console.error("שגיאה בשמירת שעות פעילות:", err);
-      setHoursSaveMessage("error");
+      const detail = err instanceof Error ? err.message : String(err);
+      setHoursSaveMessage(`error: ${detail}`);
     } finally {
       setSavingHours(false);
     }
@@ -291,18 +316,45 @@ export default function Settings() {
       const collectionsToExport = ["clients", "orders", "appointments", "hairItems", "bulkItems", "expenses"];
       const backup: Record<string, unknown> = {};
 
-      for (const collectionName of collectionsToExport) {
-        const snap = await getDocs(query(collection(db, collectionName), where("businessId", "==", businessId)));
-        backup[collectionName] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      }
+      // Promise.allSettled ולא Promise.all/רצף - כדי שכשל בשליפת collection
+      // בודד (למשל בעיית הרשאות/אינדקס ספציפית לאחד מהם) לא יפיל את כל
+      // הגיבוי; מציג אזהרה מפורשת עם השם המדויק של מה שנכשל, במקום שגיאה
+      // גורפת שלא עוזרת לאבחן איפה בדיוק הבעיה.
+      const results = await Promise.allSettled(
+        collectionsToExport.map((collectionName) =>
+          getDocs(query(collection(db, collectionName), where("businessId", "==", businessId)))
+        )
+      );
+      const failedCollections: string[] = [];
+      results.forEach((result, i) => {
+        const collectionName = collectionsToExport[i];
+        if (result.status === "fulfilled") {
+          backup[collectionName] = result.value.docs.map((d) => ({ id: d.id, ...d.data() }));
+        } else {
+          console.error(`שגיאה בשליפת ${collectionName} לגיבוי:`, result.reason);
+          failedCollections.push(collectionName);
+          backup[collectionName] = [];
+        }
+      });
 
-      const [userSnap, settingsSnap] = await Promise.all([
+      const [userResult, settingsResult] = await Promise.allSettled([
         getDoc(doc(db, "users", businessId)),
         getDoc(doc(db, "businessSettings", businessId)),
       ]);
-      backup.businessProfile = userSnap.exists() ? userSnap.data() : null;
-      backup.businessSettings = settingsSnap.exists() ? settingsSnap.data() : null;
+      backup.businessProfile =
+        userResult.status === "fulfilled" && userResult.value.exists() ? userResult.value.data() : null;
+      backup.businessSettings =
+        settingsResult.status === "fulfilled" && settingsResult.value.exists() ? settingsResult.value.data() : null;
       backup.exportedAt = new Date().toISOString();
+
+      if (userResult.status === "rejected") console.error("שגיאה בשליפת פרופיל עסק לגיבוי:", userResult.reason);
+      if (settingsResult.status === "rejected") console.error("שגיאה בשליפת הגדרות עסק לגיבוי:", settingsResult.reason);
+
+      if (failedCollections.length > 0) {
+        setBackupError(
+          `הגיבוי ירד, אבל לא ניתן היה לשלוף: ${failedCollections.join(", ")} (שאר הנתונים כן נכללים).`
+        );
+      }
 
       const json = JSON.stringify(backup, null, 2);
       const blob = new Blob([json], { type: "application/json" });
@@ -316,7 +368,8 @@ export default function Settings() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("שגיאה בהורדת גיבוי:", err);
-      setBackupError("שגיאה בהורדת הגיבוי. נסי שוב.");
+      const detail = err instanceof Error ? err.message : String(err);
+      setBackupError(`שגיאה בהורדת הגיבוי: ${detail}`);
     } finally {
       setBackupLoading(false);
     }
@@ -648,8 +701,10 @@ export default function Settings() {
             {hoursSaveMessage === "success" && (
               <div className="google-calendar-status google-calendar-status--success">שעות הפעילות נשמרו בהצלחה.</div>
             )}
-            {hoursSaveMessage === "error" && (
-              <div className="google-calendar-status google-calendar-status--error">שגיאה בשמירה. נסי שוב.</div>
+            {hoursSaveMessage?.startsWith("error") && (
+              <div className="google-calendar-status google-calendar-status--error">
+                שגיאה בשמירה: {hoursSaveMessage.replace(/^error:\s*/, "")}
+              </div>
             )}
             <button type="button" className="btn-google-calendar" onClick={handleSaveWorkingHours} disabled={savingHours}>
               {savingHours ? "שומרת..." : "שמירה"}
