@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { getApps } from 'firebase/app';
 import twemoji from '@twemoji/api';
 import { auth, db } from './services/firebase';
 import Login, { type RegisterData } from './pages/Login/Login';
@@ -110,16 +109,6 @@ function App() {
     );
     return () => unsubscribe();
   }, [isLoggedIn]);
-
-  // בדיקת תקינות חיבור לפיירבייס בעליית האפליקציה (מופיע ב-F12 Console)
-  useEffect(() => {
-    const apps = getApps();
-    if (apps.length > 0) {
-      console.log("🔥 Firebase is successfully initialized and connected!");
-    } else {
-      console.error("❌ Firebase is NOT connected.");
-    }
-  }, []);
 
   // הופכת כל תו אימוג'י שמוצג בעמוד לתמונת Twemoji קבועה (SVG), כדי
   // שהמראה יהיה זהה בכל מחשב/דפדפן/מערכת הפעלה - לא תלוי בגופן

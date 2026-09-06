@@ -40,27 +40,6 @@ export interface HairItem {
     retailPrice?: number; // מחיר מכירה ללקוחה - אם קיים, זה מוצר קמעונאי (לא רק חומר ייצור) ומקבל כפתור "מכירה מהירה" במלאי
   }
   
-  // 2. תשלומים ומסמכים
-  export interface Payment {
-    id: string;
-    clientId: string;
-    amount: number;
-    date: string;
-    paymentMethod: 'cash' | 'credit' | 'transfer' | 'check' | 'other';
-    referenceNumber?: string; // מספר אסמכתא / 4 ספרות
-    description: string;
-    pdfUrl?: string; // קישור לקובץ האישור ב-Firebase Storage
-  }
-  
-  export interface ClientDocument {
-    id: string;
-    clientId: string;
-    title: string;
-    date: string;
-    type: 'digital_contract' | 'scanned_image';
-    fileUrl: string; // קישור לתמונה או ל-PDF
-  }
-  
   // 3. הזמנת פאה
 
   // פריט מלאי פשוט (רשת, ראש פאה, קופסת מתנה וכו') שצורף להזמנה ספציפית.
@@ -84,8 +63,7 @@ export interface HairItem {
   }
 
   // תשלום בודד שנגבה על חשבון הזמנה - חלק ממערך payments על ה-order עצמו
-  // (לא collection נפרד). שונה מהממשק Payment למעלה (ששייך למודל קבלות/
-  // מסמכים עתידי בכרטיס לקוחה, clientId-scoped, ולא בשימוש כרגע בקוד).
+  // (לא collection נפרד).
   export interface OrderPayment {
     amount: number;
     method: 'cash' | 'credit' | 'transfer' | 'check';
@@ -93,31 +71,3 @@ export interface HairItem {
     note?: string;
   }
 
-  export interface WigOrder {
-    id: string;
-    clientId?: string; // אם ריק - מדובר בפאת תצוגה!
-    isShowroom: boolean;
-    status: 'in_production' | 'ready' | 'delivered';
-    usedBulkItems: UsedBulkItem[]; // פריטי מלאי פשוט שצורפו להזמנה (רשת, ראש פאה וכו')
-    usedHairItems: UsedHairItem[]; // קוקוים שמשויכים בפועל להזמנה (יכול להיות יותר מאחד)
-    hairCostEstimated: number; // אומדן עלות גולמי, מחושב אוטומטית ביצירת ההזמנה
-    totalPrice: number; // מחיר סופי ללקוחה
-    payments: OrderPayment[]; // היסטוריית תשלומים מלאה; paidAmount הוא הסכום המתוחזק שלהם
-    notes?: string;
-    createdAt: string;
-  }
-  
-  // 4. כרטיס לקוחה מורחב
-  export interface Client {
-    id: string;
-    name: string;
-    phone: string;
-    email?: string;
-    notes?: string;
-    measurements?: {
-      circumference?: string; // היקף
-      earToEar?: string; // מאוזן לאוזן
-      frontToNape?: string; // ממצח לעורף
-    };
-    createdAt: string;
-  }

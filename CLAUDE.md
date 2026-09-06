@@ -67,9 +67,7 @@ There is no test runner configured (no `npm test` script, no test files present)
 
 ## Firebase project note
 
-`src/services/firebase.ts` initializes against project `esti-wigs-system`. This differs from an older config referenced in stale docs (`key_files_preview.txt`, project `esti-wigs-portal`) — treat `src/services/firebase.ts` as the source of truth for which Firebase project is live.
-
-`key_files_preview.txt` and `project_structure.txt` at the repo root are stale snapshots from an earlier state of the project (e.g. they show a pre-auth `App.tsx` and an old `Clients.tsx`) — don't treat them as current; read the actual source files instead.
+`src/services/firebase.ts` initializes against project `esti-wigs-system`. An older config once referenced project `esti-wigs-portal` in now-deleted stale docs — treat `src/services/firebase.ts` as the source of truth for which Firebase project is live.
 
 ## Notes from GEMINI.md
 

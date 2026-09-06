@@ -33,47 +33,6 @@
   font-weight: 500;
 }
 
-.dash-quick-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.btn-dash-primary {
-  background: var(--color-accent);
-  color: var(--color-on-primary);
-  border: none;
-  padding: 10px 20px;
-  border-radius: var(--radius-lg);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-elevated);
-  transition: all var(--duration-fast) var(--easing);
-}
-
-.btn-dash-primary:hover {
-  background: var(--color-primary);
-  transform: translateY(-1px);
-}
-
-.btn-dash-secondary {
-  background: var(--color-surface);
-  color: var(--color-accent);
-  border: 1px solid var(--color-border);
-  padding: 10px 20px;
-  border-radius: var(--radius-lg);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-card);
-  transition: all var(--duration-fast) var(--easing);
-}
-
-.btn-dash-secondary:hover {
-  background: var(--color-surface-hover);
-  border-color: var(--color-accent-border);
-}
-
 /* KPI Cards */
 .dash-kpi-grid {
   display: grid;
@@ -163,12 +122,6 @@
   flex-direction: column;
 }
 
-.dash-card-header-flex {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .dash-card-title {
   font-size: 16px;
   font-weight: 700;
@@ -177,15 +130,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.dash-card-badge-info {
-  font-size: 12px;
-  background: var(--color-accent-bg);
-  color: var(--color-accent);
-  padding: 4px 10px;
-  border-radius: var(--radius-md);
-  font-weight: 600;
 }
 
 /* Charts */
