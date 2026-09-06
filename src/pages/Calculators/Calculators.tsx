@@ -243,27 +243,47 @@ function RepairsCalculator({ settings }: { settings: Settings }) {
 interface CatalogRow {
   length: number;
   cost: number;
-  suggestedPrice: number;
+  price: number;
 }
+
+type CatalogMode = "auto" | "manual";
 
 interface PriceCatalog {
   id: string;
   name: string;
   structure: string;
   fullness: string;
+  mode: CatalogMode;
   createdAt: string;
   rows: CatalogRow[];
 }
 
-// שורות קטלוג לכל האורכים האפשריים (HAIR_LENGTH_OPTIONS) - עלות גולמית
-// מ-calculateHairCost (בלי סקין/טופ/רשת/נוספות, בשונה מ-PriceCalculator -
-// הקטלוג מציג רק את עלות השיער עצמה) ומחיר מוצע עם אחוז הרווח, אותה
-// נוסחה בדיוק כמו suggestedPrice ב-RepairOrderForm.tsx.
-function computeCatalogRows(structure: string, fullness: string, settings: Settings): CatalogRow[] {
+// שורות קטלוג "אוטומטיות" לכל האורכים האפשריים (HAIR_LENGTH_OPTIONS) -
+// עלות גולמית מ-calculateHairCost (בלי סקין/טופ/רשת/נוספות, בשונה
+// מ-PriceCalculator - הקטלוג מציג רק את עלות השיער עצמה) ומחיר מוצע עם
+// אחוז הרווח, אותה נוסחה בדיוק כמו suggestedPrice ב-RepairOrderForm.tsx.
+// cost תמיד מחושב כך - זו עובדה אובייקטיבית מהמחשבון, לא ניתנת לעריכה
+// ידנית באף מצב. price הוא רק ההצעה ה"אוטומטית" - במצב ידני המשתמשת
+// יכולה לשנות אותו (ראו handleCreateCatalog/recomputeRows).
+function computeAutoRows(structure: string, fullness: string, settings: Settings): CatalogRow[] {
   return HAIR_LENGTH_OPTIONS.map((length) => {
     const { hairCost } = calculateHairCost({ length, structure, fullness }, settings);
-    const suggestedPrice = hairCost * (1 + settings.profitMargin / 100);
-    return { length, cost: Math.round(hairCost), suggestedPrice: Math.round(suggestedPrice) };
+    const cost = Math.round(hairCost);
+    const price = Math.round(hairCost * (1 + settings.profitMargin / 100));
+    return { length, cost, price };
+  });
+}
+
+// עדכון שורות קטלוג קיים (כפתור "עדכן לפי הגדרות נוכחיות" + שמירת עריכה
+// של מבנה/מלאות): cost מחושב מחדש תמיד (עלות חומר גלם יכולה להשתנות).
+// במצב אוטומטי גם price מחושב מחדש; במצב ידני ה-price שהמשתמשת קבעה
+// נשאר כמו שהוא (מאותר לפי length, לא לפי אינדקס - ליתר בטחון).
+function recomputeRows(existingRows: CatalogRow[], structure: string, fullness: string, mode: CatalogMode, settings: Settings): CatalogRow[] {
+  const autoRows = computeAutoRows(structure, fullness, settings);
+  if (mode === "auto") return autoRows;
+  return autoRows.map((row) => {
+    const existing = existingRows.find((r) => r.length === row.length);
+    return { ...row, price: existing?.price ?? row.price };
   });
 }
 
@@ -275,6 +295,8 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
   const [name, setName] = useState("");
   const [structure, setStructure] = useState("");
   const [fullness, setFullness] = useState("");
+  const [mode, setMode] = useState<CatalogMode>("auto");
+  const [manualPrices, setManualPrices] = useState<Record<number, number>>({});
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -292,7 +314,28 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
       (snapshot) => {
         setCatalogs(
           snapshot.docs
-            .map((d) => ({ id: d.id, ...(d.data() as Omit<PriceCatalog, "id">) }))
+            .map((d) => {
+              // תאימות לאחור: קטלוגים שנוצרו לפני הוספת מצב ידני/עמודת
+              // רווח לא מחזיקים mode או rows[].price (רק suggestedPrice
+              // הישן) - ממפים אותם כ"אוטומטי" עם price נופל בחזרה ל-
+              // suggestedPrice, כדי שלא יישברו בתצוגה.
+              const data = d.data() as Record<string, unknown>;
+              const rawRows = (data.rows as Array<Record<string, unknown>>) || [];
+              const rows: CatalogRow[] = rawRows.map((r) => ({
+                length: r.length as number,
+                cost: r.cost as number,
+                price: (r.price as number) ?? (r.suggestedPrice as number) ?? 0,
+              }));
+              return {
+                id: d.id,
+                name: data.name as string,
+                structure: data.structure as string,
+                fullness: data.fullness as string,
+                createdAt: data.createdAt as string,
+                mode: (data.mode === "manual" ? "manual" : "auto") as CatalogMode,
+                rows,
+              };
+            })
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         );
         setLoading(false);
@@ -307,26 +350,44 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
     return () => unsub();
   }, []);
 
+  // בבחירת מבנה/מלאות אחרים - מנקה override ידניים קודמים (נשמרים לפי
+  // length בלבד, אז בלי הניקוי הזה ערך ידני ממבנה/מלאות קודמים היה
+  // "נדבק" בטעות למבנה/מלאות החדשים). לא מזין מחדש בפועל - שדה המחיר
+  // הריק נופל חזרה ל-row.price (ההצעה האוטומטית) ברינדור, ראו למטה.
+  const handleStructureChange = (v: string) => { setStructure(v); setManualPrices({}); };
+  const handleFullnessChange = (v: string) => { setFullness(v); setManualPrices({}); };
+
+  const previewRows = useMemo(() => {
+    if (!structure || !fullness) return [];
+    return computeAutoRows(structure, fullness, settings);
+  }, [structure, fullness, settings]);
+
   const canCreate = name.trim() !== "" && structure !== "" && fullness !== "";
 
   const handleCreateCatalog = async () => {
     if (!canCreate) return;
+    const rows: CatalogRow[] = mode === "manual"
+      ? previewRows.map((row) => ({ ...row, price: manualPrices[row.length] ?? row.price }))
+      : previewRows;
     await addDoc(collection(db, "priceCatalogs"), {
       businessId: auth.currentUser!.uid,
       name: name.trim(),
       structure,
       fullness,
+      mode,
       createdAt: new Date().toISOString(),
-      rows: computeCatalogRows(structure, fullness, settings),
+      rows,
     });
     setName("");
     setStructure("");
     setFullness("");
+    setMode("auto");
+    setManualPrices({});
   };
 
   const handleRefreshCatalog = async (catalog: PriceCatalog) => {
     await updateDoc(doc(db, "priceCatalogs", catalog.id), {
-      rows: computeCatalogRows(catalog.structure, catalog.fullness, settings),
+      rows: recomputeRows(catalog.rows, catalog.structure, catalog.fullness, catalog.mode, settings),
     });
   };
 
@@ -337,16 +398,18 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
     setEditFullness(catalog.fullness);
   };
 
-  // עריכת מבנה/מלאות משנה גם את מחירי הקטלוג - אין טעם לאפשר לשמור
-  // מבנה/מלאות חדשים עם שורות מחיר "קפואות" מהערכים הישנים, אז השמירה
-  // מחשבת מחדש את rows כמו כפתור "עדכן לפי הגדרות נוכחיות".
+  // עריכת מבנה/מלאות עשויה לשנות את עלות השיער הבסיסית - cost מחושב
+  // מחדש תמיד. price מחושב מחדש רק במצב אוטומטי; במצב ידני נשאר כמו
+  // שהמשתמשת קבעה (recomputeRows, אותה לוגיקה כמו כפתור "עדכן").
   const handleSaveEdit = async () => {
     if (!editingId || editName.trim() === "" || editStructure === "" || editFullness === "") return;
+    const catalog = catalogs.find((c) => c.id === editingId);
+    if (!catalog) return;
     await updateDoc(doc(db, "priceCatalogs", editingId), {
       name: editName.trim(),
       structure: editStructure,
       fullness: editFullness,
-      rows: computeCatalogRows(editStructure, editFullness, settings),
+      rows: recomputeRows(catalog.rows, editStructure, editFullness, catalog.mode, settings),
     });
     setEditingId(null);
   };
@@ -367,11 +430,61 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
 
         <div className="calc-row">
           <MiniText label="שם הקטלוג" value={name} onChange={setName} placeholder="לדוגמה: פאות בלונד טוף לייס" />
-          <MiniSelect label="מבנה" value={structure} onChange={setStructure}
+          <MiniSelect label="מבנה" value={structure} onChange={handleStructureChange}
             options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
-          <MiniSelect label="מלאות" value={fullness} onChange={setFullness}
+          <MiniSelect label="מלאות" value={fullness} onChange={handleFullnessChange}
             options={FULLNESS_OPTIONS.map(v=>({v,l:v}))} />
         </div>
+
+        <div className="calc-field">
+          <label className="calc-field-label">קביעת מחירים - אוטומטי לפי המחשבון, או ידני בעצמך?</label>
+          <div className="tab-switch">
+            <button type="button" className={mode === "auto" ? "tab-btn active" : "tab-btn"} onClick={() => setMode("auto")}>
+              אוטומטי
+            </button>
+            <button type="button" className={mode === "manual" ? "tab-btn active" : "tab-btn"} onClick={() => setMode("manual")}>
+              ידני
+            </button>
+          </div>
+        </div>
+
+        {mode === "manual" && previewRows.length > 0 && (
+          <div className="catalog-table-wrapper">
+            <table className="catalog-table">
+              <thead>
+                <tr>
+                  <th>אורך עורף</th>
+                  <th>עלות שיער</th>
+                  <th>מחיר (לעריכה)</th>
+                  <th>רווח</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewRows.map((row) => {
+                  const price = manualPrices[row.length] ?? row.price;
+                  const profit = price - row.cost;
+                  return (
+                    <tr key={row.length}>
+                      <td className="font-bold">{row.length} ס״מ</td>
+                      <td className="mono">₪{row.cost.toLocaleString("he-IL")}</td>
+                      <td>
+                        <input
+                          type="number"
+                          className="calc-input catalog-price-input"
+                          value={price}
+                          onChange={(e) =>
+                            setManualPrices((prev) => ({ ...prev, [row.length]: Number(e.target.value) || 0 }))
+                          }
+                        />
+                      </td>
+                      <td className="mono text-success">₪{profit.toLocaleString("he-IL")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <button className="calc-settings-btn" disabled={!canCreate} onClick={handleCreateCatalog}>
           + צור קטלוג
@@ -412,7 +525,7 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
               <div>
                 <span className="price-catalog-name">{catalog.name}</span>
                 <div className="price-catalog-meta">
-                  {catalog.structure} · {catalog.fullness} · נוצר ב-{formatDateIL(catalog.createdAt)}
+                  {catalog.structure} · {catalog.fullness} · {catalog.mode === "manual" ? "תמחור ידני" : "תמחור אוטומטי"} · נוצר ב-{formatDateIL(catalog.createdAt)}
                 </div>
               </div>
               <div className="price-catalog-actions">
@@ -433,7 +546,8 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                 <tr>
                   <th>אורך עורף</th>
                   <th>עלות שיער</th>
-                  <th>מחיר מוצע</th>
+                  <th>מחיר</th>
+                  <th>רווח</th>
                 </tr>
               </thead>
               <tbody>
@@ -441,7 +555,8 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                   <tr key={row.length}>
                     <td className="font-bold">{row.length} ס״מ</td>
                     <td className="mono">₪{row.cost.toLocaleString("he-IL")}</td>
-                    <td className="mono catalog-price">₪{row.suggestedPrice.toLocaleString("he-IL")}</td>
+                    <td className="mono catalog-price">₪{row.price.toLocaleString("he-IL")}</td>
+                    <td className="mono text-success">₪{(row.price - row.cost).toLocaleString("he-IL")}</td>
                   </tr>
                 ))}
               </tbody>

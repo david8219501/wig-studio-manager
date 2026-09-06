@@ -387,6 +387,12 @@
   color: var(--color-text);
 }
 
+/* .mono (index.css) גלובלי וקובע display: inline-flex - דורס את
+   table-cell של תאי המחיר/עלות/רווח ושובר את היישור מול העמודות
+   האחרות. אותה התנגשות בדיוק שתוקנה היום ב-Reports.css/ClientDrawer.css
+   - סלקטור ממוקד (2 מחלקות+type) מנצח בלי !important. */
+.catalog-table td.mono { display: table-cell; }
+
 .catalog-table tr:hover {
   background: var(--color-background);
 }
@@ -466,4 +472,11 @@
 
 .price-catalog-delete-btn {
   color: var(--color-danger);
+}
+
+.catalog-price-input {
+  width: 90px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  text-align: right;
 }
