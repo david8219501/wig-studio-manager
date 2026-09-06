@@ -305,6 +305,15 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // הצגת/הסתרת עמודת "רווח" בטבלת הקטלוגים השמורים - state גלובלי אחד
+  // לכל הטאב (לא כפתור נפרד לכל קטלוג), כי השימוש הטיפוסי הוא הצגת
+  // המסך ללקוחה: אין סיבה לחשוף רווח בקטלוג אחד ולהסתיר באחר בעת ובעונה
+  // אחת. false כברירת מחדל - מוסתר, כדי שלא "יחשף בטעות" למי שמסתכל
+  // מעבר לכתף. לא חל על טבלת התצוגה המקדימה במצב ידני בטופס היצירה -
+  // זו כלי עבודה פנימי (העסק ממלא מחירים, לא מציג ללקוחה), אז הרווח
+  // שם תמיד מוצג כדי שהמשתמשת תדע כמה היא מרוויחה בזמן שהיא קובעת מחיר.
+  const [showProfit, setShowProfit] = useState(false);
+
   useEffect(() => {
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -508,6 +517,14 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
         <div className="calc-hint">אין עדיין קטלוגי מחירים - צרי את הראשון למעלה.</div>
       )}
 
+      {!loading && !loadError && catalogs.length > 0 && (
+        <div className="price-catalog-profit-toggle">
+          <button className="calc-toggle-btn" onClick={() => setShowProfit((prev) => !prev)}>
+            {showProfit ? "🙈 הסתר רווח" : "👁 הצג רווח"}
+          </button>
+        </div>
+      )}
+
       {!loading && !loadError && catalogs.map((catalog) => (
         <div key={catalog.id} className="calc-card price-catalog-card">
           {editingId === catalog.id ? (
@@ -547,7 +564,7 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                   <th>אורך עורף</th>
                   <th>עלות שיער</th>
                   <th>מחיר</th>
-                  <th>רווח</th>
+                  {showProfit && <th>רווח</th>}
                 </tr>
               </thead>
               <tbody>
@@ -556,7 +573,9 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                     <td className="font-bold">{row.length} ס״מ</td>
                     <td className="mono">₪{row.cost.toLocaleString("he-IL")}</td>
                     <td className="mono catalog-price">₪{row.price.toLocaleString("he-IL")}</td>
-                    <td className="mono text-success">₪{(row.price - row.cost).toLocaleString("he-IL")}</td>
+                    {showProfit && (
+                      <td className="mono text-success">₪{(row.price - row.cost).toLocaleString("he-IL")}</td>
+                    )}
                   </tr>
                 ))}
               </tbody>

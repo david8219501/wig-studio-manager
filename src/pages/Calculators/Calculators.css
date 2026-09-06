@@ -441,6 +441,11 @@
   cursor: not-allowed;
 }
 
+.price-catalog-profit-toggle {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .price-catalog-card-header {
   display: flex;
   justify-content: space-between;
