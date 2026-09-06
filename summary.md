@@ -76,3 +76,33 @@ dir/עיגול), אז לא תוקנה בסבב הזה - רק מצוינת כפע
 **בדיקות:** `npm run build` נקי (אחרי תיקון שגיאת `TS6133` על ייבוא
 `formatDateIL` מיותר שנוסף מוקדם מדי לקראת קבוצה 3 - הוסר). `npm
 run lint` - 24 בעיות, זהה לבייסליין, `Reports.tsx` נקי.
+
+## קבוצה 2: מלאי "מת" - תקוע מעל 60 יום ✅ הושלמה
+
+נוסף listener חדש (`onSnapshot`) על `hairItems` (מסונן לפי
+`businessId`, בדיוק כמו שלושת ה-listeners הקיימים ב-Reports.tsx),
+וכרטיס טבלה חדש שמציג פריטי שיער "תקועים": `status === 'available'`,
+`currentWeight === initialWeight` (לא נוצלו בכלל), ו-`createdAt`
+ישן מ-60 יום (`DEAD_STOCK_DAYS_THRESHOLD` - קבוע קשיח בקוד, לא
+נשלף מ-`businessSettings`, כמבוקש במפורש).
+
+**החלטה שהתקבלה תוך כדי (לא הוזכרה במפורש בבקשה):** קופסאות שאריות
+(`isRemnantBox: true`) מוחרגות מהחישוב. הסיבה: "לא נוצל בכלל" לא
+רלוונטי סמנטית לפריט שכבר נוצר ממיזוג שאריות קיימות, וה-`costPrice`
+שלו לא משמעותי (`types/index.ts` מציין במפורש שהמחיר האמיתי של
+קופסת שאריות הוא `remnantTotalValue/currentWeight`, לא `costPrice`).
+
+**תצוגה:** לכל שורה - מזהה (`hairCode || id`, דפוס הנפילה-לאחור
+הקיים באתר), גוון/אורך, עלות (מעוגלת, `.mono`), ימים במלאי. מוין
+מהתקוע ביותר לפחות. סכום עלות כולל (`Math.round`, `.mono`) מוצג
+מעל הטבלה. נעשה שימוש חוזר ב-`.reports-table`/`.reports-table-
+wrapper` הקיימים (אותה הגנת `overflow-x`/תיקון `.mono` מקבוצה 0).
+
+**קבצים:** `src/pages/Reports/Reports.tsx`, `src/pages/Reports/Reports.css`
+(נוספה `.dead-stock-total` בלבד).
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - נתפסה שגיאת
+`react-hooks/purity` אמיתית (`Date.now()` נקרא בתוך גוף ה-`useMemo`
+- פונקציה לא טהורה) - תוקנה ע"י שימוש חוזר ב-`now` (אובייקט `Date`
+שכבר קיים בתחילת אותו `useMemo`) במקום קריאה נוספת. אחרי התיקון:
+24 בעיות, זהה לבייסליין, `Reports.tsx` נקי.

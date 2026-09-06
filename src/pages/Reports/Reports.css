@@ -27,6 +27,7 @@
 .reports-table td.mono { display: table-cell; }
 
 .tag-service { background: var(--color-accent-bg); color: var(--color-accent); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 11px; }
+.dead-stock-total { font-size: 14px; margin-bottom: 16px; color: var(--color-primary); }
 .text-success { color: var(--color-success); }
 .text-danger { color: var(--color-danger); }
 

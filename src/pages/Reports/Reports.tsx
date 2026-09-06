@@ -5,7 +5,7 @@ import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import { isUnsoldShowroomStock } from "../../utils/orderCreation";
 import { calculateOrderProfit } from "../../utils/orderProfit";
-import type { BulkItem } from "../../types";
+import type { BulkItem, HairItem } from "../../types";
 import { getMonthNameIL } from "../../utils/formatDate";
 import "./Reports.css";
 
@@ -20,6 +20,10 @@ const PROFIT_TYPE_COLORS = ["#9b69ff", "#3b82f6", "#f59e0b", "#10b981"];
 // חישובי הרווח/החוב בדף הזה - אותו סטטוס קבוע, לא מיובא כי הוא local
 // const לא-מיוצא שם (עקבי עם המוסכמה הקיימת של קבועים מקומיים קטנים).
 const CANCELLED_STATUS = "בוטלה";
+
+// קבוצה 2: סף "מלאי מת" בימים - קבוע בקוד לפי דרישה מפורשת, לא נשלף
+// מ-businessSettings.
+const DEAD_STOCK_DAYS_THRESHOLD = 60;
 
 interface ExpenseRow {
   id: string;
@@ -45,6 +49,7 @@ export default function Reports() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
+  const [hairItems, setHairItems] = useState<HairItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -95,10 +100,24 @@ export default function Reports() {
       }
     );
 
+    const hairUnsub = onSnapshot(
+      query(collection(db, "hairItems"), where("businessId", "==", businessId)),
+      (snapshot) => {
+        setHairItems(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<HairItem, "id">) })));
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error loading hair items:", err);
+        setLoadError("שגיאה בטעינת נתוני הדוחות. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
+    );
+
     return () => {
       ordersUnsub();
       expensesUnsub();
       bulkUnsub();
+      hairUnsub();
     };
   }, []);
 
@@ -182,6 +201,22 @@ export default function Reports() {
       return row;
     });
 
+    // קבוצה 2: מלאי "מת" - פריטי שיער זמינים, תקועים מעל 60 יום, שלא
+    // נוצלו בכלל (currentWeight === initialWeight). קופסאות שאריות
+    // (isRemnantBox) מוחרגות - שם "לא נוצל" לא רלוונטי סמנטית (הן
+    // נוצרות ממיזוג שאריות קיימות, ו-costPrice לא משמעותי עבורן -
+    // המחיר האמיתי שלהן הוא remnantTotalValue/currentWeight).
+    const nowMs = now.getTime();
+    const deadStockItems = hairItems
+      .filter((h) => !h.isRemnantBox && h.status === "available" && h.currentWeight === h.initialWeight)
+      .map((h) => {
+        const daysInStock = Math.floor((nowMs - new Date(h.createdAt).getTime()) / (24 * 60 * 60 * 1000));
+        return { ...h, daysInStock };
+      })
+      .filter((h) => h.daysInStock > DEAD_STOCK_DAYS_THRESHOLD)
+      .sort((a, b) => b.daysInStock - a.daysInStock);
+    const deadStockTotalCost = deadStockItems.reduce((sum, h) => sum + (h.costPrice || 0), 0);
+
     // זמינות מלאי - המדד היחיד ב"יעילות תפעולית" עם מקור נתונים אמיתי היום
     const inventoryAvailabilityPct = bulkItems.length > 0
       ? Math.round((bulkItems.filter((b) => b.quantity > b.minThreshold).length / bulkItems.length) * 100)
@@ -212,9 +247,11 @@ export default function Reports() {
       ],
       monthlyRows,
       profitByTypeMonthly,
+      deadStockItems,
+      deadStockTotalCost,
       inventoryAvailabilityPct,
     };
-  }, [orders, expenses, bulkItems]);
+  }, [orders, expenses, bulkItems, hairItems]);
 
   return (
     <div className="reports-page">
@@ -306,6 +343,42 @@ export default function Reports() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+
+        {/* קבוצה 2: מלאי "מת" - תקוע מעל 60 יום */}
+        <div className="reports-card full-width">
+          <h2 className="reports-title">מלאי "מת" - תקוע מעל {DEAD_STOCK_DAYS_THRESHOLD} יום</h2>
+          {report.deadStockItems.length === 0 ? (
+            <p>אין כרגע פריטי מלאי תקועים מעל {DEAD_STOCK_DAYS_THRESHOLD} יום.</p>
+          ) : (
+            <>
+              <p className="dead-stock-total">
+                סה"כ עלות תקועה: <span className="mono font-bold text-danger">₪{Math.round(report.deadStockTotalCost).toLocaleString()}</span>
+              </p>
+              <div className="reports-table-wrapper">
+                <table className="reports-table">
+                  <thead>
+                    <tr>
+                      <th>מזהה</th>
+                      <th>גוון / אורך</th>
+                      <th>עלות (₪)</th>
+                      <th>ימים במלאי</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.deadStockItems.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.hairCode || item.id}</td>
+                        <td>{item.color} / {item.length} ס"מ</td>
+                        <td className="mono">₪{Math.round(item.costPrice || 0).toLocaleString()}</td>
+                        <td>{item.daysInStock}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Efficiency Report */}
