@@ -495,8 +495,8 @@ export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) 
 
   return (
     <div className="settings-page">
-      <div className="placeholder-card">
-        <h2>🏢 פרופיל העסק</h2>
+      <div className="settings-card">
+        <h2 className="settings-card-title">🏢 פרופיל העסק</h2>
         {profileLoading ? (
           <p>טוענת פרטי עסק...</p>
         ) : (
@@ -556,8 +556,8 @@ export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) 
         )}
       </div>
 
-      <div className="placeholder-card">
-        <h2>🗂️ ניהול קטגוריות</h2>
+      <div className="settings-card">
+        <h2 className="settings-card-title">🗂️ ניהול קטגוריות</h2>
         {categoriesLoading ? (
           <p>טוענת קטגוריות...</p>
         ) : (
@@ -627,8 +627,8 @@ export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) 
         )}
       </div>
 
-      <div className="placeholder-card">
-        <h2>💰 הגדרות תמחור</h2>
+      <div className="settings-card">
+        <h2 className="settings-card-title">💰 הגדרות תמחור</h2>
         {pricingLoading ? (
           <p>טוענת הגדרות תמחור...</p>
         ) : (
@@ -672,8 +672,8 @@ export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) 
         )}
       </div>
 
-      <div className="placeholder-card">
-        <h2>💾 יצוא וגיבוי נתונים</h2>
+      <div className="settings-card">
+        <h2 className="settings-card-title">💾 יצוא וגיבוי נתונים</h2>
         <p>
           מוריד קובץ JSON אחד עם כל הנתונים של העסק (לקוחות, הזמנות, פגישות,
           מלאי שיער, מלאי פשוט, הוצאות, פרופיל והגדרות) - שמור לעצמך כגיבוי.
@@ -686,8 +686,8 @@ export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) 
         </button>
       </div>
 
-      <div className="placeholder-card google-calendar-card">
-        <h2>📅 סנכרון יומן Google Calendar</h2>
+      <div className="settings-card google-calendar-card">
+        <h2 className="settings-card-title">📅 סנכרון יומן Google Calendar</h2>
         <p>
           חיבור חד-פעמי שמאפשר לכל תור חדש/מעודכן/נמחק ביומן הפגישות של המערכת
           להופיע אוטומטית גם ב-Google Calendar האישי שלך.
@@ -767,8 +767,8 @@ export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) 
         onCancel={() => setConfirmDisconnectOpen(false)}
       />
 
-      <div className="placeholder-card">
-        <h2>👤 ניהול חשבון</h2>
+      <div className="settings-card">
+        <h2 className="settings-card-title">👤 ניהול חשבון</h2>
         <button type="button" className="btn-google-calendar" onClick={() => setConfirmLogoutOpen(true)}>
           התנתקות
         </button>
@@ -787,8 +787,8 @@ export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) 
         onCancel={() => setConfirmLogoutOpen(false)}
       />
 
-      <div className="placeholder-card settings-danger-zone">
-        <h2>⚠️ אזור מסוכן</h2>
+      <div className="settings-card settings-danger-zone">
+        <h2 className="settings-card-title">⚠️ אזור מסוכן</h2>
         <p>
           מחיקת החשבון היא פעולה הרסנית ובלתי הפיכה - כל הנתונים (לקוחות, הזמנות,
           מלאי, הוצאות, פגישות והגדרות) יימחקו לצמיתות ולא ניתן יהיה לשחזר אותם.

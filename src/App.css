@@ -42,20 +42,3 @@
     flex-direction: column;
   }
   
-  /* ==========================================================================
-     3. רכיבים כלליים (General Components)
-     ========================================================================== */
-  .placeholder-card {
-    background-color: var(--color-surface);
-    padding: 24px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--color-border);
-    text-align: right;
-    transition: all var(--duration-fast) var(--easing);
-  }
-
-  .placeholder-card:hover {
-    border-color: var(--color-accent-border);
-    box-shadow: var(--shadow-elevated);
-  }

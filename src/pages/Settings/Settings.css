@@ -5,6 +5,46 @@
   padding: var(--page-padding);
 }
 
+/* כרטיס אחיד לכל 7 האזורים בדף (פרופיל עסק/קטגוריות/תמחור/גיבוי/
+   Google Calendar/ניהול חשבון/אזור מסוכן) - עבר לכאן מ-App.css תחת
+   השם הגנרי .placeholder-card (שם שרידי מסקאפולד מוקדם, לא היה מתועד
+   בשום מקום אחר ולא בשימוש מחוץ לדף הזה) ושונה שם ל-.settings-card,
+   כדי לעקוב אחרי המוסכמה הקיימת (CLAUDE.md: קובץ CSS אחד לכל
+   דף/רכיב, קו-לוקייטד) ולהיות עקבי עם השמות של כרטיסים בדפים אחרים
+   (.calc-card/.dash-card/.reports-card). .google-calendar-card/
+   .settings-danger-zone ממשיכים לדרוס רק צבע/מסגרת ספציפיים, לא
+   padding/radius/shadow - כל הכרטיסים חולקים את אלה במאה אחוז. */
+.settings-card {
+  background-color: var(--color-surface);
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+  text-align: right;
+  transition: all var(--duration-fast) var(--easing);
+}
+
+.settings-card:hover {
+  border-color: var(--color-accent-border);
+  box-shadow: var(--shadow-elevated);
+}
+
+/* כותרת-פנימית אחידה לכל כרטיס - קו מפריד מתחת לכותרת, אותו דפוס
+   כמו .calc-card-header ב-Calculators.css - כדי שכל כרטיס יקרא בבירור
+   כ"כותרת + גוף", לא כותרת צפה בלי הפרדה מהתוכן שמתחתיה. */
+.settings-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-danger-zone .settings-card-title {
+  border-bottom-color: var(--color-danger);
+}
+
 .google-calendar-card p {
   color: var(--color-text-muted);
   line-height: 1.6;
@@ -167,23 +207,26 @@
   margin: 0 0 10px;
 }
 
+/* תגיות ("pills") קומפקטיות בפריסת flex-wrap - נשברות לשורה הבאה
+   כשנגמר מקום, במקום רשימת שורות ברוחב מלא (אחת מתחת לשנייה). */
 .settings-category-list {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
   min-height: 20px;
 }
 
 .settings-category-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 6px 8px 6px 14px;
   background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   font-size: 13px;
+  color: var(--color-text);
 }
 
 .settings-category-chip button {
@@ -191,11 +234,20 @@
   border: none;
   color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 13px;
-  padding: 2px 6px;
+  font-size: 12px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--duration-fast) var(--easing), color var(--duration-fast) var(--easing);
 }
 
 .settings-category-chip button:hover {
+  background: var(--color-danger-bg);
   color: var(--color-danger);
 }
 
