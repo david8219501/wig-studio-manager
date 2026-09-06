@@ -10,86 +10,10 @@ const DEFAULT_SETTINGS = {
   profitMargin: 100, // 100% רווח
 };
 
-// נתוני קטלוג פאת טופ קלאסי לפי התמונה
-const CATALOG_PRICING = [
-  { length: 5, price: 8000 },
-  { length: 10, price: 10000 },
-  { length: 15, price: 12000 },
-  { length: 20, price: 12500 },
-  { length: 25, price: 13000 },
-  { length: 30, price: 13500 },
-  { length: 35, price: 14000 },
-  { length: 40, price: 14500 },
-  { length: 45, price: 15500 },
-  { length: 50, price: 16500 },
-  { length: 55, price: 18000 },
-  { length: 60, price: 20000 },
-];
-
-const CATALOG_SPECS = {
-  topPrice: 700,
-  netPrice: 40,
-};
-
 interface Settings {
   pricePerKgUsd: number;
   exchangeRate: number;
   profitMargin: number;
-}
-
-/* ─── רכיב קטלוג מחירון (מצד שמאל למחשבון) ─── */
-function CatalogCard({ settings }: { settings: Settings }) {
-  const [showManagerProfit, setShowManagerProfit] = useState(false);
-
-  return (
-    <div className="calc-card card-purple catalog-card">
-      <div className="calc-card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="calc-card-icon">📖</span>
-          <div>
-            <span className="calc-card-title">קטלוג מחירון - פאת טופ קלאסי</span>
-            <div className="catalog-sub-badge">
-              סקין/טופ: ₪{CATALOG_SPECS.topPrice} | רשת: ₪{CATALOG_SPECS.netPrice}
-            </div>
-          </div>
-        </div>
-
-        <button
-          className="calc-toggle-btn"
-          onClick={() => setShowManagerProfit((prev) => !prev)}
-        >
-          {showManagerProfit ? "👁️ תצוגת מנהל (עם רווח)" : "👁️ תצוגת לקוחה"}
-        </button>
-      </div>
-
-      <div className="catalog-table-wrapper">
-        <table className="catalog-table">
-          <thead>
-            <tr>
-              <th>אורך עורף</th>
-              <th>מחיר ללקוחה</th>
-              {showManagerProfit && <th>רווח משוער ({settings.profitMargin}%)</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {CATALOG_PRICING.map((item) => {
-              // חישוב רווח גס מתוך המחיר
-              const estimatedProfit = item.price * (settings.profitMargin / (100 + settings.profitMargin));
-              return (
-                <tr key={item.length}>
-                  <td className="font-bold">{item.length} ס״מ</td>
-                  <td className="catalog-price">₪{item.price.toLocaleString("he-IL")}</td>
-                  {showManagerProfit && (
-                    <td className="catalog-profit">₪{estimatedProfit.toFixed(0)}</td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
 }
 
 function PriceCalculator({ settings }: { settings: Settings }) {
@@ -368,7 +292,6 @@ export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPag
         <PriceCalculator settings={settings} />
         <RepairsCalculator settings={settings} />
         <LengthPlanner />
-        <CatalogCard settings={settings} />
       </div>
     </div>
   );

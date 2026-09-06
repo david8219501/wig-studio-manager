@@ -354,18 +354,7 @@
   height: 8px;
   border-radius: 2px;
 }
-/* ---------- Catalog Pricing Table ---------- */
-.catalog-card {
-  grid-column: span 1;
-}
-
-.catalog-sub-badge {
-  font-size: 11px;
-  color: var(--color-accent);
-  font-weight: 500;
-  margin-top: 2px;
-}
-
+/* ---------- Catalog Pricing Table (משותף עם טאב "קטלוגי מחירים") ---------- */
 .catalog-table-wrapper {
   max-height: 280px;
   overflow-y: auto;
@@ -406,12 +395,6 @@
   font-family: var(--font-mono);
   font-weight: 700;
   color: var(--color-primary);
-}
-
-.catalog-profit {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--color-success);
 }
 
 .calc-state {
