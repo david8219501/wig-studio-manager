@@ -1,0 +1,54 @@
+הכלל הזה לא נפרס אוטומטית - יש למזג אותו ידנית בקונסולת Firebase
+(Firestore Database -> Rules), בתוך ה-`service cloud.firestore {
+match /databases/{database}/documents { ... } }` הקיים. לא נגעתי
+ב-rules הקיימים ב-production כי אין להם עותק בריפו הזה, ופריסה של
+קובץ rules מנוחש-מההתחלה הייתה מוחקת/דורסת את כל מה שכבר מוגדר לשאר
+ה-collections (אותה סיבה בדיוק כמו firestore-rules-google-calendar-
+addition.txt).
+
+## הרקע - למה זה כנראה שורש הבאג
+
+`businessSettings/{businessId}` ו-`users/{uid}` שונים מבנית משאר
+ה-collections באתר (`orders`/`clients`/`appointments`/`hairItems`/
+`bulkItems`/`expenses`): באלה יש שדה `businessId` **בתוך** כל מסמך,
+וכלל גנרי כמו `allow read, write: if resource.data.businessId ==
+request.auth.uid` עובד נכון. אבל `businessSettings`/`users` מזוהים
+**רק לפי מזהה המסמך עצמו** (ה-uid) - **אין** שדה `businessId` בתוכם
+בכלל. כלל גנרי כזה **לעולם לא יתאים** להם, כי `resource.data.businessId`
+פשוט לא קיים שם - Firestore Rules מתייחסים לזה כ-`false` (לא מתאים),
+לא כשגיאה. אם אין כלל **ייעודי** נוסף במפורש בשבילם - הם חסומים
+לגמרי לקריאה/כתיבה מצד לקוח (ברירת המחדל של Firestore: deny-by-default).
+
+**זה לא באג חדש מהיום** - זה פער שכבר תועד ב-REVIEW.md (סקירה
+מ-2026-08-30, לפני כל העבודה על מסך ההגדרות) בתור "פער כבר ידוע"
+לשני ה-collections האלה יחד. הסימפטום שדווח עכשיו (שמירת קטגוריות/
+תמחור/שעות פעילות ב-businessSettings נכשלת) עולה בקנה אחד עם זה
+בדיוק - זה כנראה תמיד היה חסום, פשוט לא נבדק/דווח לפני שהיום נוספו
+כרטיסי עריכה חדשים שסוף-סוף כותבים לשם באמת ומציגים שגיאה ברורה.
+
+## הכלל המוצע
+
+```
+match /businessSettings/{businessId} {
+  allow read, write: if request.auth != null && request.auth.uid == businessId;
+}
+
+match /users/{userId} {
+  allow read, write: if request.auth != null && request.auth.uid == userId;
+}
+```
+
+לפני שמוסיפים - חשוב לוודא (כמו בקובץ הקודם) שאין כבר rule קיים
+תחת `/businessSettings/{businessId}` או `/users/{userId}` שמתיר גישה
+אחרת (למשל רחבה מדי - `if request.auth != null` בלבד, בלי בדיקת
+ה-uid - זה חמור יותר, כי אז כל עסק יכול לקרוא/לכתוב הגדרות/פרופיל
+של עסק אחר) שיתנגש/יוסתר. חוקי Firestore לא "המנצח האחרון" - כל
+match מוערך בנפרד לפי הנתיב שהוא תואם.
+
+## איך לוודא שזו באמת הסיבה (לפני/אחרי ההוספה)
+
+בקונסולת Firebase -> Firestore Database -> Rules -> יש שם גם
+"Rules Playground" (לשונית נפרדת) - אפשר לבדוק שם ישירות בקשת
+`write` ל-`businessSettings/{ה-uid שלך}` בתור authenticated עם אותו
+uid, ולראות אם היא allowed/denied **בלי לגעת בקוד בכלל**. זו הדרך
+הכי מהירה לאשר/לשלול את האבחנה הזו באופן סופי לפני שמוסיפים משהו.
