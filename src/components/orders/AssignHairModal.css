@@ -3,7 +3,7 @@
 .assign-hair-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,7 +116,7 @@
 
 .assign-hair-error {
   font-size: 13px;
-  color: var(--color-danger, #d33);
+  color: var(--color-danger);
 }
 
 .assign-hair-footer {
@@ -201,7 +201,7 @@
 }
 
 .assign-hair-card .bulk-item-remove-btn:hover {
-  color: var(--color-danger, #d33);
+  color: var(--color-danger);
 }
 
 .assign-hair-card .bulk-item-edit-btn:hover {
@@ -281,6 +281,11 @@
   padding: 10px 20px;
   font-weight: 600;
   cursor: pointer;
+  transition: opacity var(--duration-fast) var(--easing);
+}
+
+.assign-hair-card .btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
 }
 
 .assign-hair-card .btn-primary:disabled {
@@ -295,4 +300,9 @@
   border-radius: var(--radius-md);
   padding: 10px 20px;
   cursor: pointer;
+  transition: background var(--duration-fast) var(--easing);
+}
+
+.assign-hair-card .btn-secondary:hover {
+  background: var(--color-surface-hover);
 }

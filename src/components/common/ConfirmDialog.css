@@ -3,7 +3,7 @@
 .confirm-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,6 +82,11 @@
   padding: 10px 20px;
   font-weight: 600;
   cursor: pointer;
+  transition: background var(--duration-fast) var(--easing);
+}
+
+.confirm-dialog-card .btn-secondary:hover {
+  background: var(--color-surface-hover);
 }
 
 .confirm-dialog-confirm-btn {
@@ -91,6 +96,11 @@
   font-weight: 600;
   cursor: pointer;
   color: var(--color-on-primary);
+  transition: opacity var(--duration-fast) var(--easing);
+}
+
+.confirm-dialog-confirm-btn:hover {
+  opacity: 0.88;
 }
 
 .confirm-dialog-warning .confirm-dialog-confirm-btn {

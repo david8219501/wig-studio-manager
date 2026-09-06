@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 24px;
+  padding: var(--page-padding);
 }
 
 .google-calendar-card p {
@@ -55,12 +55,12 @@
 }
 
 .btn-google-calendar--disconnect {
-  background: var(--color-danger-bg, #fef2f2);
-  color: var(--color-danger, #d33);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .btn-google-calendar--disconnect:hover:not(:disabled) {
-  background: var(--color-danger, #d33);
+  background: var(--color-danger);
   color: var(--color-on-primary);
 }
 
@@ -143,7 +143,7 @@
 .settings-field input:focus,
 .settings-field select:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 @media (max-width: 640px) {
@@ -235,12 +235,12 @@
 /* "אזור מסוכן" - מופרד ויזואלית משאר הכרטיסים (מסגרת/רקע אדמדם), כדי
    שיהיה ברור מיד שזו קטגוריה שונה לגמרי מהגדרות רגילות. */
 .settings-danger-zone {
-  border: 1px solid var(--color-danger, #d33);
-  background: var(--color-danger-bg, #fef2f2);
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-bg);
 }
 
 .settings-danger-zone h2 {
-  color: var(--color-danger, #d33);
+  color: var(--color-danger);
 }
 
 .settings-danger-zone p {
@@ -250,7 +250,7 @@
 }
 
 .settings-delete-account-btn {
-  background: var(--color-danger, #d33);
+  background: var(--color-danger);
   color: var(--color-on-primary);
   border: none;
   border-radius: var(--radius-md);
@@ -269,7 +269,7 @@
   width: 100%;
   box-sizing: border-box;
   padding: 10px 14px;
-  border: 1px solid var(--color-danger, #d33);
+  border: 1px solid var(--color-danger);
   border-radius: var(--radius-md);
   font-size: 14px;
   font-family: inherit;
@@ -279,6 +279,6 @@
 }
 
 .settings-delete-confirm-input:focus {
-  box-shadow: 0 0 0 3px var(--color-danger-bg, #fef2f2);
+  box-shadow: 0 0 0 3px var(--color-danger-bg);
 }
 

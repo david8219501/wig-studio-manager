@@ -1,5 +1,5 @@
 .clients-page {
-  padding: 32px 36px;
+  padding: var(--page-padding);
   background: var(--color-background);
   min-height: 100%;
   font-family: var(--font-body);
@@ -17,7 +17,7 @@
 .clients-page__title {
   font-family: var(--font-heading);
   font-size: 28px;
-  font-weight: 600;
+  font-weight: var(--font-weight-heading);
   color: var(--color-primary);
   margin: 0;
   letter-spacing: -0.4px;
@@ -69,7 +69,7 @@
   font-family: var(--font-body);
   color: var(--color-text);
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color var(--duration-fast) var(--easing), box-shadow var(--duration-fast) var(--easing);
   box-sizing: border-box;
 }
 
@@ -79,7 +79,7 @@
 
 .clients-search__input:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .btn {
@@ -90,14 +90,14 @@
   font-weight: 600;
   font-family: var(--font-body);
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.2s;
+  transition: opacity var(--duration-fast) var(--easing), transform var(--duration-fast) var(--easing);
   white-space: nowrap;
 }
 
 .btn--primary {
   background: var(--color-accent);
   color: var(--color-on-primary);
-  box-shadow: 0 2px 8px rgba(155, 105, 255, 0.25);
+  box-shadow: var(--shadow-accent-sm);
 }
 
 .btn--primary:hover {
@@ -115,7 +115,7 @@
   font-size: 1rem;
   padding: 6px 8px;
   border-radius: var(--radius-sm);
-  transition: background 0.2s;
+  transition: background var(--duration-fast) var(--easing);
   line-height: 1;
 }
 
@@ -195,7 +195,7 @@
 
 .clients-table tbody tr {
   border-bottom: 1px solid var(--color-border);
-  transition: background 0.2s;
+  transition: background var(--duration-fast) var(--easing);
   cursor: pointer;
 }
 

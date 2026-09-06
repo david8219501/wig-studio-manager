@@ -1,7 +1,7 @@
 /* Sales.css - Ultimate Table Lock Fix */
 
 .sales-page {
-    padding: 32px 36px;
+    padding: var(--page-padding);
     background: var(--color-background);
     min-height: 100vh;
     direction: rtl;
@@ -152,7 +152,7 @@
   .sales-search:focus {
     border-color: var(--color-accent);
     background: var(--color-surface);
-    box-shadow: 0 0 0 3px var(--color-accent-bg);
+    box-shadow: var(--shadow-focus-ring);
   }
 
   .status-filters {

@@ -4,7 +4,7 @@
   direction: rtl;
   font-family: var(--font-body);
   color: var(--color-text); /* טקסט כהה עם נגיעה סגולה עמוקה */
-  padding: 24px;
+  padding: var(--page-padding);
   background: var(--color-background); /* רקע סגלגל חלש, רך ויוקרתי לכל הדף */
   min-height: 100vh;
   display: flex;
@@ -145,7 +145,7 @@
 .calc-card-title {
   font-family: var(--font-heading);
   font-size: 16px;
-  font-weight: var(--font-weight-heading);
+  font-weight: 700;
   color: var(--color-primary);
 }
 
@@ -210,7 +210,7 @@
 .calc-input:focus {
   border-color: var(--color-accent);
   background: var(--color-surface);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .calc-select {

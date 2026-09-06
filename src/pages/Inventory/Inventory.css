@@ -5,7 +5,7 @@
   direction: rtl;
   font-family: var(--font-body);
   color: var(--color-text);
-  padding: 24px;
+  padding: var(--page-padding);
   background: var(--color-background);
   min-height: 100%;
 }
@@ -22,8 +22,8 @@
 
 .inventory-header h1 {
   font-family: var(--font-heading);
-  font-size: 26px;
-  font-weight: 500;
+  font-size: 28px;
+  font-weight: var(--font-weight-heading);
   margin: 0;
   color: var(--color-primary);
 }
@@ -88,7 +88,7 @@
 .filter-bar select:focus,
 .filter-bar input:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .search-input {
@@ -309,7 +309,7 @@
   cursor: pointer;
   font-size: 14px;
   padding: 4px 6px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   transition: background var(--duration-fast) var(--easing);
 }
 
@@ -334,7 +334,7 @@
   border: none;
   background: transparent;
   padding: 7px 14px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-muted);
@@ -436,7 +436,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -577,7 +577,7 @@
 .form-field select:focus,
 .form-field textarea:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .field-error {

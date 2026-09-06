@@ -5,7 +5,7 @@
    .drawer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.3); /* רקע כהה ועדין בלי טישטוש */
+    background: var(--color-overlay);
     z-index: 900;
     animation: fadeIn 0.2s ease-out;
   }
@@ -373,7 +373,7 @@
 
   .spec-input:focus {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px var(--color-accent-bg);
+    box-shadow: var(--shadow-focus-ring);
   }
 
   .btn-edit-specs {

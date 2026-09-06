@@ -13,7 +13,7 @@
 .time-input-text:focus {
   border-color: var(--color-accent);
   background: var(--color-surface);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .time-input-invalid {

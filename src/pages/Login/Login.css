@@ -98,7 +98,7 @@
 .form-group input:focus {
   border-color: var(--color-accent);
   background: var(--color-surface);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 /* עטיפת שדה סיסמה עם כפתור עין לצפייה - השדה עצמו dir="ltr" (תוכן
@@ -127,7 +127,7 @@
   align-items: center;
   justify-content: center;
   padding: 6px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   transition: color var(--duration-fast) var(--easing);
 }
 

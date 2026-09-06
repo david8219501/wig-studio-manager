@@ -4,7 +4,7 @@
   direction: rtl;
   font-family: var(--font-body);
   color: var(--color-text);
-  padding: 24px;
+  padding: var(--page-padding);
   background: var(--color-background);
   min-height: 100vh;
   box-sizing: border-box;
@@ -22,8 +22,8 @@
 }
 
 .expenses-header h1 {
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: var(--font-weight-heading);
   color: var(--color-primary);
   margin: 0;
 }
@@ -136,7 +136,7 @@
 
 .expenses-search:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .expenses-filter {
@@ -288,7 +288,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -350,7 +350,7 @@
 .form-group select:focus,
 .form-group textarea:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .modal-actions {
