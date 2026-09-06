@@ -143,3 +143,11 @@
 .repair-order-card .btn-secondary:hover {
   background: var(--color-surface-hover);
 }
+
+/* Responsive - הקובץ הזה לא הכיל אף @media, ל-.repair-row (3 עמודות
+   קבועות) - נוסף כאן, אותו breakpoint כמו NewOrderWizard.css/Inventory.css. */
+@media (max-width: 640px) {
+  .repair-row {
+    grid-template-columns: 1fr;
+  }
+}

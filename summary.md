@@ -108,6 +108,56 @@ Calculators): Dashboard (30px/700→28px/500), Expenses (26px/600→
 אוטומציית דפדפן זמין) - כל השינויים אומתו דרך build+lint נקיים
 וסקירת קוד קפדנית (grep ממוקד לפני ואחרי כל שינוי), לא צילומי מסך.
 
-## שלב 3: בדיקת רספונסיביות בסיסית (בתהליך)
+## שלב 3: בדיקת רספונסיביות בסיסית ✅ הושלמה
 
-טרם בוצע - ימשיך מיד.
+בדיקה שיטתית של כל `grid-template-columns` באתר (30+ מופעים) מול
+כל `@media` קיים בכל קובץ, כדי לאתר בדיוק אותה משפחת בעיה שכבר
+זוהתה קודם ב-Reports.tsx (`.reports-stats-grid`/`.reports-main-grid`
+בלי breakpoint לקריסה במסך צר). נמצאו ותוקנו **6 גרידים קבועים ב-6
+קבצים** בלי כיסוי responsive מתאים:
+
+1. **`Reports.css`** - `.reports-stats-grid` (4 עמודות) +
+   `.reports-main-grid` (2fr/1fr) - **בדיוק המקרה שכבר צוין קודם
+   ולא תוקן אז**. נוסף אותו דפוס מדויק כמו `.dash-kpi-grid`/
+   `.dash-main-grid` הקיים ב-Dashboard.css (מבנה גרידים זהה): 1200px
+   → 2 עמודות + main-grid ל-1fr, 768px → stats-grid ל-1fr.
+2. **`ClientDrawer.css`** - `.financial-summary-grid` (3 עמודות,
+   סיכום פיננסי בתוך מגירת לקוחה) לא היה מכוסה על ידי ה-`@media
+   (max-width: 900px)` הקיים בקובץ (שכיסה רק את המגירה עצמה) - נוסף
+   collapse ל-1fr באותו breakpoint.
+3. **`OrderDetailsPanel.css`** - `.order-details-grid`/`.order-
+   details-grid-3` (2/3 עמודות) לא היו מכוסים על ידי ה-`@media
+   (max-width: 700px)` הקיים (שכיסה רק 2 גרידים אחרים באותו קובץ) -
+   נוסף collapse ל-1fr לשניהם.
+4. **`NewOrderWizard.css`** (אשף הזמנה רב-שלבי) - **קובץ שלם בלי אף
+   `@media`**, עם 3 גרידים קבועים (`.type-grid` 3 עמודות, `.form-row`/
+   `.form-row-3` 2/3 עמודות, `.bulk-item-add-row`) - נוסף `@media
+   (max-width: 640px)` חדש שמקריס את כולם ל-1fr.
+5. **`RepairOrderForm.css`** - אותו מצב: קובץ בלי אף `@media`,
+   `.repair-row` (3 עמודות) - נוסף אותו breakpoint (640px).
+6. **`Expenses.css`** - `.modal-form` (2 עמודות, טופס בתוך מודל) -
+   אותו מצב, נוסף אותו breakpoint (640px).
+
+**ממצא נוסף תוך כדי (שולב באותו תיקון):** בדיקת `.btn-primary`/
+`.btn-secondary` בקובץ `Expenses.css` גילתה שגם שם, בדיוק כמו 5
+הקבצים שתוקנו בשלב 2, חסר `:hover` - תוקן באותו אופן (`opacity:
+0.88` / `background: var(--color-surface-hover)`), ליישור מלא עם
+שאר האתר.
+
+**קבצים:** `Reports.css`, `ClientDrawer.css`, `OrderDetailsPanel.css`,
+`NewOrderWizard.css`, `RepairOrderForm.css`, `Expenses.css`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע (CSS בלבד).
+
+---
+
+## סיכום כללי - כל 3 השלבים הושלמו
+
+שלב 1 (ביקורת, ללא תיקון) → שלב 2 (4 טוקנים חדשים ב-`index.css`,
+ניקוי פולבקים שרידיים, איחוד טיפוגרפיית כותרות, 6 קבצים עם hover
+חדש) → שלב 3 (6 גרידים עם breakpoints חדשים/מושלמים) - כל שלב עם
+build+lint+commit+push נפרד משלו, כפי שהתבקש. 0 בעיות lint חדשות
+לאורך כל התהליך. לא ניתן היה לבדוק ויזואלית בדפדפן בסביבה הזו (אין
+כלי אוטומציית דפדפן זמין) - כל האימות מבוסס build+lint נקיים
+וסקירת קוד קפדנית (grep ממוקד לפני/אחרי כל שינוי), לא צילומי מסך.

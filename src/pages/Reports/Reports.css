@@ -74,3 +74,14 @@
     transform: rotate(360deg);
   }
 }
+
+/* Responsive - אותו דפוס בדיוק כמו .dash-kpi-grid/.dash-main-grid ב-
+   Dashboard.css (זוג גרידים זהה במבנה: 4 עמודות קבועות + 2fr/1fr) */
+@media (max-width: 1200px) {
+  .reports-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .reports-main-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .reports-stats-grid { grid-template-columns: 1fr; }
+}

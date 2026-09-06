@@ -454,4 +454,8 @@
       width: 100%;
       justify-content: space-between;
     }
+
+    .financial-summary-grid {
+      grid-template-columns: 1fr;
+    }
   }

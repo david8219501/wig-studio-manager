@@ -305,3 +305,21 @@
   .btn-secondary:hover {
     background: var(--color-surface-hover);
   }
+
+  /* Responsive - הקובץ הזה (אשף הזמנה רב-שלבי) לא הכיל אף @media,
+     ל-4 הגרידים הקבועים (3/2/3 עמודות + auto-auto) - נוסף כאן, אותו
+     breakpoint כמו Inventory.css. */
+  @media (max-width: 640px) {
+    .type-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-row,
+    .form-row-3 {
+      grid-template-columns: 1fr;
+    }
+
+    .bulk-item-add-row {
+      grid-template-columns: 1fr;
+    }
+  }

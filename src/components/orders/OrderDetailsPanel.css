@@ -466,6 +466,11 @@
     max-width: 100%;
   }
 
+  .order-details-grid,
+  .order-details-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
   .add-payment-row {
     grid-template-columns: 1fr;
   }
