@@ -14,9 +14,17 @@
 .full-width { grid-column: span 2; }
 .reports-title { font-size: 16px; font-weight: 700; color: var(--color-primary); margin-bottom: 20px; }
 
+.reports-table-wrapper { overflow-x: auto; }
 .reports-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.reports-table th { text-align: right; color: var(--color-text-muted); padding: 12px; border-bottom: 2px solid var(--color-border); }
-.reports-table td { padding: 14px 12px; border-bottom: 1px solid var(--color-border); color: var(--color-primary); }
+.reports-table th { text-align: right; color: var(--color-text-muted); padding: 12px; border-bottom: 2px solid var(--color-border); white-space: nowrap; }
+.reports-table td { padding: 14px 12px; border-bottom: 1px solid var(--color-border); color: var(--color-primary); text-align: right; white-space: nowrap; }
+
+/* .mono (index.css) גלובלי וקובע display: inline-flex - מיועד לטקסט
+   מונוספייס בתוך שורה רגילה, לא ל-<td> עצמו. עמודות הכנסות/הוצאות/
+   רווח כאן מקבלות mono ישירות על ה-<td>, מה שדורס את table-cell שלהן
+   ושובר את יישור העמודות - בדיוק ההתנגשות שכבר נפתרה ב-Sales.css/
+   ClientDrawer.css. סלקטור ממוקד (2 מחלקות+type) מנצח בלי !important. */
+.reports-table td.mono { display: table-cell; }
 
 .tag-service { background: var(--color-accent-bg); color: var(--color-accent); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 11px; }
 .text-success { color: var(--color-success); }

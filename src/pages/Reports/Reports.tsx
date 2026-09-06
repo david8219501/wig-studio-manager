@@ -218,30 +218,32 @@ export default function Reports() {
           {report.monthlyRows.length === 0 ? (
             <p>עדיין אין מספיק נתונים כדי להציג דו"ח חודשי.</p>
           ) : (
-            <table className="reports-table">
-              <thead>
-                <tr>
-                  <th>חודש</th>
-                  <th>הכנסות (₪)</th>
-                  <th>הוצאות (₪)</th>
-                  <th>רווח נקי (₪)</th>
-                  <th>מספר הזמנות</th>
-                  <th>שירות מוביל</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.monthlyRows.map((row, i) => (
-                  <tr key={i}>
-                    <td>{row.month}</td>
-                    <td className="mono">₪{row.income.toLocaleString()}</td>
-                    <td className="mono text-danger">₪{row.exp.toLocaleString()}</td>
-                    <td className="mono font-bold text-success">₪{row.profit.toLocaleString()}</td>
-                    <td>{row.orders}</td>
-                    <td><span className="tag-service">{row.topService}</span></td>
+            <div className="reports-table-wrapper">
+              <table className="reports-table">
+                <thead>
+                  <tr>
+                    <th>חודש</th>
+                    <th>הכנסות (₪)</th>
+                    <th>הוצאות (₪)</th>
+                    <th>רווח נקי (₪)</th>
+                    <th>מספר הזמנות</th>
+                    <th>שירות מוביל</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {report.monthlyRows.map((row, i) => (
+                    <tr key={i}>
+                      <td>{row.month}</td>
+                      <td className="mono">₪{Math.round(row.income).toLocaleString()}</td>
+                      <td className="mono text-danger">₪{Math.round(row.exp).toLocaleString()}</td>
+                      <td className="mono font-bold text-success">₪{Math.round(row.profit).toLocaleString()}</td>
+                      <td>{row.orders}</td>
+                      <td><span className="tag-service">{row.topService}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
