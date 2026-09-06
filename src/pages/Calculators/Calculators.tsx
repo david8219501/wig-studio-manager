@@ -362,12 +362,13 @@ export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPag
         </div>
       )}
 
-      {/* הגריד מכיל עכשיו גם את כרטיס הקטלוג מצד שמאל למחשבון */}
+      {/* מחשבון הצעת מחיר + מחשבון שדרוגים/תיקונים בשורה עליונה אחד ליד
+          השני; מחשבון אורכים לבניית פאה יורד לשורה שמתחת. */}
       <div className="calc-grid">
         <PriceCalculator settings={settings} />
-        <CatalogCard settings={settings} />
-        <LengthPlanner />
         <RepairsCalculator settings={settings} />
+        <LengthPlanner />
+        <CatalogCard settings={settings} />
       </div>
     </div>
   );
