@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { httpsCallable } from "firebase/functions";
-import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteUser } from "firebase/auth";
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
+import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from "firebase/storage";
 import { auth, db, functions, storage } from "../../services/firebase";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_APPOINTMENT_TYPES } from "../../utils/businessSettings";
 import "./Settings.css";
+
+interface SettingsProps {
+  // נקראת אחרי מחיקת חשבון מוצלחת - App.tsx צריך לעדכן isLoggedIn/
+  // manualAuthRef בעצמו (Settings.tsx לא מחזיק state כזה). ראו הערה
+  // מפורטת ליד handleLogout ב-App.tsx - אותה בעיה בדיוק חלה כאן
+  // (onAuthStateChanged לבדו לא מספיק אחרי deleteUser).
+  onAccountDeleted?: () => void;
+}
 
 // חייבים להיות זהים בדיוק לערכים ב-functions/src/config.ts (project קבוע,
 // לא נבחר דינמית) - כתובת ה-callback ידועה מראש כדי שאפשר יהיה למסור
@@ -20,7 +29,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undef
 type ConnectionStatus = "unknown" | "connected" | "error";
 type SyncStatus = "idle" | "syncing" | "done" | "error";
 
-export default function Settings() {
+export default function Settings({ onAccountDeleted }: SettingsProps) {
   // פרופיל העסק - נטען פעם אחת (getDoc, לא מאזין חי) לתוך state עריכה
   // מקומי, כמו כל טופס עריכה אחר באתר (ClientDrawer וכו') - מאזין חי
   // כאן היה דורס את מה שהמשתמשת מקלידה תוך כדי עריכה. שינוי שנשמר
@@ -300,6 +309,68 @@ export default function Settings() {
       setBackupError(`שגיאה בהורדת הגיבוי: ${detail}`);
     } finally {
       setBackupLoading(false);
+    }
+  };
+
+  // מחיקת חשבון - הרסני ובלתי הפיך. שני חסמים לפני שזה בכלל אפשרי:
+  // ConfirmDialog (danger) ואז דיאלוג ייעודי שדורש הקלדת "מחקי" מדויקת
+  // לפני שכפתור המחיקה הסופי בכלל מתאפשר (לא רק אישור/ביטול רגיל -
+  // רמת החומרה כאן מצדיקה חסם נוסף).
+  //
+  // סדר הפעולות חשוב: קודם מוחקים את כל נתוני Firestore (כשהחשבון
+  // עדיין מאומת ותקין), ורק בסוף מוחקים את חשבון ה-Auth עצמו - הפוך
+  // היה מסוכן יותר: ברגע ש-deleteUser מצליח, ה-ID token מתבטל כמעט
+  // מיד, וכל קריאת Firestore אחריו (שדורשת auth תקין מול הכללים)
+  // הייתה נכשלת - משאירה חלק מהנתונים בלי דרך למחוק אותם יותר.
+  const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+
+  const handleDeleteAccount = async () => {
+    const businessId = auth.currentUser?.uid;
+    const currentUser = auth.currentUser;
+    if (!businessId || !currentUser) return;
+
+    setDeletingAccount(true);
+    setDeleteAccountError(null);
+    try {
+      const collectionsToDelete = ["clients", "orders", "appointments", "hairItems", "bulkItems", "expenses"];
+      for (const collectionName of collectionsToDelete) {
+        const snap = await getDocs(query(collection(db, collectionName), where("businessId", "==", businessId)));
+        await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+      }
+
+      await deleteDoc(doc(db, "businessSettings", businessId)).catch(() => {});
+      await deleteDoc(doc(db, "users", businessId)).catch(() => {});
+
+      // לוגו ב-Storage - לא קריטי אם נכשל (למשל Storage לא הוקם אצל
+      // עסק מסוים, או שאין בכלל לוגו) - לא עוצר את מחיקת שאר הנתונים.
+      try {
+        const folderRef = ref(storage, `logos/${businessId}`);
+        const list = await listAll(folderRef);
+        await Promise.all(list.items.map((item) => deleteObject(item)));
+      } catch (err) {
+        console.error("שגיאה במחיקת לוגו מ-Storage (לא קריטי, ממשיכה):", err);
+      }
+
+      // אחרון בכוונה - ראו הסבר למעלה.
+      await deleteUser(currentUser);
+
+      onAccountDeleted?.();
+    } catch (err) {
+      console.error("שגיאה במחיקת חשבון:", err);
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/requires-recent-login") {
+        setDeleteAccountError(
+          "הנתונים נמחקו בהצלחה, אבל מחיקת חשבון ההתחברות עצמו נכשלה - Firebase דורש התחברות טרייה לפעולה רגישה כזו. יש להתנתק (כפתור בסיידבר), להתחבר מחדש, ולנסות שוב את מחיקת החשבון כדי להשלים."
+        );
+      } else {
+        const detail = err instanceof Error ? err.message : String(err);
+        setDeleteAccountError(`שגיאה במחיקת החשבון: ${detail}`);
+      }
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -689,6 +760,69 @@ export default function Settings() {
         onConfirm={handleDisconnectGoogleCalendar}
         onCancel={() => setConfirmDisconnectOpen(false)}
       />
+
+      <div className="placeholder-card settings-danger-zone">
+        <h2>⚠️ אזור מסוכן</h2>
+        <p>
+          מחיקת החשבון היא פעולה הרסנית ובלתי הפיכה - כל הנתונים (לקוחות, הזמנות,
+          מלאי, הוצאות, פגישות והגדרות) יימחקו לצמיתות ולא ניתן יהיה לשחזר אותם.
+        </p>
+        {deleteAccountError && (
+          <div className="google-calendar-status google-calendar-status--error">{deleteAccountError}</div>
+        )}
+        <button
+          type="button"
+          className="settings-delete-account-btn"
+          onClick={() => setDeleteAccountDialogOpen(true)}
+        >
+          מחיקת חשבון
+        </button>
+      </div>
+
+      {deleteAccountDialogOpen && (
+        <div className="confirm-dialog-overlay" onClick={() => !deletingAccount && setDeleteAccountDialogOpen(false)}>
+          <div className="confirm-dialog-card confirm-dialog-danger" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-dialog-icon">⚠️</div>
+            <h2 className="confirm-dialog-title">מחיקת חשבון - לצמיתות</h2>
+            <p className="confirm-dialog-message">
+              פעולה זו תמחק את כל הנתונים שלך (לקוחות, הזמנות, מלאי, הוצאות,
+              פגישות, הגדרות) ואת חשבון ההתחברות עצמו - <strong>לצמיתות, בלי אפשרות שחזור</strong>.
+              {"\n\n"}
+              כדי לאשר, הקלידי בדיוק את המילה <strong>מחקי</strong> בתיבה למטה.
+            </p>
+            <input
+              type="text"
+              className="settings-delete-confirm-input"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="הקלידי: מחקי"
+              autoFocus
+              disabled={deletingAccount}
+            />
+            <div className="confirm-dialog-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setDeleteAccountDialogOpen(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={deletingAccount}
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                className="confirm-dialog-confirm-btn"
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount || deleteConfirmText.trim() !== "מחקי"}
+              >
+                {deletingAccount ? "מוחקת..." : "מחיקת חשבון לצמיתות"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

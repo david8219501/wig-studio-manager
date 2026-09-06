@@ -292,7 +292,15 @@ function App() {
       case 'sales': return <Sales />;
       case 'expenses': return <Expenses />;
       case 'reports': return <Reports />;
-      case 'settings': return <Settings />;
+      case 'settings':
+        return (
+          <Settings
+            onAccountDeleted={() => {
+              manualAuthRef.current = false;
+              setIsLoggedIn(false);
+            }}
+          />
+        );
       default: return <Dashboard />;
     }
   };

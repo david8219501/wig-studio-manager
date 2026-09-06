@@ -232,3 +232,53 @@
   }
 }
 
+/* "אזור מסוכן" - מופרד ויזואלית משאר הכרטיסים (מסגרת/רקע אדמדם), כדי
+   שיהיה ברור מיד שזו קטגוריה שונה לגמרי מהגדרות רגילות. */
+.settings-danger-zone {
+  border: 1px solid var(--color-danger, #d33);
+  background: var(--color-danger-bg, #fef2f2);
+}
+
+.settings-danger-zone h2 {
+  color: var(--color-danger, #d33);
+}
+
+.settings-danger-zone p {
+  color: var(--color-text);
+  line-height: 1.6;
+  margin: 8px 0 16px;
+}
+
+.settings-delete-account-btn {
+  background: var(--color-danger, #d33);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--easing);
+}
+
+.settings-delete-account-btn:hover {
+  opacity: 0.85;
+}
+
+.settings-delete-confirm-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px solid var(--color-danger, #d33);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.settings-delete-confirm-input:focus {
+  box-shadow: 0 0 0 3px var(--color-danger-bg, #fef2f2);
+}
+
