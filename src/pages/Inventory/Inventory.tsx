@@ -14,6 +14,7 @@ import RemnantMergeLogModal from './RemnantMergeLogModal';
 import ShowroomStockFormModal from './ShowroomStockFormModal';
 import SellShowroomStockModal from './SellShowroomStockModal';
 import ShowroomStockDetailsPanel from './ShowroomStockDetailsPanel';
+import HairItemDetailsPanel from './HairItemDetailsPanel';
 import OrderDetailsPanel from '../../components/orders/OrderDetailsPanel';
 import AssignHairModal from '../../components/orders/AssignHairModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -38,6 +39,10 @@ const Inventory: React.FC = () => {
   // --- מלאי שיער ---
   const [hairItems, setHairItems] = useState<HairItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingHairItemId, setEditingHairItemId] = useState<string | null>(null);
+  // פאנל פרטים נשלף - נפתח בלחיצה על שורה בטבלה המצומצמת (5 עמודות),
+  // אותו דפוס כמו selectedShowroomOrderId למטה.
+  const [selectedHairItemId, setSelectedHairItemId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [textureFilter, setTextureFilter] = useState<string>('all'); // סוג שיער / מקור
   const [hairTypeFilter, setHairTypeFilter] = useState<string>('all'); // מרקם
@@ -226,6 +231,8 @@ const Inventory: React.FC = () => {
   // כל ה-ids הבאים נגזרים מ-hairItems/orders החיים (לא state של האובייקט
   // עצמו) - כדי שהמודלים תמיד יראו עדכון חי, באותו דפוס כמו mergeLogBox למטה.
   const mergeLogBox = hairItems.find((item) => item.id === mergeLogBoxId) || null;
+  const selectedHairItem = hairItems.find((item) => item.id === selectedHairItemId) || null;
+  const editingHairItem = hairItems.find((item) => item.id === editingHairItemId) || null;
   const selectedShowroomOrder = orders.find((o) => o.id === selectedShowroomOrderId) || null;
   const editingShowroomOrder = orders.find((o) => o.id === editingShowroomOrderId) || null;
   const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
@@ -288,7 +295,19 @@ const Inventory: React.FC = () => {
   // ה-hairCode הידידותי שהטופס הציג (item.id כאן, ראו הסבר ב-nextHairCode
   // למעלה) - ה-hairCode נשמר בנפרד כשדה תצוגה בלבד. מתייגים ב-businessId
   // כדי שהפריט ישויך לעסק המחובר בלבד.
+  //
+  // עריכת פריט קיים (editingHairItemId מוגדר) - רק updateDoc על השדות
+  // התיאוריים (ראו AddHairModal - אורך/משקל לא ניתנים לעריכה שם), בלי
+  // לרשום הוצאת רכישה נוספת (זו לא קנייה חדשה, בדיוק כמו handleSaveBulkItem).
   const handleSaveHairItem = async (item: HairItem) => {
+    if (editingHairItemId) {
+      const { id, ...data } = item;
+      await updateDoc(doc(db, 'hairItems', id), data);
+      setIsAddModalOpen(false);
+      setEditingHairItemId(null);
+      return;
+    }
+
     const { id: hairCode, ...data } = item;
     const newDocRef = doc(collection(db, 'hairItems'));
     await setDoc(newDocRef, { ...data, hairCode, businessId: auth.currentUser!.uid });
@@ -617,7 +636,13 @@ const Inventory: React.FC = () => {
               ))}
             </select>
 
-            <button className="btn-primary add-hair-btn" onClick={() => setIsAddModalOpen(true)}>
+            <button
+              className="btn-primary add-hair-btn"
+              onClick={() => {
+                setEditingHairItemId(null);
+                setIsAddModalOpen(true);
+              }}
+            >
               + קליטת קוקו חדש
             </button>
             <button className="btn-secondary add-hair-btn" onClick={() => setIsRemnantBoxModalOpen(true)}>
@@ -630,65 +655,36 @@ const Inventory: React.FC = () => {
               <thead>
                 <tr>
                   <th>מזהה</th>
-                  <th>ספק</th>
-                  <th>אורך</th>
-                  <th>משקל התחלתי</th>
-                  <th>משקל נוכחי</th>
                   <th>גוון</th>
-                  <th>מרקם</th>
-                  <th>סוג שיער</th>
-                  <th>עלות רכישה</th>
+                  <th>אורך</th>
+                  <th>משקל נוכחי</th>
                   <th>סטטוס</th>
-                  <th>פעולות</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredHairItems.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="empty-state">
+                    <td colSpan={5} className="empty-state">
                       לא נמצאו קוקוים התואמים לסינון
                     </td>
                   </tr>
                 ) : (
                   filteredHairItems.map((item) => {
                     const isRemnant = item.isRemnantBox === true;
-                    const canMerge = !isRemnant && item.currentWeight > 0;
-                    const avgPricePerGram = isRemnant && item.currentWeight > 0
-                      ? (item.remnantTotalValue ?? 0) / item.currentWeight
-                      : 0;
                     return (
-                      <tr key={item.id}>
+                      <tr
+                        key={item.id}
+                        className="hair-row"
+                        onClick={() => setSelectedHairItemId(item.id)}
+                      >
                         <td className="mono">{item.hairCode || item.id}</td>
-                        <td>{isRemnant && '📦 '}{item.supplier}</td>
+                        <td>{isRemnant && '📦 '}{item.color}</td>
                         <td>{isRemnant ? '—' : `${item.length} ס"מ`}</td>
-                        <td>{isRemnant ? '—' : `${item.initialWeight} גרם`}</td>
                         <td>{item.currentWeight} גרם</td>
-                        <td>{item.color}</td>
-                        <td>{isRemnant ? '—' : item.hairType}</td>
-                        <td>{isRemnant ? '—' : item.texture}</td>
-                        <td>{isRemnant ? `מחיר ממוצע לגרם: ₪${avgPricePerGram.toFixed(2)}` : `₪${item.costPrice.toLocaleString()}`}</td>
                         <td>
                           <span className={statusBadgeClass(item.status)}>
                             {STATUS_LABELS[item.status]}
                           </span>
-                        </td>
-                        <td>
-                          {canMerge && (
-                            <button
-                              className="btn-secondary merge-remnant-btn"
-                              onClick={() => setMergeSourceItem(item)}
-                            >
-                              📦 מזג לשאריות
-                            </button>
-                          )}
-                          {isRemnant && (
-                            <button
-                              className="btn-secondary merge-log-btn"
-                              onClick={() => setMergeLogBoxId(item.id)}
-                            >
-                              📋 יומן מיזוגים{item.remnantMergeLog?.length ? ` (${item.remnantMergeLog.length})` : ''}
-                            </button>
-                          )}
                         </td>
                       </tr>
                     );
@@ -892,10 +888,34 @@ const Inventory: React.FC = () => {
       )}
 
       <AddHairModal
+        key={editingHairItemId ?? 'new'}
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingHairItemId(null);
+        }}
         onSave={handleSaveHairItem}
         nextId={nextHairCode}
+        editingItem={editingHairItem}
+      />
+
+      <HairItemDetailsPanel
+        isOpen={selectedHairItemId !== null}
+        item={selectedHairItem}
+        onClose={() => setSelectedHairItemId(null)}
+        onMerge={() => {
+          if (selectedHairItem) setMergeSourceItem(selectedHairItem);
+          setSelectedHairItemId(null);
+        }}
+        onViewMergeLog={() => {
+          if (selectedHairItemId) setMergeLogBoxId(selectedHairItemId);
+          setSelectedHairItemId(null);
+        }}
+        onEdit={() => {
+          if (selectedHairItemId) setEditingHairItemId(selectedHairItemId);
+          setSelectedHairItemId(null);
+          setIsAddModalOpen(true);
+        }}
       />
 
       <AddBulkItemModal

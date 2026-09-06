@@ -282,22 +282,6 @@
   border-color: transparent;
 }
 
-.merge-remnant-btn {
-  padding: 6px 10px;
-  font-size: 12px;
-  white-space: nowrap;
-  background: var(--color-accent-bg);
-  color: var(--color-accent);
-  border-color: transparent;
-}
-
-.merge-log-btn {
-  padding: 6px 10px;
-  font-size: 12px;
-  white-space: nowrap;
-  margin-inline-start: 6px;
-}
-
 /* כפתורי עריכה/מחיקה לכל שורה במלאי הפשוט - אותו מראה "כפתור-רפאים
    מינימלי" כמו order-details-edit-btn/order-details-remove-btn
    ב-OrderDetailsPanel.css, רק מוגדרים כאן עצמאית (הקובץ הזה לא טוען
@@ -356,7 +340,8 @@
 /* כל שורה בטבלת "פאות תצוגה" פותחת את ShowroomStockDetailsPanel בלחיצה
    (חוץ מבחירת הסטטוס - יש לה stopPropagation) - אותו דפוס כמו .sales-row
    ב-Sales.css. אפקט ה-hover עצמו כבר גנרי לכל שורה בטבלה (למעלה). */
-.showroom-row {
+.showroom-row,
+.hair-row {
   cursor: pointer;
 }
 

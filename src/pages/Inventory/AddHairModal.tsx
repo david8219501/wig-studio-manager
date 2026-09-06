@@ -7,6 +7,13 @@ interface AddHairModalProps {
   onClose: () => void;
   onSave: (item: HairItem) => Promise<void>;
   nextId: string; // התווית הידידותית הבאה לתצוגה, למשל HAIR-05 - לא ה-Firestore document id בפועל (זה auto-generated ב-Inventory.tsx, ראו nextHairCode שם)
+  // כשמוגדר - הטופס עובר למצב עריכה. אורך/משקל התחלתי לא ניתנים לעריכה
+  // כאן בכוונה (בדיוק כמו quantity ב-AddBulkItemModal) - הם משפיעים על
+  // חישובי משקל/שארית שכבר בתוקף על הפריט (currentWeight/remnantTotalValue),
+  // ועריכה שקטה שלהם הייתה יוצרת אי-עקביות. currentWeight/status/
+  // isRemnantBox/remnantMergeLog/lastUsedAt נשמרים כמו שהם (spread מ-
+  // editingItem ב-handleSubmit) - לא נגעים בהם דרך הטופס הזה.
+  editingItem?: HairItem | null;
 }
 
 // אלו הצעות ברירת מחדל בלבד - השדות הם string חופשי בטיפוס, כך שאפשר גם להקליד ערך אחר
@@ -23,8 +30,25 @@ const emptyForm = {
   costPrice: '',
 };
 
-const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, nextId }) => {
-  const [form, setForm] = useState(emptyForm);
+// אתחול ה-form ישירות מ-editingItem (lazy initial state) - בלי useEffect.
+// זה תקין רק כי Inventory.tsx מרנדר עם key={editingItem?.id ?? 'new'} -
+// מה שגורם ל-React למחזר (remount) את כל הרכיב מחדש בכל פעם שהיעד
+// לעריכה משתנה, כך שה-state תמיד מתחיל נקי בלי שום effect.
+const formFromItem = (item: HairItem | null): typeof emptyForm =>
+  item
+    ? {
+        supplier: item.supplier,
+        length: String(item.length),
+        initialWeight: String(item.initialWeight),
+        hairType: item.hairType,
+        texture: item.texture,
+        color: item.color,
+        costPrice: String(item.costPrice),
+      }
+    : emptyForm;
+
+const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, nextId, editingItem = null }) => {
+  const [form, setForm] = useState(() => formFromItem(editingItem));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -50,19 +74,31 @@ const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, ne
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    const newItem: HairItem = {
-      id: nextId,
-      supplier: form.supplier.trim(),
-      length: Number(form.length),
-      initialWeight: Number(form.initialWeight),
-      currentWeight: Number(form.initialWeight), // בקליטה: משקל נוכחי = משקל התחלתי
-      hairType: form.hairType,
-      texture: form.texture,
-      color: form.color.trim(),
-      costPrice: Number(form.costPrice),
-      status: 'available',
-      createdAt: new Date().toISOString(),
-    };
+    // עריכה: spread מ-editingItem קודם - שומר currentWeight/status/
+    // isRemnantBox/remnantMergeLog/lastUsedAt/createdAt/length/
+    // initialWeight כמו שהם, דורס רק את שדות הטופס הניתנים לעריכה.
+    const newItem: HairItem = editingItem
+      ? {
+          ...editingItem,
+          supplier: form.supplier.trim(),
+          hairType: form.hairType,
+          texture: form.texture,
+          color: form.color.trim(),
+          costPrice: Number(form.costPrice),
+        }
+      : {
+          id: nextId,
+          supplier: form.supplier.trim(),
+          length: Number(form.length),
+          initialWeight: Number(form.initialWeight),
+          currentWeight: Number(form.initialWeight), // בקליטה: משקל נוכחי = משקל התחלתי
+          hairType: form.hairType,
+          texture: form.texture,
+          color: form.color.trim(),
+          costPrice: Number(form.costPrice),
+          status: 'available',
+          createdAt: new Date().toISOString(),
+        };
 
     setSaving(true);
     setSaveError(null);
@@ -82,14 +118,14 @@ const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, ne
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>קליטת קוקו חדש</h2>
+          <h2>{editingItem ? 'עריכת פרטי קוקו' : 'קליטת קוקו חדש'}</h2>
           <button className="modal-close-btn" onClick={onClose} aria-label="סגור">
             ✕
           </button>
         </div>
 
         <div className="modal-id-badge">
-          מזהה שיוקצה אוטומטית: <span>{nextId}</span>
+          {editingItem ? 'מזהה' : 'מזהה שיוקצה אוטומטית'}: <span>{editingItem ? (editingItem.hairCode || editingItem.id) : nextId}</span>
         </div>
 
         <div className="modal-form-grid">
@@ -104,27 +140,33 @@ const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, ne
             {errors.supplier && <span className="field-error">{errors.supplier}</span>}
           </div>
 
-          <div className="form-field">
-            <label>אורך (ס"מ) *</label>
-            <input
-              type="number"
-              value={form.length}
-              onChange={(e) => handleChange('length', e.target.value)}
-              placeholder="40"
-            />
-            {errors.length && <span className="field-error">{errors.length}</span>}
-          </div>
+          {/* אורך/משקל התחלתי לא ניתנים לעריכה - ראו הערה ליד editingItem
+              בהגדרת ה-props למעלה. */}
+          {!editingItem && (
+            <>
+              <div className="form-field">
+                <label>אורך (ס"מ) *</label>
+                <input
+                  type="number"
+                  value={form.length}
+                  onChange={(e) => handleChange('length', e.target.value)}
+                  placeholder="40"
+                />
+                {errors.length && <span className="field-error">{errors.length}</span>}
+              </div>
 
-          <div className="form-field">
-            <label>משקל התחלתי (גרם) *</label>
-            <input
-              type="number"
-              value={form.initialWeight}
-              onChange={(e) => handleChange('initialWeight', e.target.value)}
-              placeholder="120"
-            />
-            {errors.initialWeight && <span className="field-error">{errors.initialWeight}</span>}
-          </div>
+              <div className="form-field">
+                <label>משקל התחלתי (גרם) *</label>
+                <input
+                  type="number"
+                  value={form.initialWeight}
+                  onChange={(e) => handleChange('initialWeight', e.target.value)}
+                  placeholder="120"
+                />
+                {errors.initialWeight && <span className="field-error">{errors.initialWeight}</span>}
+              </div>
+            </>
+          )}
 
           <div className="form-field">
             <label>מרקם (חלק/גלי/מתולתל)</label>
@@ -177,7 +219,7 @@ const AddHairModal: React.FC<AddHairModalProps> = ({ isOpen, onClose, onSave, ne
             ביטול
           </button>
           <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? 'שומר...' : 'שמור קוקו'}
+            {saving ? 'שומר...' : editingItem ? 'שמירת שינויים' : 'שמור קוקו'}
           </button>
         </div>
       </div>
