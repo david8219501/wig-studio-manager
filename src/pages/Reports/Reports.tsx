@@ -217,6 +217,20 @@ export default function Reports() {
       .sort((a, b) => b.daysInStock - a.daysInStock);
     const deadStockTotalCost = deadStockItems.reduce((sum, h) => sum + (h.costPrice || 0), 0);
 
+    // קבוצה 3: חובות פתוחים לפי ותק - מחושב ישירות מ-orders שכבר טעונים,
+    // אין צורך ב-listener נוסף. totalPrice > paidAmount, הזמנות "בוטלה"
+    // מוחרגות. ממוין מהוותיק לחדש (החוב הכי "בוגר" קודם).
+    const openDebts = orders
+      .filter((o) => o.status !== CANCELLED_STATUS && (o.totalPrice || 0) > (o.paidAmount || 0))
+      .map((o) => ({
+        id: o.id,
+        clientName: o.clientName,
+        debt: (o.totalPrice || 0) - (o.paidAmount || 0),
+        daysSince: Math.floor((now.getTime() - new Date(o.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
+      }))
+      .sort((a, b) => b.daysSince - a.daysSince);
+    const openDebtsTotal = openDebts.reduce((sum, d) => sum + d.debt, 0);
+
     // זמינות מלאי - המדד היחיד ב"יעילות תפעולית" עם מקור נתונים אמיתי היום
     const inventoryAvailabilityPct = bulkItems.length > 0
       ? Math.round((bulkItems.filter((b) => b.quantity > b.minThreshold).length / bulkItems.length) * 100)
@@ -249,6 +263,8 @@ export default function Reports() {
       profitByTypeMonthly,
       deadStockItems,
       deadStockTotalCost,
+      openDebts,
+      openDebtsTotal,
       inventoryAvailabilityPct,
     };
   }, [orders, expenses, bulkItems, hairItems]);
@@ -372,6 +388,40 @@ export default function Reports() {
                         <td>{item.color} / {item.length} ס"מ</td>
                         <td className="mono">₪{Math.round(item.costPrice || 0).toLocaleString()}</td>
                         <td>{item.daysInStock}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* קבוצה 3: חובות פתוחים לפי ותק */}
+        <div className="reports-card full-width">
+          <h2 className="reports-title">חובות פתוחים לפי ותק</h2>
+          {report.openDebts.length === 0 ? (
+            <p>אין כרגע חובות פתוחים.</p>
+          ) : (
+            <>
+              <p className="dead-stock-total">
+                סה"כ חוב פתוח: <span className="mono font-bold text-danger">₪{Math.round(report.openDebtsTotal).toLocaleString()}</span>
+              </p>
+              <div className="reports-table-wrapper">
+                <table className="reports-table">
+                  <thead>
+                    <tr>
+                      <th>לקוחה</th>
+                      <th>סכום חוב (₪)</th>
+                      <th>ימים מאז ההזמנה</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.openDebts.map((debt) => (
+                      <tr key={debt.id}>
+                        <td>{debt.clientName}</td>
+                        <td className="mono text-danger">₪{Math.round(debt.debt).toLocaleString()}</td>
+                        <td>{debt.daysSince}</td>
                       </tr>
                     ))}
                   </tbody>
