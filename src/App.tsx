@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getApps } from 'firebase/app';
 import twemoji from '@twemoji/api';
@@ -240,6 +240,24 @@ function App() {
     }
   };
 
+  // התנתקות - קוראת ל-setIsLoggedIn(false) במפורש ולא מסתמכת רק על
+  // onAuthStateChanged: אם התחברות ידנית כבר קרתה בטאב הזה (
+  // manualAuthRef.current === true), המאזין ההוא מדלג לצמיתות על
+  // setIsLoggedIn כדי לא להתנגש בהשהיית הודעת ההצלחה - כלומר signOut
+  // לבד, בלי הקריאה הזו, היה משאיר את המסך תקוע על המערכת המחוברת.
+  // מאפסת גם את הדגל עצמו, כדי שזיהוי סשן אוטומטי יעבוד נכון שוב אם
+  // מתחברים מחדש באותו טאב.
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      manualAuthRef.current = false;
+      setIsLoggedIn(false);
+    }
+  };
+
   // עוד לא ידוע אם יש סשן מחובר קיים - מסך טעינה ריק במקום להבהב את
   // Login לרגע ואז לקפוץ מיד למערכת.
   if (checkingAuth) {
@@ -288,6 +306,7 @@ function App() {
         businessName={businessName}
         userInitials={userInitials}
         logoUrl={logoUrl}
+        onLogout={handleLogout}
       />
       <main className="main-content">
         <div className="content-area">
