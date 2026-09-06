@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import { isUnsoldShowroomStock } from "../../utils/orderCreation";
+import { calculateOrderProfit } from "../../utils/orderProfit";
 import type { BulkItem } from "../../types";
 import { getMonthNameIL } from "../../utils/formatDate";
 import "./Reports.css";
+
+// אותם 4 סוגי עבודה בדיוק שהאתר יוצר בפועל (ORDER_TYPE_LABELS ב-
+// NewOrderWizard.tsx, ותוויות קבועות ב-RepairOrderForm/
+// ShowroomStockFormModal/QuickRetailSaleModal) - סדר קבוע לצבעים
+// עקביים בגרף מחודש לחודש.
+const PROFIT_ORDER_TYPES = ["פאה חדשה", "תיקון / שירות", "מוצר קמעונאי", "פאת תצוגה"];
+const PROFIT_TYPE_COLORS = ["#9b69ff", "#3b82f6", "#f59e0b", "#10b981"];
+
+// הזמנות "בוטלה" (OrderDetailsPanel.tsx - ביטול הזמנה) מוחרגות מכל
+// חישובי הרווח/החוב בדף הזה - אותו סטטוס קבוע, לא מיובא כי הוא local
+// const לא-מיוצא שם (עקבי עם המוסכמה הקיימת של קבועים מקומיים קטנים).
+const CANCELLED_STATUS = "בוטלה";
 
 interface ExpenseRow {
   id: string;
@@ -144,6 +158,30 @@ export default function Reports() {
       .filter((row) => row.orders > 0 || row.exp > 0)
       .reverse();
 
+    // קבוצה 1: רווחיות לפי סוג עבודה, לאורך 12 חודשים - סך כולל (לא
+    // ממוצע) שכל סוג עבודה הביא, מקובץ לפי orderType. calculateOrderProfit
+    // (רווח נטו, לא totalPrice גולמי) על כל הזמנה. הזמנות "בוטלה" מוחרגות.
+    const months12: { key: string; label: string }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months12.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: getMonthNameIL(d, "short"),
+      });
+    }
+    const profitByTypeMonthly = months12.map(({ key, label }) => {
+      const monthOrders = orders.filter(
+        (o) => monthKey(o.createdAt) === key && o.status !== CANCELLED_STATUS
+      );
+      const row: Record<string, string | number> = { month: label };
+      PROFIT_ORDER_TYPES.forEach((type) => {
+        row[type] = Math.round(
+          monthOrders.filter((o) => o.orderType === type).reduce((sum, o) => sum + calculateOrderProfit(o), 0)
+        );
+      });
+      return row;
+    });
+
     // זמינות מלאי - המדד היחיד ב"יעילות תפעולית" עם מקור נתונים אמיתי היום
     const inventoryAvailabilityPct = bulkItems.length > 0
       ? Math.round((bulkItems.filter((b) => b.quantity > b.minThreshold).length / bulkItems.length) * 100)
@@ -173,6 +211,7 @@ export default function Reports() {
         },
       ],
       monthlyRows,
+      profitByTypeMonthly,
       inventoryAvailabilityPct,
     };
   }, [orders, expenses, bulkItems]);
@@ -245,6 +284,28 @@ export default function Reports() {
               </table>
             </div>
           )}
+        </div>
+
+        {/* קבוצה 1: רווחיות לפי סוג עבודה - 12 חודשים אחרונים */}
+        <div className="reports-card full-width">
+          <h2 className="reports-title">רווחיות לפי סוג עבודה - 12 חודשים אחרונים</h2>
+          <div className="chart-wrapper">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={report.profitByTypeMonthly} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eeeff1" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#525866" }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#525866" }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: "10px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                  formatter={(value: unknown, name: unknown) => [`₪${Number(value).toLocaleString()}`, String(name)]}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {PROFIT_ORDER_TYPES.map((type, i) => (
+                  <Bar key={type} dataKey={type} name={type} stackId="profit" fill={PROFIT_TYPE_COLORS[i]} radius={i === PROFIT_ORDER_TYPES.length - 1 ? [4, 4, 0, 0] : undefined} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Efficiency Report */}
