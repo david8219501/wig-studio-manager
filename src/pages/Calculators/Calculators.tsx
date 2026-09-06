@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, calculateHairCostFromGrams } from "../../utils/hairCost";
+import { formatDateIL } from "../../utils/formatDate";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import './Calculators.css';
 
 const DEFAULT_SETTINGS = {
@@ -236,6 +238,230 @@ function RepairsCalculator({ settings }: { settings: Settings }) {
   );
 }
 
+/* ─── קטלוגי מחירים - טאב "קטלוגי מחירים" ─── */
+
+interface CatalogRow {
+  length: number;
+  cost: number;
+  suggestedPrice: number;
+}
+
+interface PriceCatalog {
+  id: string;
+  name: string;
+  structure: string;
+  fullness: string;
+  createdAt: string;
+  rows: CatalogRow[];
+}
+
+// שורות קטלוג לכל האורכים האפשריים (HAIR_LENGTH_OPTIONS) - עלות גולמית
+// מ-calculateHairCost (בלי סקין/טופ/רשת/נוספות, בשונה מ-PriceCalculator -
+// הקטלוג מציג רק את עלות השיער עצמה) ומחיר מוצע עם אחוז הרווח, אותה
+// נוסחה בדיוק כמו suggestedPrice ב-RepairOrderForm.tsx.
+function computeCatalogRows(structure: string, fullness: string, settings: Settings): CatalogRow[] {
+  return HAIR_LENGTH_OPTIONS.map((length) => {
+    const { hairCost } = calculateHairCost({ length, structure, fullness }, settings);
+    const suggestedPrice = hairCost * (1 + settings.profitMargin / 100);
+    return { length, cost: Math.round(hairCost), suggestedPrice: Math.round(suggestedPrice) };
+  });
+}
+
+function PriceCatalogsTab({ settings }: { settings: Settings }) {
+  const [catalogs, setCatalogs] = useState<PriceCatalog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [name, setName] = useState("");
+  const [structure, setStructure] = useState("");
+  const [fullness, setFullness] = useState("");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStructure, setEditStructure] = useState("");
+  const [editFullness, setEditFullness] = useState("");
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
+    const unsub = onSnapshot(
+      query(collection(db, "priceCatalogs"), where("businessId", "==", businessId)),
+      (snapshot) => {
+        setCatalogs(
+          snapshot.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Omit<PriceCatalog, "id">) }))
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        );
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error loading price catalogs:", err);
+        setLoadError("שגיאה בטעינת קטלוגי המחירים. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, []);
+
+  const canCreate = name.trim() !== "" && structure !== "" && fullness !== "";
+
+  const handleCreateCatalog = async () => {
+    if (!canCreate) return;
+    await addDoc(collection(db, "priceCatalogs"), {
+      businessId: auth.currentUser!.uid,
+      name: name.trim(),
+      structure,
+      fullness,
+      createdAt: new Date().toISOString(),
+      rows: computeCatalogRows(structure, fullness, settings),
+    });
+    setName("");
+    setStructure("");
+    setFullness("");
+  };
+
+  const handleRefreshCatalog = async (catalog: PriceCatalog) => {
+    await updateDoc(doc(db, "priceCatalogs", catalog.id), {
+      rows: computeCatalogRows(catalog.structure, catalog.fullness, settings),
+    });
+  };
+
+  const startEdit = (catalog: PriceCatalog) => {
+    setEditingId(catalog.id);
+    setEditName(catalog.name);
+    setEditStructure(catalog.structure);
+    setEditFullness(catalog.fullness);
+  };
+
+  // עריכת מבנה/מלאות משנה גם את מחירי הקטלוג - אין טעם לאפשר לשמור
+  // מבנה/מלאות חדשים עם שורות מחיר "קפואות" מהערכים הישנים, אז השמירה
+  // מחשבת מחדש את rows כמו כפתור "עדכן לפי הגדרות נוכחיות".
+  const handleSaveEdit = async () => {
+    if (!editingId || editName.trim() === "" || editStructure === "" || editFullness === "") return;
+    await updateDoc(doc(db, "priceCatalogs", editingId), {
+      name: editName.trim(),
+      structure: editStructure,
+      fullness: editFullness,
+      rows: computeCatalogRows(editStructure, editFullness, settings),
+    });
+    setEditingId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingId) return;
+    await deleteDoc(doc(db, "priceCatalogs", deletingId));
+    setDeletingId(null);
+  };
+
+  return (
+    <div className="price-catalog-tab">
+      <div className="calc-card card-purple price-catalog-create-card">
+        <div className="calc-card-header">
+          <span className="calc-card-icon">📖</span>
+          <span className="calc-card-title">יצירת קטלוג חדש</span>
+        </div>
+
+        <div className="calc-row">
+          <MiniText label="שם הקטלוג" value={name} onChange={setName} placeholder="לדוגמה: פאות בלונד טוף לייס" />
+          <MiniSelect label="מבנה" value={structure} onChange={setStructure}
+            options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
+          <MiniSelect label="מלאות" value={fullness} onChange={setFullness}
+            options={FULLNESS_OPTIONS.map(v=>({v,l:v}))} />
+        </div>
+
+        <button className="calc-settings-btn" disabled={!canCreate} onClick={handleCreateCatalog}>
+          + צור קטלוג
+        </button>
+      </div>
+
+      {loading && (
+        <div className="calc-state">
+          <p>טוענת קטלוגי מחירים...</p>
+        </div>
+      )}
+
+      {!loading && loadError && (
+        <div className="calc-state calc-state--error">
+          <span className="calc-state__icon">⚠️</span>
+          <p>{loadError}</p>
+        </div>
+      )}
+
+      {!loading && !loadError && catalogs.length === 0 && (
+        <div className="calc-hint">אין עדיין קטלוגי מחירים - צרי את הראשון למעלה.</div>
+      )}
+
+      {!loading && !loadError && catalogs.map((catalog) => (
+        <div key={catalog.id} className="calc-card price-catalog-card">
+          {editingId === catalog.id ? (
+            <div className="calc-row">
+              <MiniText label="שם הקטלוג" value={editName} onChange={setEditName} />
+              <MiniSelect label="מבנה" value={editStructure} onChange={setEditStructure}
+                options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
+              <MiniSelect label="מלאות" value={editFullness} onChange={setEditFullness}
+                options={FULLNESS_OPTIONS.map(v=>({v,l:v}))} />
+              <button className="calc-toggle-btn" onClick={handleSaveEdit}>💾 שמירה</button>
+              <button className="calc-toggle-btn" onClick={() => setEditingId(null)}>ביטול</button>
+            </div>
+          ) : (
+            <div className="price-catalog-card-header">
+              <div>
+                <span className="price-catalog-name">{catalog.name}</span>
+                <div className="price-catalog-meta">
+                  {catalog.structure} · {catalog.fullness} · נוצר ב-{formatDateIL(catalog.createdAt)}
+                </div>
+              </div>
+              <div className="price-catalog-actions">
+                <button className="calc-toggle-btn" onClick={() => handleRefreshCatalog(catalog)}>
+                  🔄 עדכן לפי הגדרות נוכחיות
+                </button>
+                <button className="calc-toggle-btn" onClick={() => startEdit(catalog)}>✏️ עריכה</button>
+                <button className="calc-toggle-btn price-catalog-delete-btn" onClick={() => setDeletingId(catalog.id)}>
+                  🗑️ מחיקה
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="catalog-table-wrapper">
+            <table className="catalog-table">
+              <thead>
+                <tr>
+                  <th>אורך עורף</th>
+                  <th>עלות שיער</th>
+                  <th>מחיר מוצע</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalog.rows.map((row) => (
+                  <tr key={row.length}>
+                    <td className="font-bold">{row.length} ס״מ</td>
+                    <td className="mono">₪{row.cost.toLocaleString("he-IL")}</td>
+                    <td className="mono catalog-price">₪{row.suggestedPrice.toLocaleString("he-IL")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+
+      <ConfirmDialog
+        isOpen={deletingId !== null}
+        title="מחיקת קטלוג מחירים"
+        message="למחוק את הקטלוג הזה לצמיתות? הפעולה לא ניתנת לביטול."
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
+    </div>
+  );
+}
+
 interface CalculatorsPageProps {
   onNavigateToSettings?: () => void;
 }
@@ -243,6 +469,7 @@ interface CalculatorsPageProps {
 export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPageProps) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"calculators" | "catalogs">("calculators");
 
   // טעינת הגדרות התמחור של העסק מ-Firestore (ואם עדיין אין - שמירת ברירת
   // המחדל). העריכה עצמה עברה למסך ההגדרות (Settings.tsx, כרטיס "הגדרות
@@ -279,6 +506,21 @@ export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPag
         </button>
       </div>
 
+      <div className="tab-switch">
+        <button
+          className={activeTab === "calculators" ? "tab-btn active" : "tab-btn"}
+          onClick={() => setActiveTab("calculators")}
+        >
+          מחשבונים
+        </button>
+        <button
+          className={activeTab === "catalogs" ? "tab-btn active" : "tab-btn"}
+          onClick={() => setActiveTab("catalogs")}
+        >
+          קטלוגי מחירים
+        </button>
+      </div>
+
       {loadError && (
         <div className="calc-state calc-state--error">
           <span className="calc-state__icon">⚠️</span>
@@ -286,13 +528,17 @@ export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPag
         </div>
       )}
 
-      {/* מחשבון הצעת מחיר + מחשבון שדרוגים/תיקונים בשורה עליונה אחד ליד
-          השני; מחשבון אורכים לבניית פאה יורד לשורה שמתחת. */}
-      <div className="calc-grid">
-        <PriceCalculator settings={settings} />
-        <RepairsCalculator settings={settings} />
-        <LengthPlanner />
-      </div>
+      {activeTab === "calculators" && (
+        // מחשבון הצעת מחיר + מחשבון שדרוגים/תיקונים בשורה עליונה אחד ליד
+        // השני; מחשבון אורכים לבניית פאה יורד לשורה שמתחת.
+        <div className="calc-grid">
+          <PriceCalculator settings={settings} />
+          <RepairsCalculator settings={settings} />
+          <LengthPlanner />
+        </div>
+      )}
+
+      {activeTab === "catalogs" && <PriceCatalogsTab settings={settings} />}
     </div>
   );
 }
@@ -305,6 +551,21 @@ function MiniSelect({ label, value, onChange, options }: { label: string; value:
         <option value="">בחר...</option>
         {options.map(({v,l})=><option key={v} value={v}>{l}</option>)}
       </select>
+    </div>
+  );
+}
+
+function MiniText({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div className="calc-field">
+      <label className="calc-field-label">{label}</label>
+      <input
+        type="text"
+        className="calc-input"
+        value={value}
+        placeholder={placeholder}
+        onChange={e=>onChange(e.target.value)}
+      />
     </div>
   );
 }

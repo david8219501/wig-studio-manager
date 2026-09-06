@@ -415,3 +415,55 @@
 .calc-state__icon {
   font-size: 1.3rem;
 }
+
+/* ---------- טאב קטלוגי מחירים ---------- */
+/* .tab-switch/.tab-btn גלובליים (Inventory.css) - נעשה בהם שימוש חוזר
+   בלי להגדיר מחדש, כי כל ה-CSS מתאגד לחבילה אחת (אותו דפוס שימוש חוזר
+   שכבר הוקם היום ב-.chart-wrapper בין Dashboard.css ל-Reports.tsx). */
+.price-catalog-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.price-catalog-create-card .calc-settings-btn {
+  align-self: flex-start;
+}
+
+.price-catalog-create-card .calc-settings-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.price-catalog-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.price-catalog-name {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.price-catalog-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.price-catalog-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.price-catalog-delete-btn {
+  color: var(--color-danger);
+}
