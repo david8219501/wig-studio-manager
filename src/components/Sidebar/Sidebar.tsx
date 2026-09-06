@@ -6,7 +6,6 @@ interface SidebarProps {
   businessName?: string;
   userInitials?: string;
   logoUrl?: string | null;
-  onLogout?: () => void;
 }
 
 const NAV_ITEMS = [
@@ -20,7 +19,7 @@ const NAV_ITEMS = [
   { label: "דוחות", icon: "📊", id: "reports" },
 ];
 
-export default function Sidebar({ activePage, onNavigate, businessName, userInitials, logoUrl, onLogout }: SidebarProps) {
+export default function Sidebar({ activePage, onNavigate, businessName, userInitials, logoUrl }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -55,10 +54,6 @@ export default function Sidebar({ activePage, onNavigate, businessName, userInit
         >
           <span className="nav-icon">⚙️</span>
           <span>הגדרות</span>
-        </button>
-        <button onClick={onLogout} className="nav-item">
-          <span className="nav-icon">🚪</span>
-          <span>התנתקות</span>
         </button>
       </div>
     </aside>

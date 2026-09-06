@@ -9,6 +9,10 @@ import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_APPOINTMENT_TYPES } from "../../uti
 import "./Settings.css";
 
 interface SettingsProps {
+  // handleLogout האמיתי מ-App.tsx (מטפל גם ב-manualAuthRef/isLoggedIn/
+  // ניקוי הודעות הצלחה ישנות - ראו שם) - Settings.tsx רק מפעיל אותו
+  // דרך כפתור מקומי + ConfirmDialog, לא מממש שום לוגיקת auth בעצמו.
+  onLogout?: () => void;
   // נקראת אחרי מחיקת חשבון מוצלחת - App.tsx צריך לעדכן isLoggedIn/
   // manualAuthRef בעצמו (Settings.tsx לא מחזיק state כזה). ראו הערה
   // מפורטת ליד handleLogout ב-App.tsx - אותה בעיה בדיוק חלה כאן
@@ -29,7 +33,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undef
 type ConnectionStatus = "unknown" | "connected" | "error";
 type SyncStatus = "idle" | "syncing" | "done" | "error";
 
-export default function Settings({ onAccountDeleted }: SettingsProps) {
+export default function Settings({ onLogout, onAccountDeleted }: SettingsProps) {
   // פרופיל העסק - נטען פעם אחת (getDoc, לא מאזין חי) לתוך state עריכה
   // מקומי, כמו כל טופס עריכה אחר באתר (ClientDrawer וכו') - מאזין חי
   // כאן היה דורס את מה שהמשתמשת מקלידה תוך כדי עריכה. שינוי שנשמר
@@ -322,6 +326,8 @@ export default function Settings({ onAccountDeleted }: SettingsProps) {
   // היה מסוכן יותר: ברגע ש-deleteUser מצליח, ה-ID token מתבטל כמעט
   // מיד, וכל קריאת Firestore אחריו (שדורשת auth תקין מול הכללים)
   // הייתה נכשלת - משאירה חלק מהנתונים בלי דרך למחוק אותם יותר.
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -759,6 +765,26 @@ export default function Settings({ onAccountDeleted }: SettingsProps) {
         confirmLabel={disconnecting ? "מנתקת..." : "כן, נתקי"}
         onConfirm={handleDisconnectGoogleCalendar}
         onCancel={() => setConfirmDisconnectOpen(false)}
+      />
+
+      <div className="placeholder-card">
+        <h2>👤 ניהול חשבון</h2>
+        <button type="button" className="btn-google-calendar" onClick={() => setConfirmLogoutOpen(true)}>
+          התנתקות
+        </button>
+      </div>
+
+      <ConfirmDialog
+        isOpen={confirmLogoutOpen}
+        title="התנתקות"
+        message="האם את בטוחה שברצונך להתנתק?"
+        variant="warning"
+        confirmLabel="כן, התנתקי"
+        onConfirm={() => {
+          setConfirmLogoutOpen(false);
+          onLogout?.();
+        }}
+        onCancel={() => setConfirmLogoutOpen(false)}
       />
 
       <div className="placeholder-card settings-danger-zone">

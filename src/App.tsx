@@ -246,7 +246,10 @@ function App() {
   // setIsLoggedIn כדי לא להתנגש בהשהיית הודעת ההצלחה - כלומר signOut
   // לבד, בלי הקריאה הזו, היה משאיר את המסך תקוע על המערכת המחוברת.
   // מאפסת גם את הדגל עצמו, כדי שזיהוי סשן אוטומטי יעבוד נכון שוב אם
-  // מתחברים מחדש באותו טאב.
+  // מתחברים מחדש באותו טאב. גם מנקה successMessage/errorMessage -
+  // אחרת מסך ה-Login שחוזר להופיע היה עדיין מציג את הודעת "התחברת
+  // בהצלחה!" הישנה מההתחברות המקורית (ה-state הזה לא מתאפס לבד -
+  // App.tsx אף פעם לא unmount, רק Login לא מוצג/מוצג לפי isLoggedIn).
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -254,6 +257,8 @@ function App() {
       console.error("Logout error:", error);
     } finally {
       manualAuthRef.current = false;
+      setSuccessMessage('');
+      setErrorMessage('');
       setIsLoggedIn(false);
     }
   };
@@ -295,6 +300,7 @@ function App() {
       case 'settings':
         return (
           <Settings
+            onLogout={handleLogout}
             onAccountDeleted={() => {
               manualAuthRef.current = false;
               setIsLoggedIn(false);
@@ -314,7 +320,6 @@ function App() {
         businessName={businessName}
         userInitials={userInitials}
         logoUrl={logoUrl}
-        onLogout={handleLogout}
       />
       <main className="main-content">
         <div className="content-area">
