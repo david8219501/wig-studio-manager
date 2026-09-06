@@ -4,14 +4,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc,
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, functions, storage } from "../../services/firebase";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
-import TimeInput from "../../components/common/TimeInput";
-import {
-  DEFAULT_EXPENSE_CATEGORIES,
-  DEFAULT_APPOINTMENT_TYPES,
-  DEFAULT_WORKING_HOURS,
-  WEEK_DAYS,
-  type WorkingHours,
-} from "../../utils/businessSettings";
+import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_APPOINTMENT_TYPES } from "../../utils/businessSettings";
 import "./Settings.css";
 
 // חייבים להיות זהים בדיוק לערכים ב-functions/src/config.ts (project קבוע,
@@ -232,71 +225,6 @@ export default function Settings() {
       setPricingSaveMessage("error");
     } finally {
       setSavingPricing(false);
-    }
-  };
-
-  // שעות פעילות - businessSettings/{uid}.workingHours, אובייקט לכל יום.
-  // רק שמירת נתונים בשלב הזה (לא נאכף עדיין באף מקום אחר באתר, למשל
-  // ביומן) - כמו שהתבקש.
-  const [workingHours, setWorkingHours] = useState<WorkingHours>(DEFAULT_WORKING_HOURS);
-  const [hoursLoading, setHoursLoading] = useState(true);
-  const [savingHours, setSavingHours] = useState(false);
-  const [hoursSaveMessage, setHoursSaveMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const businessId = auth.currentUser?.uid;
-    if (!businessId) return;
-    getDoc(doc(db, "businessSettings", businessId))
-      .then((snap) => {
-        const data = snap.data() as { workingHours?: Partial<WorkingHours> } | undefined;
-        if (data?.workingHours) {
-          // מיזוג עמוק לכל יום בנפרד (לא רק ברמת המפתח העליון) - אם
-          // Firestore אי-פעם מחזיק יום חלקי (חסר open/close/closed),
-          // זה ממלא את מה שחסר מברירת המחדל במקום להשאיר undefined
-          // שיישלח בחזרה ב-setDoc הבא ויידחה ("Unsupported field value:
-          // undefined") - זה בדיוק הבאג שכבר תוקן פעם עם הערת תשלום.
-          const merged: WorkingHours = {};
-          for (const { key } of WEEK_DAYS) {
-            merged[key] = { ...DEFAULT_WORKING_HOURS[key], ...data.workingHours?.[key] };
-          }
-          setWorkingHours(merged);
-        }
-      })
-      .catch((err) => console.error("שגיאה בטעינת שעות פעילות:", err))
-      .finally(() => setHoursLoading(false));
-  }, []);
-
-  const updateDayHours = (day: string, patch: Partial<WorkingHours[string]>) => {
-    setWorkingHours((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }));
-  };
-
-  const handleSaveWorkingHours = async () => {
-    const businessId = auth.currentUser?.uid;
-    if (!businessId) return;
-    setSavingHours(true);
-    setHoursSaveMessage(null);
-    try {
-      // סניטציה הגנתית ממש לפני השמירה - מבטיחה שכל יום נשלח עם 3
-      // השדות מלאים (לא undefined), בלי קשר למה שהיה ב-state, כדי
-      // לחסום את משפחת הבאג הזו סופית מכל כיוון אפשרי.
-      const sanitized: WorkingHours = {};
-      for (const { key } of WEEK_DAYS) {
-        const day = workingHours[key] ?? DEFAULT_WORKING_HOURS[key];
-        sanitized[key] = {
-          open: day.open || DEFAULT_WORKING_HOURS[key].open,
-          close: day.close || DEFAULT_WORKING_HOURS[key].close,
-          closed: !!day.closed,
-        };
-      }
-      await setDoc(doc(db, "businessSettings", businessId), { workingHours: sanitized }, { merge: true });
-      setWorkingHours(sanitized);
-      setHoursSaveMessage("success");
-    } catch (err) {
-      console.error("שגיאה בשמירת שעות פעילות:", err);
-      const detail = err instanceof Error ? err.message : String(err);
-      setHoursSaveMessage(`error: ${detail}`);
-    } finally {
-      setSavingHours(false);
     }
   };
 
@@ -662,52 +590,6 @@ export default function Settings() {
             )}
             <button type="button" className="btn-google-calendar" onClick={handleSavePricing} disabled={savingPricing}>
               {savingPricing ? "שומרת..." : "שמירה"}
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className="placeholder-card">
-        <h2>🕒 שעות פעילות</h2>
-        {hoursLoading ? (
-          <p>טוענת שעות פעילות...</p>
-        ) : (
-          <>
-            <div className="settings-hours-table">
-              {WEEK_DAYS.map(({ key, label }) => {
-                const day = workingHours[key] ?? DEFAULT_WORKING_HOURS[key];
-                return (
-                  <div key={key} className="settings-hours-row">
-                    <span className="settings-hours-day">{label}</span>
-                    <label className="settings-hours-closed-toggle">
-                      <input
-                        type="checkbox"
-                        checked={day.closed}
-                        onChange={(e) => updateDayHours(key, { closed: e.target.checked })}
-                      />
-                      סגור ביום זה
-                    </label>
-                    {!day.closed && (
-                      <div className="settings-hours-times">
-                        <TimeInput value={day.open} onChange={(v) => updateDayHours(key, { open: v })} />
-                        <span>עד</span>
-                        <TimeInput value={day.close} onChange={(v) => updateDayHours(key, { close: v })} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {hoursSaveMessage === "success" && (
-              <div className="google-calendar-status google-calendar-status--success">שעות הפעילות נשמרו בהצלחה.</div>
-            )}
-            {hoursSaveMessage?.startsWith("error") && (
-              <div className="google-calendar-status google-calendar-status--error">
-                שגיאה בשמירה: {hoursSaveMessage.replace(/^error:\s*/, "")}
-              </div>
-            )}
-            <button type="button" className="btn-google-calendar" onClick={handleSaveWorkingHours} disabled={savingHours}>
-              {savingHours ? "שומרת..." : "שמירה"}
             </button>
           </>
         )}

@@ -31,36 +31,3 @@ export const LEGACY_EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   production: "ייצור הזמנות",
   other: "שונות",
 };
-
-// שעות פעילות - businessSettings/{businessId}.workingHours, אובייקט
-// לכל יום בשבוע. מפתחות באנגלית (יציבים, לא תלויי-תרגום) - התווית
-// העברית נגזרת מ-WEEK_DAYS בכל מקום שמציג את זה.
-export interface DayWorkingHours {
-  open: string; // "HH:mm"
-  close: string; // "HH:mm"
-  closed: boolean;
-}
-
-export type WorkingHours = Record<string, DayWorkingHours>;
-
-export const WEEK_DAYS: { key: string; label: string }[] = [
-  { key: "sunday", label: "ראשון" },
-  { key: "monday", label: "שני" },
-  { key: "tuesday", label: "שלישי" },
-  { key: "wednesday", label: "רביעי" },
-  { key: "thursday", label: "חמישי" },
-  { key: "friday", label: "שישי" },
-  { key: "saturday", label: "שבת" },
-];
-
-// ברירת מחדל סבירה לסלון פאות ישראלי - פתוח א'-ה' יום מלא, שישי מקוצר,
-// שבת סגור. ניתנת לעריכה מלאה בהגדרות - זו רק נקודת פתיחה.
-export const DEFAULT_WORKING_HOURS: WorkingHours = {
-  sunday: { open: "09:00", close: "19:00", closed: false },
-  monday: { open: "09:00", close: "19:00", closed: false },
-  tuesday: { open: "09:00", close: "19:00", closed: false },
-  wednesday: { open: "09:00", close: "19:00", closed: false },
-  thursday: { open: "09:00", close: "19:00", closed: false },
-  friday: { open: "09:00", close: "14:00", closed: false },
-  saturday: { open: "09:00", close: "19:00", closed: true },
-};
