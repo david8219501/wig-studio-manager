@@ -204,6 +204,12 @@ const Inventory: React.FC = () => {
   // שמצביע על הקוקו הזה, כדי שאפשר יהיה לחלק את עלות הבלאי ביניהם באופן
   // יחסי לפי gramsUsed בכל entry (לא לפי הזמנה - הזמנה יחידה יכולה
   // בעקרון להכיל כמה entries לאותו קוקו, אם שויך בכמה פעימות).
+  //
+  // totalMergedToRemnantBoxes - משקל שהועבר בעבר לקופסאות שאריות (מיזוג,
+  // לא שימוש בהזמנה) חייב להיות מנוכה גם הוא לפני חישוב הבלאי - אחרת
+  // הוא מתחשב פעמיים כ"בלאי" למרות שהוא נשמר בפועל בשווי בקופסה. עובר
+  // על remnantMergeLog של כל קופסת שאריות (isRemnantBox) בעסק, ומחפש
+  // רשומות שבהן sourceItemId הוא הקוקו הנסגר.
   const closingSummary = useMemo(() => {
     const item = hairItems.find((h) => h.id === closingHairItemId) || null;
     if (!item) return null;
@@ -217,9 +223,20 @@ const Inventory: React.FC = () => {
         }
       });
     });
-    const waste = item.initialWeight - totalGramsUsed;
+
+    let totalMergedToRemnantBoxes = 0;
+    hairItems.forEach((box) => {
+      if (!box.isRemnantBox) return;
+      (box.remnantMergeLog ?? []).forEach((logEntry) => {
+        if (logEntry.sourceItemId === item.id) {
+          totalMergedToRemnantBoxes += logEntry.weightMerged;
+        }
+      });
+    });
+
+    const waste = item.initialWeight - totalGramsUsed - totalMergedToRemnantBoxes;
     const wasteCost = waste > 0 ? item.costPrice * (waste / item.initialWeight) : 0;
-    return { matches, totalGramsUsed, waste, wasteCost };
+    return { matches, totalGramsUsed, totalMergedToRemnantBoxes, waste, wasteCost };
   }, [closingHairItemId, hairItems, orders]);
 
   // פאות תצוגה שעדיין לא נמכרו - orders עם isShowroomStock: true וללא clientId
@@ -1109,6 +1126,7 @@ const Inventory: React.FC = () => {
           closingHairItem && closingSummary
             ? `משקל שנקנה: ${closingHairItem.initialWeight} גרם
 סך גרמים שתועדו בפועל בהזמנות: ${closingSummary.totalGramsUsed} גרם
+הועבר לקופסאות שאריות: ${closingSummary.totalMergedToRemnantBoxes} גרם
 בלאי מחושב: ${closingSummary.waste.toFixed(1)} גרם${
                 closingSummary.wasteCost > 0
                   ? ` (₪${closingSummary.wasteCost.toFixed(0)})`
