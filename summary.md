@@ -1,92 +1,55 @@
-# סיכום: תיקון נוסחת בלאי + פיצ'ר "סגירת קוקו" (2 חלקים)
+# סיכום: "ביטול סגירת קוקו" (שחזור בלאי) ✅ הושלמה
 
-## חלק א': תיקון נוסחת ה-30% המשוערת ב-hairCost.ts ✅ הושלמה
+תוספת לפיצ'ר "סגירת קוקו" הקיים (Inventory.tsx) - מאפשרת לבטל סגירה
+שבוצעה בטעות, ולשחזר בדיוק את מה שהשתנה.
 
-**הקוד המדויק שנבדק** (`calculateHairCostFromGrams`, לפני התיקון):
-```ts
-const waste = netGrams * 0.3;
-const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * (netGrams + waste) / 1000;
-```
+## יומן חלוקה מדויק - שדות חדשים ב-HairItem (types/index.ts)
 
-**האבחנה אושרה:** זו הנוסחה הלא-מדויקת. `waste = netGrams * 0.3` שקול
-ל-`purchased = netGrams * 1.3`, ו-30/130 = **23.1%** בלאי אמיתי
-מהמשקל שנקנה - לא 30%. הנוסחה הנכונה: קונים X גרם, 30% מהם הולך
-לאיבוד, נשארים עם 70% שמישים (`netGrams = X * 0.7`) - כלומר
-`X = netGrams / 0.7`.
+- **`wasteReconciliationLog?: WasteReconciliationLogEntry[]`** -
+  `{orderId, entryIndex, amountAdded}[]` לכל שיוך שהושפע בסגירה
+  האחרונה. נשמר ב-`handleConfirmCloseHairItem` (עודכן) **תוך כדי**
+  חלוקת הבלאי - לא מחושב מחדש בהמשך, בדיוק כמבוקש ("לא להסתמך על
+  חישוב מחדש מאוחר יותר, שעלול לתת תוצאה שגויה אם ההזמנה נערכה
+  בינתיים").
+- **`wasteReconciledFromStatus?: HairItem['status']`** - הסטטוס
+  שהיה על הקוקו ממש לפני הסגירה (בפועל תמיד `'available'` היום, אבל
+  נשמר במפורש כדי שביטול ישחזר בדיוק, לא יניח ערך גורף - כמבוקש).
 
-**התיקון** (`src/utils/hairCost.ts`):
-```ts
-const purchasedGrams = netGrams / 0.7;
-const waste = purchasedGrams - netGrams;
-const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * purchasedGrams / 1000;
-```
+## כפתור "↩ ביטול סגירה / שחזור בלאי" - HairItemDetailsPanel.tsx
 
-**תיקון אחד מספיק לכל האתר:** `Calculators.tsx` (שני המחשבונים -
-הצעת מחיר ושדרוגים/תיקונים), `NewOrderWizard.tsx`, ו-`RepairOrderForm.tsx`
-כולם קוראים ל-`calculateHairCostFromGrams`/`calculateHairCost`
-(שקוראת לה) מ-`hairCost.ts` בלבד - נבדק ב-grep שאין אף חישוב
-עצמאי/כפול במקום אחר. כל 4 מקומות התצוגה (`ResultRow`/הודעות טקסט)
-רק מציגים את `waste`/`hairCost` שמוחזרים - שום מקום לא היה צריך
-עדכון נפרד.
+מוצג **במקום** כפתור "סגירת קוקו" (לא לצדו) - שני מצבים סותרים של
+אותו פריט, מבחין ביניהם `item.wasteReconciledAt`. לא רלוונטי לקופסת
+שאריות (אותה החרגה כמו הכפתור המקורי).
 
-**לא נגעתי** (כמבוקש): חישוב העלות המדויקת של שיוך שיער אמיתי
-(`usedHairItems`, `costPrice * gramsUsed/initialWeight`) - זה כבר
-מדויק לגמרי ולא תלוי בהערכת ה-30% המשוערת.
+## הביטול בפועל - handleConfirmUndoCloseHairItem (Inventory.tsx)
 
-**קבצים:** `src/utils/hairCost.ts` בלבד.
+עובר על `wasteReconciliationLog`, מקבץ לפי `orderId` (הזמנה יכולה
+להחזיק כמה רשומות), ולכל רשומה **מחסר בדיוק** את `amountAdded`
+מ-`costAtTime` של אותו `entryIndex` (לא מאפס, לא מחשב מחדש). בסיום -
+`updateDoc` על הקוקו: `status` חוזר ל-`wasteReconciledFromStatus`
+(או `'available'` אם חסר), ו-`wasteReconciledAt`/
+`wasteReconciledFromStatus`/`wasteReconciliationLog` **מוסרים
+לגמרי** (`deleteField()`, לא `undefined`/מחרוזת ריקה) - כדי שאפשר
+יהיה "לסגור" את הקוקו שוב בעתיד.
 
-**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
-לבייסליין הקבוע.
+**הגנת מקרה קצה:** לכל רשומה בלוג - אם `entryIndex` לא קיים יותר
+במערך, **או** קיים אבל מצביע על `usedHairItems` entry עם
+`hairItemId` **שונה** (למשל בגלל שרשומה קודמת הוסרה מהמערך וכל
+האינדקסים שאחריה זזו) - מדלגים בשקט (אי אפשר לשחזר למשהו שכבר לא
+קיים). בסיום מוצגת הודעת סיכום ("שוחזרו X רשומות בהצלחה, Y דולגו...")
+בבאנר חדש (`.hair-undo-result-banner`, מעל אזור הפילטרים בטאב "מלאי
+שיער ייחודי") - ניתן לסגירה, לא נעלם אוטומטית.
 
-## חלק ב': פיצ'ר "סגירת קוקו" + חלוקת בלאי אמיתי בדיעבד ✅ הושלמה
+## עדכון קטן ב-ConfirmDialog הקיים של הסגירה
 
-**שדה חדש:** `HairItem.wasteReconciledAt?: string` (`types/index.ts`)
-- ISO timestamp שנקבע כשהבלאי חושב וחולק; משמש כחסם יחיד למניעת
-סגירה כפולה (לא בודק גם `status`, כדי שלא להתבלבל עם 'depleted'
-שיכול להיקבע גם ממיזוג לשאריות בנתיב אחר).
+הטקסט "הפעולה לא ניתנת לביטול" הוסר מהודעת האישור המקורית של
+"סגירת קוקו" (כבר לא נכון) והוחלף בהפניה לכפתור הביטול החדש.
 
-**כפתור חדש ב-`HairItemDetailsPanel.tsx`:** "🔒 סגירת קוקו - חישוב
-בלאי בפועל" - מוצג רק כש-`!isRemnant && !item.wasteReconciledAt`
-(קופסת שאריות מנוהלת בשווי דינמי, `remnantTotalValue`, לא
-`initialWeight`/`costPrice` - המודל הזה לא רלוונטי לה בכלל).
-
-**החישוב** (`closingSummary`, `useMemo` ב-`Inventory.tsx`, נגזר
-מ-`hairItems`/`orders` שכבר טעונים - בלי query נוסף): עובר על **כל**
-ה-`orders` של העסק (`orders` כבר לא מסונן לפי status - כל הסטטוסים
-כולל "נמסרה"/"נמכרה"/"בוטלה" נכללים, כמבוקש במפורש "לא רק פתוחות"),
-אוגר כל `usedHairItems` entry שמצביע על הקוקו הנבחר (`orderId` +
-אינדקס במערך + `gramsUsed` שלו - **entry בודד, לא הזמנה** - הזמנה
-יכולה להכיל כמה שיוכים לאותו קוקו אם שויך בכמה פעימות). `waste =
-initialWeight - totalGramsUsed`. `wasteCost = costPrice *
-waste/initialWeight` (רק אם `waste > 0`).
-
-**ה-`ConfirmDialog`** (משתמש ברכיב המשותף הקיים, לא מודל ייעודי -
-עקבי עם דפוס `undoConfirm` הקיים לאזהרות מרובות-שורות) מציג את כל
-המספרים (משקל שנקנה/גרמים שתועדו/בלאי בגרם+₪), ונוסח שונה בין בלאי
-חיובי (מזהיר במפורש שהרווח המוצג של הזמנות - כולל כבר-סגורות -
-יתעדכן) לבלאי אפסי/שלילי (רק "אין בלאי לחלוקה, נסגר בלי לשנות הזמנה").
-
-**השמירה** (`handleConfirmCloseHairItem`): מקבצת את ה-entries לפי
-`orderId` (כי הזמנה יחידה יכולה להחזיק כמה entries לאותו קוקו),
-ולכל הזמנה - מוסיפה (**לא** דורסת) ל-`costAtTime` של כל entry
-רלוונטי את חלקו היחסי (`wasteCost * entry.gramsUsed/totalGramsUsed`),
-ושומרת `updateDoc(orders/{id}, { usedHairItems: ... })`. **לא נדרש
-שדה `productionCost`/`profit` נפרד** - שניהם מחושבים חי מ-`usedHairItems`
-(`calculateOrderProductionCost`/`calculateOrderProfit` ב-`orderProfit.ts`),
-אז עדכון המערך מספיק לעדכן את התצוגה בכל מקום (Sales/Dashboard/Reports)
-אוטומטית. לבסוף - `updateDoc(hairItems/{id}, { status: 'depleted',
-wasteReconciledAt: <now> })`.
-
-**מגבלה ידועה שלא טופלה (מחוץ לתחום המפרט המדויק):** אם קוקו שימש
-גם כמקור למיזוג-לשאריות (`handleMergeIntoRemnantBox`) לפני "סגירה",
-המשקל שהועבר לקופסה לא מנוכה מ-`waste` (המפרט הגדיר בלאי כ-
-`initialWeight - totalGramsUsed מ-usedHairItems` בלבד, בלי להזכיר
-מיזוגים) - זה יכול לנפח את הבלאי המחושב במקרה קצה כזה. לא תוקן כי
-לא התבקש; מצוין כאן לתשומת לב.
-
-**קבצים:** `types/index.ts`, `Inventory.tsx` (state/`closingSummary`/
-`handleConfirmCloseHairItem`/`ConfirmDialog` חדש), `HairItemDetailsPanel.tsx`
-(prop+כפתור חדשים).
+**קבצים:** `types/index.ts` (שני שדות חדשים + `WasteReconciliationLogEntry`),
+`Inventory.tsx` (state/handler חדשים, `ConfirmDialog` חדש, באנר
+תוצאה, `deleteField` נוסף ל-import), `Inventory.css`
+(`.hair-undo-result-banner`), `HairItemDetailsPanel.tsx`
+(prop+כפתור מותנה חדשים).
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.

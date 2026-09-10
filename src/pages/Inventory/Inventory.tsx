@@ -1,8 +1,8 @@
 // src/pages/Inventory/Inventory.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, deleteDoc, onSnapshot, setDoc, updateDoc, doc, query, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, deleteField, onSnapshot, setDoc, updateDoc, doc, query, where } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
-import type { BulkItem, HairItem, RemnantMergeLogEntry } from '../../types';
+import type { BulkItem, HairItem, RemnantMergeLogEntry, WasteReconciliationLogEntry } from '../../types';
 import type { Order } from '../Sales/Sales';
 import AddHairModal from './AddHairModal';
 import AddBulkItemModal from './AddBulkItemModal';
@@ -58,6 +58,11 @@ const Inventory: React.FC = () => {
   // handleConfirmCloseHairItem למטה).
   const [closingHairItemId, setClosingHairItemId] = useState<string | null>(null);
   const [closingHairItemError, setClosingHairItemError] = useState<string | null>(null);
+  // "ביטול סגירה" - הופכת בדיוק את הסגירה, לפי wasteReconciliationLog
+  // (ראו handleConfirmUndoCloseHairItem למטה).
+  const [undoingCloseHairItemId, setUndoingCloseHairItemId] = useState<string | null>(null);
+  const [undoingCloseHairItemError, setUndoingCloseHairItemError] = useState<string | null>(null);
+  const [undoCloseResultMessage, setUndoCloseResultMessage] = useState<string | null>(null);
 
   // --- מלאי פשוט ---
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
@@ -261,6 +266,7 @@ const Inventory: React.FC = () => {
   const selectedHairItem = hairItems.find((item) => item.id === selectedHairItemId) || null;
   const editingHairItem = hairItems.find((item) => item.id === editingHairItemId) || null;
   const closingHairItem = hairItems.find((item) => item.id === closingHairItemId) || null;
+  const undoingCloseHairItem = hairItems.find((item) => item.id === undoingCloseHairItemId) || null;
   const selectedShowroomOrder = orders.find((o) => o.id === selectedShowroomOrderId) || null;
   const editingShowroomOrder = orders.find((o) => o.id === editingShowroomOrderId) || null;
   const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
@@ -476,6 +482,11 @@ const Inventory: React.FC = () => {
 
     setClosingHairItemError(null);
     try {
+      // wasteReconciliationLog - תיעוד מדויק של כמה נוסף לכל entry ספציפי,
+      // כדי ש"ביטול סגירה" יוכל לחסר בדיוק את זה בלי לחשב מחדש (חישוב
+      // מחדש עלול לתת תוצאה שגויה אם ההזמנה נערכה בינתיים).
+      const reconciliationLog: WasteReconciliationLogEntry[] = [];
+
       if (wasteCost > 0 && totalGramsUsed > 0) {
         const entriesByOrder = new Map<string, number[]>();
         matches.forEach(({ orderId, entryIndex }) => {
@@ -493,6 +504,7 @@ const Inventory: React.FC = () => {
               const entry = updatedUsedHairItems[entryIndex];
               const share = wasteCost * (entry.gramsUsed / totalGramsUsed);
               updatedUsedHairItems[entryIndex] = { ...entry, costAtTime: entry.costAtTime + share };
+              reconciliationLog.push({ orderId, entryIndex, amountAdded: share });
             });
             await updateDoc(doc(db, 'orders', orderId), { usedHairItems: updatedUsedHairItems });
           })
@@ -502,6 +514,8 @@ const Inventory: React.FC = () => {
       await updateDoc(doc(db, 'hairItems', closingHairItem.id), {
         status: 'depleted',
         wasteReconciledAt: new Date().toISOString(),
+        wasteReconciledFromStatus: closingHairItem.status,
+        wasteReconciliationLog: reconciliationLog,
       });
 
       setClosingHairItemId(null);
@@ -509,6 +523,75 @@ const Inventory: React.FC = () => {
     } catch (err) {
       console.error('Error closing hair item / reconciling waste:', err);
       setClosingHairItemError('שגיאה בסגירת הקוקו. נסי שוב.');
+    }
+  };
+
+  // "ביטול סגירה" - הופכת בדיוק את handleConfirmCloseHairItem: עוברת על
+  // wasteReconciliationLog ומחסרת כל amountAdded מ-costAtTime של אותו
+  // entry (לא מאפסת/מחשבת מחדש). entry שכבר לא קיים (השיוך נמחק לגמרי
+  // מההזמנה, לא רק נערך) - מדלגת עליו בשקט, אבל סופרת לדוח הסיכום.
+  const handleConfirmUndoCloseHairItem = async () => {
+    if (!undoingCloseHairItem) return;
+    const log = undoingCloseHairItem.wasteReconciliationLog ?? [];
+
+    let restoredCount = 0;
+    let skippedCount = 0;
+
+    setUndoingCloseHairItemError(null);
+    try {
+      const entriesByOrder = new Map<string, WasteReconciliationLogEntry[]>();
+      log.forEach((entry) => {
+        const list = entriesByOrder.get(entry.orderId) ?? [];
+        list.push(entry);
+        entriesByOrder.set(entry.orderId, list);
+      });
+
+      await Promise.all(
+        Array.from(entriesByOrder.entries()).map(async ([orderId, entries]) => {
+          const order = orders.find((o) => o.id === orderId);
+          if (!order) {
+            skippedCount += entries.length;
+            return;
+          }
+          const updatedUsedHairItems = [...(order.usedHairItems ?? [])];
+          let changed = false;
+          entries.forEach(({ entryIndex, amountAdded }) => {
+            const existing = updatedUsedHairItems[entryIndex];
+            // הגנה על מקרה קצה - השיוך הספציפי הזה כבר לא קיים (נמחק
+            // לגמרי, לא רק נערך) או שהאינדקס כבר מצביע על שיוך אחר
+            // (למשל אחרי שהוסרו שיוכים קודמים ממנו במערך) - אי אפשר
+            // לשחזר למשהו שכבר לא קיים, מדלגים בשקט.
+            if (!existing || existing.hairItemId !== undoingCloseHairItem.id) {
+              skippedCount++;
+              return;
+            }
+            updatedUsedHairItems[entryIndex] = { ...existing, costAtTime: existing.costAtTime - amountAdded };
+            changed = true;
+            restoredCount++;
+          });
+          if (changed) {
+            await updateDoc(doc(db, 'orders', orderId), { usedHairItems: updatedUsedHairItems });
+          }
+        })
+      );
+
+      await updateDoc(doc(db, 'hairItems', undoingCloseHairItem.id), {
+        status: undoingCloseHairItem.wasteReconciledFromStatus ?? 'available',
+        wasteReconciledAt: deleteField(),
+        wasteReconciledFromStatus: deleteField(),
+        wasteReconciliationLog: deleteField(),
+      });
+
+      setUndoingCloseHairItemId(null);
+      setSelectedHairItemId(null);
+      setUndoCloseResultMessage(
+        skippedCount > 0
+          ? `שוחזרו ${restoredCount} רשומות בהצלחה, ${skippedCount} דולגו (השיוך המקורי כבר לא קיים בהזמנה).`
+          : `שוחזרו ${restoredCount} רשומות בהצלחה.`
+      );
+    } catch (err) {
+      console.error('Error undoing hair item close / restoring waste:', err);
+      setUndoingCloseHairItemError('שגיאה בביטול הסגירה. נסי שוב.');
     }
   };
 
@@ -666,6 +749,20 @@ const Inventory: React.FC = () => {
 
       {!loading && !loadError && activeTab === 'hair' && (
         <div className="tab-content">
+          {undoCloseResultMessage && (
+            <div className="hair-undo-result-banner">
+              <span>{undoCloseResultMessage}</span>
+              <button
+                type="button"
+                onClick={() => setUndoCloseResultMessage(null)}
+                aria-label="סגירת ההודעה"
+                title="סגירת ההודעה"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <div className="filter-bar">
             <input
               type="text"
@@ -999,6 +1096,10 @@ const Inventory: React.FC = () => {
           if (selectedHairItemId) setClosingHairItemId(selectedHairItemId);
           setSelectedHairItemId(null);
         }}
+        onUndoCloseItem={() => {
+          if (selectedHairItemId) setUndoingCloseHairItemId(selectedHairItemId);
+          setSelectedHairItemId(null);
+        }}
       />
 
       <ConfirmDialog
@@ -1020,7 +1121,7 @@ ${
                   : "לא נמצא בלאי לחלוקה - הקוקו יסומן כסגור בלי לשנות שום הזמנה."
               }${closingHairItemError ? `\n\n${closingHairItemError}` : ""}
 
-הפעולה לא ניתנת לביטול. להמשיך?`
+אפשר לבטל את הסגירה בהמשך (☰ ביטול סגירה בפאנל). להמשיך?`
             : ""
         }
         variant="warning"
@@ -1029,6 +1130,23 @@ ${
         onCancel={() => {
           setClosingHairItemId(null);
           setClosingHairItemError(null);
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={undoingCloseHairItemId !== null}
+        title="ביטול סגירת קוקו - שחזור בלאי"
+        message={`הפעולה תחזיר את הרווח של ההזמנות המושפעות לערך שהיה לפני הסגירה (מחיקת התוספת המדויקת שנוספה ל-costAtTime של כל שיוך רלוונטי).${
+          undoingCloseHairItemError ? `\n\n${undoingCloseHairItemError}` : ""
+        }
+
+להמשיך?`}
+        variant="warning"
+        confirmLabel="כן, בטלי את הסגירה"
+        onConfirm={handleConfirmUndoCloseHairItem}
+        onCancel={() => {
+          setUndoingCloseHairItemId(null);
+          setUndoingCloseHairItemError(null);
         }}
       />
 

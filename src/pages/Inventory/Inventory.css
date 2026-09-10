@@ -59,6 +59,33 @@
   color: var(--color-on-primary);
 }
 
+/* הודעת סיכום זמנית אחרי "ביטול סגירת קוקו" (כמה שוחזרו/דולגו) -
+   דפוס באנר-מידע פשוט, אותם טוקנים כמו .google-calendar-status--info
+   ב-Settings.css, מוגדר כאן בנפרד (הקובץ הזה לא טוען CSS של קבצים אחרים). */
+.hair-undo-result-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.hair-undo-result-banner button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
 /* ---------- Filter bar ---------- */
 .filter-bar {
   display: flex;

@@ -18,7 +18,18 @@ export interface HairItem {
     remnantMergeLog?: RemnantMergeLogEntry[]; // יומן מיזוגים לקופסת שאריות - מאפשר "בטל מיזוג" (רלוונטי רק כש-isRemnantBox)
     lastUsedAt?: string; // ISO timestamp - מתי לאחרונה שויכו גרמים מהפריט הזה להזמנה (AssignHairModal). משמש לוולידציה של "בטל מיזוג" בקופסת שאריות
     wasteReconciledAt?: string; // ISO timestamp - נקבע ב"סגירת קוקו" (Inventory.tsx) כשהבלאי האמיתי (initialWeight מול סך gramsUsed שתועד) חושב וחולק בדיעבד בין ההזמנות הרלוונטיות. מונע סגירה כפולה - לא רלוונטי לקופסת שאריות (isRemnantBox)
+    wasteReconciliationLog?: WasteReconciliationLogEntry[]; // יומן מדויק של הסגירה האחרונה - כמה נוסף בדיוק לכל entry בכל הזמנה, כדי ש"ביטול סגירה" יוכל לחסר בדיוק את מה שנוסף (לא לחשב מחדש, שעלול לתת תוצאה שגויה אם ההזמנה נערכה בינתיים)
+    wasteReconciledFromStatus?: HairItem['status']; // הסטטוס שהיה על הקוקו ממש לפני הסגירה - כדי ש"ביטול סגירה" ישחזר אליו בדיוק (לא יניח 'available' באופן גורף)
     createdAt: string;
+  }
+
+  // רשומה בודדת ביומן חלוקת בלאי - נשמרת בזמן "סגירת קוקו" (ראו
+  // wasteReconciliationLog למעלה), כדי ש"ביטול סגירה" יוכל לחסר בדיוק
+  // את amountAdded מ-costAtTime של אותו entry, בלי לחשב מחדש.
+  export interface WasteReconciliationLogEntry {
+    orderId: string;
+    entryIndex: number;
+    amountAdded: number;
   }
 
   // רשומת מיזוג בודדת ביומן של קופסת שאריות - נשמרת כתמונת מצב של המיזוג
