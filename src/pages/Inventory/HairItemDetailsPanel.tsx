@@ -30,6 +30,7 @@ interface HairItemDetailsPanelProps {
   onMerge: () => void;
   onViewMergeLog: () => void;
   onEdit: () => void;
+  onCloseItem: () => void;
 }
 
 export default function HairItemDetailsPanel({
@@ -39,6 +40,7 @@ export default function HairItemDetailsPanel({
   onMerge,
   onViewMergeLog,
   onEdit,
+  onCloseItem,
 }: HairItemDetailsPanelProps) {
   if (!isOpen || !item) return null;
 
@@ -113,6 +115,14 @@ export default function HairItemDetailsPanel({
             <button type="button" className="hair-details-btn-secondary" onClick={onEdit}>
               ✏️ עריכה
             </button>
+            {/* לא רלוונטי לקופסת שאריות (מודל ערך שונה לגמרי - remnantTotalValue,
+                לא initialWeight/costPrice) ולא לפריט שכבר נסגר - wasteReconciledAt
+                מונע סגירה כפולה, ראו handleConfirmCloseHairItem ב-Inventory.tsx. */}
+            {!isRemnant && !item.wasteReconciledAt && (
+              <button type="button" className="hair-details-btn-secondary" onClick={onCloseItem}>
+                🔒 סגירת קוקו - חישוב בלאי בפועל
+              </button>
+            )}
           </div>
         </div>
       </div>

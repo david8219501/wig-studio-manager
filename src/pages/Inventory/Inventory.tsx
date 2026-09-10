@@ -54,6 +54,10 @@ const Inventory: React.FC = () => {
   const [mergeSourceItem, setMergeSourceItem] = useState<HairItem | null>(null);
   const [mergeLogBoxId, setMergeLogBoxId] = useState<string | null>(null);
   const [undoConfirm, setUndoConfirm] = useState<{ index: number; message: string } | null>(null);
+  // "סגירת קוקו" - חישוב בלאי אמיתי בדיעבד (ראו closingSummary/
+  // handleConfirmCloseHairItem למטה).
+  const [closingHairItemId, setClosingHairItemId] = useState<string | null>(null);
+  const [closingHairItemError, setClosingHairItemError] = useState<string | null>(null);
 
   // --- מלאי פשוט ---
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
@@ -190,6 +194,29 @@ const Inventory: React.FC = () => {
     [hairItems]
   );
 
+  // "סגירת קוקו" - סיכום הבלאי האמיתי בדיעבד. matches אוגר כל usedHairItems
+  // entry (מכל ה-orders, בלי סינון סטטוס - "גם על הזמנות שנמסרו/נמכרו")
+  // שמצביע על הקוקו הזה, כדי שאפשר יהיה לחלק את עלות הבלאי ביניהם באופן
+  // יחסי לפי gramsUsed בכל entry (לא לפי הזמנה - הזמנה יחידה יכולה
+  // בעקרון להכיל כמה entries לאותו קוקו, אם שויך בכמה פעימות).
+  const closingSummary = useMemo(() => {
+    const item = hairItems.find((h) => h.id === closingHairItemId) || null;
+    if (!item) return null;
+    const matches: { orderId: string; entryIndex: number; gramsUsed: number }[] = [];
+    let totalGramsUsed = 0;
+    orders.forEach((order) => {
+      (order.usedHairItems ?? []).forEach((used, entryIndex) => {
+        if (used.hairItemId === item.id) {
+          matches.push({ orderId: order.id, entryIndex, gramsUsed: used.gramsUsed });
+          totalGramsUsed += used.gramsUsed;
+        }
+      });
+    });
+    const waste = item.initialWeight - totalGramsUsed;
+    const wasteCost = waste > 0 ? item.costPrice * (waste / item.initialWeight) : 0;
+    return { matches, totalGramsUsed, waste, wasteCost };
+  }, [closingHairItemId, hairItems, orders]);
+
   // פאות תצוגה שעדיין לא נמכרו - orders עם isShowroomStock: true וללא clientId
   // (isUnsoldShowroomStock ב-Sales.tsx הוא אותו תנאי בדיוק, כדי שהן לא
   // יופיעו גם שם/ב-Dashboard/Reports עד שנמכרות בפועל).
@@ -233,6 +260,7 @@ const Inventory: React.FC = () => {
   const mergeLogBox = hairItems.find((item) => item.id === mergeLogBoxId) || null;
   const selectedHairItem = hairItems.find((item) => item.id === selectedHairItemId) || null;
   const editingHairItem = hairItems.find((item) => item.id === editingHairItemId) || null;
+  const closingHairItem = hairItems.find((item) => item.id === closingHairItemId) || null;
   const selectedShowroomOrder = orders.find((o) => o.id === selectedShowroomOrderId) || null;
   const editingShowroomOrder = orders.find((o) => o.id === editingShowroomOrderId) || null;
   const assigningShowroomOrder = orders.find((o) => o.id === assigningShowroomOrderId) || null;
@@ -431,6 +459,57 @@ const Inventory: React.FC = () => {
       await performUndoMerge(undoConfirm.index);
     }
     setUndoConfirm(null);
+  };
+
+  // "סגירת קוקו" - מחלקת את עלות הבלאי האמיתי (closingSummary.wasteCost)
+  // באופן יחסי בין כל usedHairItems entry שמצביע על הקוקו הזה (לפי
+  // gramsUsed של אותו entry מתוך totalGramsUsed הכולל), ומגדילה בהתאם
+  // את costAtTime הקיים שלו (לא דורסת - מוסיפה) - גם על הזמנות שנמסרו/
+  // נמכרו, בלי סינון סטטוס. productionCost/profit של אותן הזמנות
+  // מחושבים חי מ-usedHairItems (calculateOrderProductionCost/Profit ב-
+  // orderProfit.ts) - אין שדה נפרד לעדכן, updateDoc על usedHairItems
+  // מספיק. בסוף מסמנת את הקוקו עצמו כ-depleted + wasteReconciledAt,
+  // כדי שלא יהיה אפשר "לסגור" פעמיים (ראו הבדיקה ב-HairItemDetailsPanel).
+  const handleConfirmCloseHairItem = async () => {
+    if (!closingHairItem || !closingSummary) return;
+    const { matches, totalGramsUsed, wasteCost } = closingSummary;
+
+    setClosingHairItemError(null);
+    try {
+      if (wasteCost > 0 && totalGramsUsed > 0) {
+        const entriesByOrder = new Map<string, number[]>();
+        matches.forEach(({ orderId, entryIndex }) => {
+          const list = entriesByOrder.get(orderId) ?? [];
+          list.push(entryIndex);
+          entriesByOrder.set(orderId, list);
+        });
+
+        await Promise.all(
+          Array.from(entriesByOrder.entries()).map(async ([orderId, entryIndexes]) => {
+            const order = orders.find((o) => o.id === orderId);
+            if (!order) return;
+            const updatedUsedHairItems = [...(order.usedHairItems ?? [])];
+            entryIndexes.forEach((entryIndex) => {
+              const entry = updatedUsedHairItems[entryIndex];
+              const share = wasteCost * (entry.gramsUsed / totalGramsUsed);
+              updatedUsedHairItems[entryIndex] = { ...entry, costAtTime: entry.costAtTime + share };
+            });
+            await updateDoc(doc(db, 'orders', orderId), { usedHairItems: updatedUsedHairItems });
+          })
+        );
+      }
+
+      await updateDoc(doc(db, 'hairItems', closingHairItem.id), {
+        status: 'depleted',
+        wasteReconciledAt: new Date().toISOString(),
+      });
+
+      setClosingHairItemId(null);
+      setSelectedHairItemId(null);
+    } catch (err) {
+      console.error('Error closing hair item / reconciling waste:', err);
+      setClosingHairItemError('שגיאה בסגירת הקוקו. נסי שוב.');
+    }
   };
 
   // יצירת פריט חדש - רושמת הוצאת רכישה (זו קנייה אמיתית). עריכת פריט
@@ -915,6 +994,41 @@ const Inventory: React.FC = () => {
           if (selectedHairItemId) setEditingHairItemId(selectedHairItemId);
           setSelectedHairItemId(null);
           setIsAddModalOpen(true);
+        }}
+        onCloseItem={() => {
+          if (selectedHairItemId) setClosingHairItemId(selectedHairItemId);
+          setSelectedHairItemId(null);
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={closingHairItemId !== null}
+        title="סגירת קוקו - חישוב בלאי בפועל"
+        message={
+          closingHairItem && closingSummary
+            ? `משקל שנקנה: ${closingHairItem.initialWeight} גרם
+סך גרמים שתועדו בפועל בהזמנות: ${closingSummary.totalGramsUsed} גרם
+בלאי מחושב: ${closingSummary.waste.toFixed(1)} גרם${
+                closingSummary.wasteCost > 0
+                  ? ` (₪${closingSummary.wasteCost.toFixed(0)})`
+                  : ""
+              }
+
+${
+                closingSummary.wasteCost > 0
+                  ? `הבלאי יתחלק באופן יחסי בין ${closingSummary.matches.length} שיוכים בהזמנות שנמצאו (כולל הזמנות שכבר נמסרו/נמכרו) - עלות הייצור והרווח המוצגים של אותן הזמנות יתעדכנו בהתאם.`
+                  : "לא נמצא בלאי לחלוקה - הקוקו יסומן כסגור בלי לשנות שום הזמנה."
+              }${closingHairItemError ? `\n\n${closingHairItemError}` : ""}
+
+הפעולה לא ניתנת לביטול. להמשיך?`
+            : ""
+        }
+        variant="warning"
+        confirmLabel="כן, סגרי את הקוקו"
+        onConfirm={handleConfirmCloseHairItem}
+        onCancel={() => {
+          setClosingHairItemId(null);
+          setClosingHairItemError(null);
         }}
       />
 

@@ -17,6 +17,7 @@ export interface HairItem {
     remnantTotalValue?: number; // שווי כולל בש"ח של השארית שבקופסה כרגע (רלוונטי רק כש-isRemnantBox)
     remnantMergeLog?: RemnantMergeLogEntry[]; // יומן מיזוגים לקופסת שאריות - מאפשר "בטל מיזוג" (רלוונטי רק כש-isRemnantBox)
     lastUsedAt?: string; // ISO timestamp - מתי לאחרונה שויכו גרמים מהפריט הזה להזמנה (AssignHairModal). משמש לוולידציה של "בטל מיזוג" בקופסת שאריות
+    wasteReconciledAt?: string; // ISO timestamp - נקבע ב"סגירת קוקו" (Inventory.tsx) כשהבלאי האמיתי (initialWeight מול סך gramsUsed שתועד) חושב וחולק בדיעבד בין ההזמנות הרלוונטיות. מונע סגירה כפולה - לא רלוונטי לקופסת שאריות (isRemnantBox)
     createdAt: string;
   }
 
