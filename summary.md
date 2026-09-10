@@ -1,35 +1,48 @@
-# סיכום: פריסה ראשונית ל-Firebase Hosting
+# סיכום: תיקון נוסחת בלאי + פיצ'ר "סגירת קוקו" (2 חלקים)
 
-## מה נבדק ובוצע
+## חלק א': תיקון נוסחת ה-30% המשוערת ב-hairCost.ts ✅ הושלמה
 
-- **`firebase.json`**: לא הייתה בו הגדרת `hosting` בכלל (רק
-  `storage`/`functions`) - נוספה:
-  - `public: "dist"` - תיקיית הפלט של `vite build`.
-  - `rewrites: [{ source: "**", destination: "/index.html" }]` -
-    catch-all ל-SPA. לא קריטי כרגע בפועל (האתר הוא state-based
-    routing בלי react-router/נתיבי URL אמיתיים - כל הניווט קורה
-    בזיכרון, לא ב-URL), אבל זו ברירת המחדל הבטוחה הסטנדרטית לכל
-    אתר SPA שמתארחת ב-Firebase Hosting - מונע 404 בכל תרחיש עתידי
-    של רענון על נתיב לא-root.
-  - `ignore` סטנדרטי (`firebase.json`, dotfiles, `node_modules`).
-- `npm run build` - נקי, יצר מחדש את `dist/` (5 קבצים: index.html +
-  assets/CSS/JS + favicon/icons).
-- `firebase deploy --only hosting` - הצליח (`esti-wigs-system`,
-  הפרויקט המוגדר כבר כברירת מחדל ב-`.firebaserc`/מחובר ב-CLI).
+**הקוד המדויק שנבדק** (`calculateHairCostFromGrams`, לפני התיקון):
+```ts
+const waste = netGrams * 0.3;
+const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * (netGrams + waste) / 1000;
+```
 
-## כתובת האתר החי
+**האבחנה אושרה:** זו הנוסחה הלא-מדויקת. `waste = netGrams * 0.3` שקול
+ל-`purchased = netGrams * 1.3`, ו-30/130 = **23.1%** בלאי אמיתי
+מהמשקל שנקנה - לא 30%. הנוסחה הנכונה: קונים X גרם, 30% מהם הולך
+לאיבוד, נשארים עם 70% שמישים (`netGrams = X * 0.7`) - כלומר
+`X = netGrams / 0.7`.
 
-**https://esti-wigs-system.web.app**
+**התיקון** (`src/utils/hairCost.ts`):
+```ts
+const purchasedGrams = netGrams / 0.7;
+const waste = purchasedGrams - netGrams;
+const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * purchasedGrams / 1000;
+```
 
-(קונסולת הפרויקט: https://console.firebase.google.com/project/esti-wigs-system/overview)
+**תיקון אחד מספיק לכל האתר:** `Calculators.tsx` (שני המחשבונים -
+הצעת מחיר ושדרוגים/תיקונים), `NewOrderWizard.tsx`, ו-`RepairOrderForm.tsx`
+כולם קוראים ל-`calculateHairCostFromGrams`/`calculateHairCost`
+(שקוראת לה) מ-`hairCost.ts` בלבד - נבדק ב-grep שאין אף חישוב
+עצמאי/כפול במקום אחר. כל 4 מקומות התצוגה (`ResultRow`/הודעות טקסט)
+רק מציגים את `waste`/`hairCost` שמוחזרים - שום מקום לא היה צריך
+עדכון נפרד.
 
-## הערה
+**לא נגעתי** (כמבוקש): חישוב העלות המדויקת של שיוך שיער אמיתי
+(`usedHairItems`, `costPrice * gramsUsed/initialWeight`) - זה כבר
+מדויק לגמרי ולא תלוי בהערכת ה-30% המשוערת.
 
-`.firebase/hosting.ZGlzdA.cache` (קובץ cache מקומי של ה-CLI) הופיע
-כ"modified" ב-git status אחרי הפריסה - הוא **כבר** עקוב (tracked)
-בריפו מלפני זמן, למרות ש-`.gitignore` כן מכיל `.firebase/` (הכלל
-מונע מעקב חדש, לא מבטל מעקב קיים). לא נגעתי בו - לא היה חלק
-מהמשימה, ומחיקתו מדרישת המעקב היא decision נפרד שלא התבקש.
+**קבצים:** `src/utils/hairCost.ts` בלבד.
 
-**בדיקות:** `npm run build` נקי, `firebase deploy --only hosting`
-הסתיים ב-"Deploy complete!" בלי שגיאות.
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
+
+## חלק ב': פיצ'ר "סגירת קוקו" + חלוקת בלאי אמיתי בדיעבד
+
+**חלק ב' לא בוצע עדיין** - הודעת המשתמש שהגיעה נקטעה/הוכפלה
+באמצע התיאור (בדיוק בנקודה "המערכת משווה בין המשקל שנקנה
+(initialWeight) לסך כל הגרמים שתועדו בפועל (סכימת gramsUsed בכל
+usedHairItems..." - חסר את שאר התיאור: מה קורה עם ההפרש שמתגלה
+(הבלאי האמיתי), מה בפועל "סגירת קוקו" עושה ב-UI/ב-Firestore, ואיפה
+הפיצ'ר הזה מוצג. יש לבקש מהמשתמש את שאר התיאור לפני שממשיכים.

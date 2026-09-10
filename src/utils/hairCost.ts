@@ -47,9 +47,16 @@ export function lookupBaseWeight(length: number): number {
 // חלק החישוב המשותף: בלאי 30% + מחיר לק"ג -> עלות, מתוך משקל נטו נתון.
 // כשהמשקל כבר ידוע ישירות (למשל תיקון/שירות שמזין גרמים בעצמו, בלי
 // אורך/מבנה/מלאות) קוראים לפונקציה הזו ישירות במקום calculateHairCost.
+//
+// בלאי 30% מוגדר כ-30% מהמשקל שנקנה (לא 30% מהמשקל הנטו): קונים X גרם,
+// נשארים עם 70% שמישים (netGrams = X * 0.7) ו-30% הולכים לאיבוד בעיבוד.
+// לכן המשקל שנקנה בפועל הוא netGrams / 0.7, לא netGrams * 1.3 - הנוסחה
+// הקודמת (waste = netGrams * 0.3) הייתה שקולה ל-23.1% בלאי אמיתי מהמשקל
+// שנקנה, לא 30%.
 export function calculateHairCostFromGrams(netGrams: number, settings: HairCostSettings): HairCostResult {
-  const waste = netGrams * 0.3;
-  const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * (netGrams + waste) / 1000;
+  const purchasedGrams = netGrams / 0.7;
+  const waste = purchasedGrams - netGrams;
+  const hairCost = (settings.pricePerKgUsd * settings.exchangeRate) * purchasedGrams / 1000;
   return { netGrams, waste, hairCost };
 }
 
