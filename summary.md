@@ -1,40 +1,45 @@
-# סיכום: "החזר ללקוחה" יוצר גם הוצאה (expenses) ✅ הושלמה
+# סיכום: יתרת זכות - שימוש בהזמנה קיימת + ביטול ↔ יומן מדויק (2 משימות)
 
-## הבעיה
-`handleConfirmRefund` (`ClientDrawer.tsx`) הפחית `creditBalance`
-ורשם `creditHistory` שלילי, אבל לא רשם שום `expense` - כסף אמיתי
-שיוצא מהעסק לא נראה בדשבורד/דוחות בכלל.
+## משימה 1: שימוש בהזמנה קיימת + שחזור בביטול תשלום ✅ הושלמה
 
-## התיקון
+**החלטת קיבוץ commit:** חלק א' וחלק ב' נעשו ב-`npm run build`
+נפרד כל אחד (כמבוקש), אבל נדחפים ב-**commit אחד משותף** - שני
+החלקים נוגעים לאותו זוג handlers (הוספת/מחיקת תשלום ב-
+`OrderDetailsPanel.tsx`) וקשורים הדוקות מדי (חלק ב' הוא ההופכי
+המדויק של חלק א' על אותו payment method) כדי שיהיה הגיוני לפצל
+אותם ל-2 commits נפרדים לתכונה אחת.
 
-1. **הוצאה חדשה** (`addDoc` ל-`expenses`) בכל החזר: `amount`
-   (סכום ההחזר), `category: "החזרים ללקוחות"` (קבוע חדש
-   `REFUND_EXPENSE_CATEGORY`), `description: "החזר ללקוחה - {שם}"`,
-   `date` (תאריך ההחזר), `businessId`, + `supplier`/`paymentMethod`/
-   `status` (שדות חובה בטיפוס `Expense` הקיים ב-`Expenses.tsx`) -
-   `supplier: client.name`, `paymentMethod: "cash"`, `status: "paid"`
-   - אותו דפוס בדיוק כמו `createInventoryExpense` הקיים ב-`Inventory.tsx`.
+### חלק א': תשלום מיתרת זכות בהזמנה קיימת
 
-2. **קטגוריה חדשה** `REFUND_EXPENSE_CATEGORY = "החזרים ללקוחות"`
-   (`src/utils/businessSettings.ts`) - נוספה גם ל-`DEFAULT_EXPENSE_CATEGORIES`
-   (זרע ברירת מחדל לעסקים חדשים). **וגם** מובטח לעסק **הקיים** בפועל:
-   בכל החזר, `setDoc(businessSettings/{uid}, {expenseCategories:
-   arrayUnion(REFUND_EXPENSE_CATEGORY)}, {merge:true})` - `arrayUnion`
-   אידמפוטנטי (לא כופל אם כבר קיימת), `setDoc(merge:true)` במקום
-   `updateDoc` כדי שיעבוד גם אם `businessSettings/{uid}` עדיין לא
-   קיים בכלל (לא רק תיאורטי - זה תרחיש אמיתי לעסק חדש).
+**ממצא הכרחי (לא היה נדרש אחרת):** ל-`OrderDetailsPanel.tsx` לא
+היתה שום גישה ליתרת הזכות של הלקוחה המקושרת - `order` prop לא
+מכיל את זה בכלל. נוסף מאזין `onSnapshot` עצמאי על `clients/{clientId}`
+(`clientCreditBalance`), אותו דפוס בדיוק כמו `liveCreditBalance`
+ב-`ClientDrawer.tsx`.
 
-3. **לא נכלל ב"הוצאות מלאי וספקים":** `isInventoryExpenseCategory`
-   (הפונקציה המשותפת מהתיקון הקודם היום) בודקת רק `"inventory"`/
-   `"מלאי ושיער"` - `"החזרים ללקוחות"` **לא** תואם, ולכן מסתכם
-   אוטומטית תחת הוצאות התפעול/שיווק הכלליות. **השפעה נכונה על "רווח
-   החודש" בדשבורד** (שכבר מחסיר רק הוצאות תפעול, לא מלאי, מהתיקון
-   הקודם היום) - הוצאה חדשה בחודש הרלוונטי תוריד את "רווח החודש"
-   בהתאם, נכון.
+בטופס "הוספת תשלום" - אופציה חדשה **"💰 יתרת זכות (₪X)"** ב-`<select>`
+(**רק** בטופס ההוספה, לא בטופס העריכה - כמבוקש), מוצגת רק כש-
+`order.clientId && clientCreditBalance > 0`. וולידציה: הסכום לא
+יכול לעלות על `clientCreditBalance`. בשמירה - מלבד הוספת התשלום
+הרגילה ל-`payments`, `updateDoc` נוסף על הלקוחה (`increment(-amount)`
++ `arrayUnion` שלילי, `reason: "תשלום מיתרת זכות בהזמנה קיימת"`) -
+אותו דפוס בדיוק כמו ניצול יתרה באשף הזמנה חדשה.
 
-**קבצים:** `src/components/clients/ClientDrawer.tsx` (imports
-`addDoc`/`setDoc`, `handleConfirmRefund` מורחב), `src/utils/businessSettings.ts`
-(`REFUND_EXPENSE_CATEGORY` חדש + נוסף ל-`DEFAULT_EXPENSE_CATEGORIES`).
+### חלק ב': מחיקת תשלום מיתרת זכות משחזרת אותה
 
-**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
-לבייסליין הקבוע.
+`handleConfirmDeletePayment` - נבדק `removedPayment.method ===
+'credit_balance'` **לפני** המחיקה בפועל. אם כן - מלבד ההסרה הרגילה
+מ-`payments` (**לא השתנתה**), `updateDoc` נוסף: `increment(+amount)`
++ `arrayUnion` חיובי (`reason: "ביטול תשלום מיתרת זכות"`). לתשלומים
+רגילים - **שום שינוי** בהתנהגות. גם עודכן טקסט `ConfirmDialog` המחיקה
+- מזכיר במפורש "יוחזרו ליתרת הזכות" **רק** כשהתשלום הנמחק הוא
+`credit_balance` (אחרת נשאר הטקסט המקורי, שכולל "לא ניתנת לביטול").
+
+**קבצים:** `src/components/orders/OrderDetailsPanel.tsx`.
+
+**בדיקות:** `npm run build` נקי אחרי כל חלק. `npm run lint` - 24
+בעיות, זהה לבייסליין הקבוע, אחרי כל חלק.
+
+## משימה 2: כפתור ביטול (X) בהיסטוריית יתרת זכות
+
+טרם בוצע - ממשיך מיד (חלק א': תשתית ids, חלק ב': כפתור+ביטול בפועל).

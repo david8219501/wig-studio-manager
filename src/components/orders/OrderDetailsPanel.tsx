@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { arrayUnion, collection, doc, getDoc, getDocs, increment, query, updateDoc, where } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc, getDocs, increment, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { BulkItem, CreditHistoryEntry, HairItem, OrderPayment, UsedBulkItem } from "../../types";
 import type { Order } from "../../pages/Sales/Sales";
@@ -129,6 +129,25 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, order?.id]);
 
+  // יתרת זכות חיה של הלקוחה המקושרת - מאזין עצמאי (לא רק order prop,
+  // שלא מכיל את זה בכלל) כדי לדעת אם להציג את אופציית "יתרת זכות"
+  // בטופס הוספת תשלום, ולוולידציה (לא לעלות על היתרה). אותו דפוס בדיוק
+  // כמו liveCreditBalance ב-ClientDrawer.tsx.
+  const [clientCreditBalance, setClientCreditBalance] = useState(0);
+
+  useEffect(() => {
+    if (!order?.clientId) return;
+    const unsubscribe = onSnapshot(
+      doc(db, "clients", order.clientId),
+      (snap) => {
+        const data = snap.data() as { creditBalance?: number } | undefined;
+        setClientCreditBalance(data?.creditBalance ?? 0);
+      },
+      (err) => console.error("Error loading client credit balance for order panel:", err)
+    );
+    return () => unsubscribe();
+  }, [order?.clientId]);
+
   const selectedBulkCatalogItem = useMemo(
     () => bulkItemsCatalog.find((b) => b.id === bulkItemPickerId) || null,
     [bulkItemsCatalog, bulkItemPickerId]
@@ -152,6 +171,11 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
       setPaymentError("יש להזין סכום תשלום תקין.");
       return;
     }
+    // תשלום מיתרת זכות - לא ניתן "לשלם" יותר מהיתרה הקיימת בפועל.
+    if (payMethod === "credit_balance" && Number(payAmount) > clientCreditBalance) {
+      setPaymentError(`הסכום גבוה מיתרת הזכות הקיימת (₪${clientCreditBalance.toLocaleString()}).`);
+      return;
+    }
 
     setSavingPayment(true);
     setPaymentError(null);
@@ -169,6 +193,22 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
         payments: newPayments,
         paidAmount: newPaidAmount,
       });
+
+      // תשלום מיתרת זכות - מפחית מהיתרה של הלקוחה בפועל, אותו דפוס
+      // בדיוק כמו ניצול יתרה באשף הזמנה חדשה (NewOrderWizard.tsx).
+      if (payMethod === "credit_balance" && order.clientId) {
+        const creditEntry: CreditHistoryEntry = {
+          amount: -Number(payAmount),
+          reason: "תשלום מיתרת זכות בהזמנה קיימת",
+          relatedOrderId: order.id,
+          date: new Date().toISOString(),
+        };
+        await updateDoc(doc(db, "clients", order.clientId), {
+          creditBalance: increment(-Number(payAmount)),
+          creditHistory: arrayUnion(creditEntry),
+        });
+      }
+
       setPayAmount("");
       setPayNote("");
       setPayMethod("cash");
@@ -233,6 +273,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
 
     setDeletingPayment(true);
 
+    const removedPayment = payments[deletingPaymentIndex];
     const newPayments = payments.filter((_, i) => i !== deletingPaymentIndex);
     const newPaidAmount = newPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -241,6 +282,23 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
         payments: newPayments,
         paidAmount: newPaidAmount,
       });
+
+      // מחיקת תשלום מיתרת זכות "מחזירה" את הכסף ליתרה - לא סתם מוחקת
+      // אותו. לתשלומים רגילים (מזומן/אשראי/וכו') - שום שינוי, ראו
+      // ה-if המצומצם הזה. אותו דפוס בדיוק כמו הוספת יתרה ב-handleCancelOrder.
+      if (removedPayment?.method === "credit_balance" && order.clientId) {
+        const creditEntry: CreditHistoryEntry = {
+          amount: removedPayment.amount,
+          reason: "ביטול תשלום מיתרת זכות",
+          relatedOrderId: order.id,
+          date: new Date().toISOString(),
+        };
+        await updateDoc(doc(db, "clients", order.clientId), {
+          creditBalance: increment(removedPayment.amount),
+          creditHistory: arrayUnion(creditEntry),
+        });
+      }
+
       setDeletingPaymentIndex(null);
       if (editingPaymentIndex === deletingPaymentIndex) {
         setEditingPaymentIndex(null);
@@ -734,6 +792,11 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
                   <option value="credit">💳 אשראי</option>
                   <option value="transfer">🏦 העברה</option>
                   <option value="check">📜 צ'ק</option>
+                  {/* מוצג רק אם יש ללקוחה יתרת זכות בפועל - אין טעם להציע
+                      תשלום מיתרה שלא קיימת. */}
+                  {order.clientId && clientCreditBalance > 0 && (
+                    <option value="credit_balance">💰 יתרת זכות (₪{clientCreditBalance.toLocaleString()})</option>
+                  )}
                 </select>
                 <DateInput value={payDate} onChange={setPayDate} />
               </div>
@@ -769,7 +832,11 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
       <ConfirmDialog
         isOpen={deletingPaymentIndex !== null}
         title="מחיקת תשלום"
-        message="למחוק את התשלום הזה? הפעולה תעדכן את הסכום ששולם בפועל, ולא ניתנת לביטול."
+        message={
+          deletingPaymentIndex !== null && payments[deletingPaymentIndex]?.method === "credit_balance"
+            ? `למחוק את התשלום הזה? ₪${payments[deletingPaymentIndex].amount.toLocaleString()} יוחזרו ליתרת הזכות של הלקוחה. הפעולה תעדכן את הסכום ששולם בפועל.`
+            : "למחוק את התשלום הזה? הפעולה תעדכן את הסכום ששולם בפועל, ולא ניתנת לביטול."
+        }
         variant="danger"
         confirmLabel={deletingPayment ? "מוחקת..." : "כן, מחיקה"}
         onConfirm={handleConfirmDeletePayment}
