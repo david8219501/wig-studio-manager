@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { arrayUnion, collection, doc, increment, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, doc, increment, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
 import type { Order } from "../../pages/Sales/Sales";
 import type { CreditHistoryEntry } from "../../types";
 import { formatDateIL } from "../../utils/formatDate";
+import { REFUND_EXPENSE_CATEGORY } from "../../utils/businessSettings";
 import NewOrderWizard, { type ClientOption } from "../orders/NewOrderWizard";
 import RepairOrderForm from "../orders/RepairOrderForm";
 import SellShowroomStockModal from "../../pages/Inventory/SellShowroomStockModal";
@@ -143,7 +144,11 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
 
   // ביצוע החזר בפועל ללקוחה - מפחית מהיתרה ומוסיף רשומה שלילית ליומן,
   // אותו updateDoc אטומי (increment+arrayUnion) כמו הוספת יתרה ב-
-  // handleCancelOrder (OrderDetailsPanel.tsx).
+  // handleCancelOrder (OrderDetailsPanel.tsx). בנוסף - כסף אמיתי שיוצא
+  // מהעסק, אז נרשמת גם הוצאה (expenses) תחת קטגוריה נפרדת
+  // ("החזרים ללקוחות", לא "מלאי ושיער") - כדי שהיא תיכלל בהוצאות
+  // התפעול/שיווק (isInventoryExpenseCategory) ותשפיע נכון על "רווח
+  // החודש" בדשבורד, ולא תתבלבל עם עלות ייצור/רכישת מלאי.
   const handleConfirmRefund = async () => {
     const amount = Number(refundAmount);
     if (refundAmount === "" || amount <= 0) {
@@ -155,18 +160,43 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
       return;
     }
 
+    const businessId = auth.currentUser?.uid;
+    if (!businessId) return;
+
     setSavingRefund(true);
     setRefundError(null);
     try {
+      const nowIso = new Date().toISOString();
       const creditEntry: CreditHistoryEntry = {
         amount: -amount,
         reason: "החזר ללקוחה",
-        date: new Date().toISOString(),
+        date: nowIso,
       };
       await updateDoc(doc(db, "clients", client.id), {
         creditBalance: increment(-amount),
         creditHistory: arrayUnion(creditEntry),
       });
+
+      await addDoc(collection(db, "expenses"), {
+        businessId,
+        date: nowIso.split("T")[0],
+        supplier: client.name,
+        category: REFUND_EXPENSE_CATEGORY,
+        description: `החזר ללקוחה - ${client.name}`,
+        amount,
+        paymentMethod: "cash",
+        status: "paid",
+      });
+
+      // מוסיפה את הקטגוריה לרשימה המנוהלת בהגדרות אם היא עדיין לא שם -
+      // arrayUnion אידמפוטנטי (לא כופל אם כבר קיימת), setDoc(merge:true)
+      // כדי שזה יעבוד גם אם businessSettings/{uid} עדיין לא קיים בכלל.
+      await setDoc(
+        doc(db, "businessSettings", businessId),
+        { expenseCategories: arrayUnion(REFUND_EXPENSE_CATEGORY) },
+        { merge: true }
+      );
+
       setIsRefundFormOpen(false);
       setRefundAmount("");
     } catch (err) {
