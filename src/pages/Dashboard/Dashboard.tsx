@@ -10,6 +10,7 @@ import { calculateOrderProfit } from "../../utils/orderProfit";
 import { isInventoryExpenseCategory } from "../../utils/businessSettings";
 import type { BulkItem } from "../../types";
 import { formatDateIL, getMonthNameIL } from "../../utils/formatDate";
+import InfoTooltip from "../../components/common/InfoTooltip";
 import "./Dashboard.css";
 
 interface ClientRow {
@@ -298,7 +299,10 @@ export default function Dashboard() {
         <div className="kpi-card">
           <div className="kpi-icon icon-purple">💰</div>
           <div className="kpi-content">
-            <span className="kpi-label">רווח החודש</span>
+            <span className="kpi-label">
+              רווח החודש
+              <InfoTooltip text="רווח תפעולי מכל ההזמנות (מכירה פחות עלות שיער/חומרים) פחות הוצאות תפעול ושיווק כלליות. לא כולל הוצאות רכישת מלאי (אלה כבר מגולמות בעלות הייצור של כל הזמנה) ולא כולל הזמנות שבוטלו." />
+            </span>
             <span className="kpi-value">₪{stats.thisMonthRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             {stats.revenueTrendPct !== null ? (
               <span className={`kpi-trend ${stats.revenueTrendPct >= 0 ? "trend-up" : "trend-down"}`}>
@@ -312,7 +316,10 @@ export default function Dashboard() {
         <div className="kpi-card">
           <div className="kpi-icon icon-orange">💳</div>
           <div className="kpi-content">
-            <span className="kpi-label">חובות פתוחים</span>
+            <span className="kpi-label">
+              חובות פתוחים
+              <InfoTooltip text="סכום totalPrice פחות paidAmount על כל ההזמנות עם יתרה לתשלום - כולל הזמנות שבוטלו (לא מוחרגות כאן, בשונה מ'חובות פתוחים לפי ותק' בדף הדוחות)." />
+            </span>
             <span className="kpi-value">₪{stats.openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             <span className="kpi-trend trend-neutral">{stats.debtOrders.length} הזמנות עם יתרה לתשלום</span>
           </div>
@@ -423,7 +430,10 @@ export default function Dashboard() {
 
           {/* Services Breakdown */}
           <div className="dash-card">
-            <h2 className="dash-card-title">📊 התפלגות סוגי עבודה</h2>
+            <h2 className="dash-card-title">
+              📊 התפלגות סוגי עבודה
+              <InfoTooltip text="אחוז מתוך סך ההכנסה הגולמית (totalPrice) של כל סוגי העבודה - לפי הכנסה, לא לפי רווח, ולא מוחרג הזמנות שבוטלו." />
+            </h2>
             {stats.servicesBreakdown.length === 0 ? (
               <p className="text-muted">אין עדיין נתונים להצגה.</p>
             ) : (

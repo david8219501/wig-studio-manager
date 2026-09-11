@@ -7,6 +7,7 @@ import { isUnsoldShowroomStock } from "../../utils/orderCreation";
 import { calculateOrderProfit } from "../../utils/orderProfit";
 import type { BulkItem, HairItem } from "../../types";
 import { getMonthNameIL } from "../../utils/formatDate";
+import InfoTooltip from "../../components/common/InfoTooltip";
 import "./Reports.css";
 
 // אותם 4 סוגי עבודה בדיוק שהאתר יוצר בפועל (ORDER_TYPE_LABELS ב-
@@ -257,6 +258,7 @@ export default function Reports() {
           label: "רווח משוער",
           value: `₪${Math.round(profitThisYear).toLocaleString()}`,
           change: formatPct(profitThisYear, profitLastYear),
+          tooltip: "הכנסה גולמית שנתית (totalPrice) פחות כל ההוצאות השנתיות שנרשמו, כולל רכישות מלאי - לא מבוסס על עלות ייצור בפועל לכל הזמנה (שונה מ'רווח החודש' בדשבורד).",
         },
       ],
       monthlyRows,
@@ -296,7 +298,10 @@ export default function Reports() {
       <div className="reports-stats-grid">
         {report.summaryStats.map((stat, i) => (
           <div key={i} className="stat-card">
-            <span className="stat-label">{stat.label}</span>
+            <span className="stat-label">
+              {stat.label}
+              {stat.tooltip && <InfoTooltip text={stat.tooltip} />}
+            </span>
             <span className="stat-value">{stat.value}</span>
             {stat.change && <span className="stat-change">{stat.change}{stat.change.startsWith("+") || stat.change.startsWith("-") ? " מתקופה קודמת" : ""}</span>}
           </div>
@@ -317,7 +322,10 @@ export default function Reports() {
                     <th>חודש</th>
                     <th>הכנסות (₪)</th>
                     <th>הוצאות (₪)</th>
-                    <th>רווח נקי (₪)</th>
+                    <th>
+                      רווח נקי (₪)
+                      <InfoTooltip text="הכנסה גולמית של החודש (סכום totalPrice של ההזמנות) פחות כל ההוצאות שנרשמו באותו חודש, כולל רכישות מלאי - לא מבוסס על עלות ייצור בפועל לכל הזמנה בנפרד (שונה מ'רווח החודש' בדשבורד)." />
+                    </th>
                     <th>מספר הזמנות</th>
                     <th>שירות מוביל</th>
                   </tr>
@@ -399,7 +407,10 @@ export default function Reports() {
 
         {/* קבוצה 3: חובות פתוחים לפי ותק */}
         <div className="reports-card full-width">
-          <h2 className="reports-title">חובות פתוחים לפי ותק</h2>
+          <h2 className="reports-title">
+            חובות פתוחים לפי ותק
+            <InfoTooltip text="totalPrice פחות paidAmount - כאן, בשונה מ'חובות פתוחים' בדשבורד/מכירות, הזמנות שבוטלו מוחרגות במפורש. הסכום עשוי להיות שונה מהמדדים המקבילים בדפים אחרים בגלל זה." />
+          </h2>
           {report.openDebts.length === 0 ? (
             <p>אין כרגע חובות פתוחים.</p>
           ) : (

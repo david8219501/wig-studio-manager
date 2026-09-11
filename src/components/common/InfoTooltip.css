@@ -1,0 +1,58 @@
+/* InfoTooltip.css - אייקון הסבר קטן + בועית טקסט, לשימוש חוזר בכל
+   האתר (Dashboard/Reports/וכו') - אחת מהמחלקות המשותפות היחידות
+   שמוגדרות מחוץ לקובץ CSS של דף ספציפי (src/components/common/),
+   בדיוק כמו ConfirmDialog/DateInput/TimeInput/CustomSelect. */
+
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 4px;
+  vertical-align: middle;
+}
+
+.info-tooltip-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: color var(--duration-fast) var(--easing), background var(--duration-fast) var(--easing);
+}
+
+.info-tooltip-icon:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+
+/* נפתחת למטה (לא מעלה) בכוונה - אחד ממקומות השימוש הוא כותרת עמודה
+   בטבלה עם overflow-x:auto על ה-wrapper (Reports.tsx) - פתיחה מעלה
+   הייתה בסיכון להיחתך ע"י ה-overflow החי בשורה הראשונה של הטבלה. */
+.info-tooltip-bubble {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-elevated);
+  width: 220px;
+  max-width: 80vw;
+  z-index: 500;
+  white-space: normal;
+  text-align: right;
+  pointer-events: none;
+}

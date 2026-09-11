@@ -9,6 +9,7 @@ import { calculateOrderProfit } from "../../utils/orderProfit";
 import DateInput from "../../components/common/DateInput";
 import CustomSelect from "../../components/common/CustomSelect";
 import { OTHER_STATUS, KNOWN_STATUSES, STATUS_SELECT_OPTIONS } from "../../utils/orderStatus";
+import InfoTooltip from "../../components/common/InfoTooltip";
 import "./Sales.css";
 
 export interface Order {
@@ -165,11 +166,17 @@ export default function Sales() {
           <span className="fin-value mono">₪{totalPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-danger">
-          <span className="fin-title">יתרת חובות פתוחים</span>
+          <span className="fin-title">
+            יתרת חובות פתוחים
+            <InfoTooltip text="סכום totalPrice פחות paidAmount על כל ההזמנות המוצגות כרגע (לפי הסינון הפעיל בטבלה) - כולל הזמנות שבוטלו, אלא אם סיננת אותן במפורש." />
+          </span>
           <span className="fin-value mono">₪{openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-profit">
-          <span className="fin-title">רווח בפועל (משוער)</span>
+          <span className="fin-title">
+            רווח בפועל (משוער)
+            <InfoTooltip text="סכום רווח תפעולי (מכירה פחות עלות ייצור בפועל) על כל ההזמנות המוצגות כרגע - כולל הזמנות שבוטלו, אלא אם סיננת אותן במפורש. לא מחסיר הוצאות תפעול כלליות של העסק." />
+          </span>
           <span className="fin-value mono">₪{totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
