@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc, getDocs, increment, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
-import type { BulkItem, HairItem, OrderPayment, UsedBulkItem } from "../../types";
+import type { BulkItem, CreditHistoryEntry, HairItem, OrderPayment, UsedBulkItem } from "../../types";
 import type { Order } from "../../pages/Sales/Sales";
 import { formatDateIL } from "../../utils/formatDate";
 import { OTHER_STATUS, KNOWN_STATUSES, STATUS_SELECT_OPTIONS } from "../../utils/orderStatus";
@@ -361,6 +361,24 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
         }
 
         await updateDoc(doc(db, "orders", order.id), { status: CANCELLED_STATUS });
+      }
+
+      // יתרת זכות אוטומטית - תמיד, בלי לשאול, אם שולם משהו בפועל על
+      // ההזמנה שמתבטלת (חל על שני הענפים למעלה - גם ביטול פאת תצוגה:
+      // התשלום שכבר נגבה נשאר יתרה ללקוחה, לא "נעלם" רק בגלל שהפאה
+      // חוזרת להיות מלאי לא-מכור. clientId/paidAmount נקראים כאן מה-
+      // order המקורי (prop), לא מושפעים מה-updateDoc-ים למעלה).
+      if (order.paidAmount > 0 && order.clientId) {
+        const creditEntry: CreditHistoryEntry = {
+          amount: order.paidAmount,
+          reason: "ביטול הזמנה",
+          relatedOrderId: order.id,
+          date: new Date().toISOString(),
+        };
+        await updateDoc(doc(db, "clients", order.clientId), {
+          creditBalance: increment(order.paidAmount),
+          creditHistory: arrayUnion(creditEntry),
+        });
       }
 
       setCancelConfirmOpen(false);
@@ -762,9 +780,12 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
         isOpen={cancelConfirmOpen}
         title={order.isShowroomStock ? "ביטול מכירה" : "ביטול הזמנה"}
         message={
-          order.isShowroomStock
+          (order.isShowroomStock
             ? "לבטל את המכירה? הפאה עצמה נשארת שלמה בדיוק כמו שהיא (שיוך השיער/החומרים לא נפגע) - היא רק תחזור להופיע כ'במלאי' בלשונית פאות תצוגה, מוכנה למכירה הבאה. הפעולה לא ניתנת לביטול."
-            : "לבטל את ההזמנה? כל פריטי המלאי ושיוכי השיער שנוצלו יוחזרו למלאי אוטומטית, וההזמנה תסומן כמבוטלת (לא תימחק). הפעולה לא ניתנת לביטול."
+            : "לבטל את ההזמנה? כל פריטי המלאי ושיוכי השיער שנוצלו יוחזרו למלאי אוטומטית, וההזמנה תסומן כמבוטלת (לא תימחק). הפעולה לא ניתנת לביטול.") +
+          (order.paidAmount > 0
+            ? `\n\n₪${order.paidAmount.toLocaleString()} ישולמו כיתרת זכות ללקוחה (אוטומטית, ניתן לצפייה ולהחזר בכרטיס הלקוחה).`
+            : "")
         }
         variant="danger"
         confirmLabel={cancelingOrder ? "מבטלת..." : order.isShowroomStock ? "כן, בטלי מכירה" : "כן, בטלי הזמנה"}
