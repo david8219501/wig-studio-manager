@@ -7,6 +7,7 @@ import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import { isUnsoldShowroomStock } from "../../utils/orderCreation";
 import { calculateOrderProfit } from "../../utils/orderProfit";
+import { isInventoryExpenseCategory } from "../../utils/businessSettings";
 import type { BulkItem } from "../../types";
 import { formatDateIL, getMonthNameIL } from "../../utils/formatDate";
 import "./Dashboard.css";
@@ -16,6 +17,18 @@ interface ClientRow {
   name: string;
   createdAt: Date | null;
 }
+
+interface ExpenseRow {
+  id: string;
+  date: string; // YYYY-MM-DD
+  category: string;
+  amount: number;
+}
+
+// הזמנות "בוטלה" (OrderDetailsPanel.tsx - ביטול הזמנה) מוחרגות מ"רווח
+// החודש" - אותו סטטוס קבוע, לא מיובא כי הוא local const לא-מיוצא שם
+// (עקבי עם המוסכמה הקיימת של קבועים מקומיים קטנים - ראו Reports.tsx).
+const CANCELLED_STATUS = "בוטלה";
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   new: "חדשה",
@@ -57,6 +70,7 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -122,10 +136,24 @@ export default function Dashboard() {
       }
     );
 
+    const expensesUnsub = onSnapshot(
+      query(collection(db, "expenses"), where("businessId", "==", businessId)),
+      (snapshot) => {
+        setExpenses(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ExpenseRow, "id">) })));
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error loading expenses:", err);
+        setLoadError("שגיאה בטעינת נתוני הדשבורד. בדקי את החיבור ונסי לרענן את הדף.");
+        setLoading(false);
+      }
+    );
+
     return () => {
       ordersUnsub();
       clientsUnsub();
       bulkUnsub();
+      expensesUnsub();
     };
   }, []);
 
@@ -135,15 +163,22 @@ export default function Dashboard() {
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-    // רווח נטו (הכנסה פחות עלות ייצור בפועל - שיוך שיער/פריטי מלאי), לא
-    // הכנסה גולמית - אותו מקור אמת יחיד (calculateOrderProfit) שכבר
-    // משמש את "רווח" ב-Sales.tsx, כדי שהמספרים יהיו עקביים בין שני המסכים.
-    const thisMonthRevenue = orders
-      .filter((o) => monthKey(o.createdAt) === thisMonth)
-      .reduce((sum, o) => sum + calculateOrderProfit(o), 0);
-    const lastMonthRevenue = orders
-      .filter((o) => monthKey(o.createdAt) === lastMonth)
-      .reduce((sum, o) => sum + calculateOrderProfit(o), 0);
+    // "רווח החודש" = רווח תפעולי מכל ההזמנות (calculateOrderProfit - אותו
+    // מקור אמת כמו "רווח" ב-Sales.tsx, מוציא הזמנות "בוטלה") פחות הוצאות
+    // תפעול/שיווק כלליות בלבד - לא הוצאות "מלאי וספקים": אלה כבר מגולמות
+    // בעלות הייצור של כל הזמנה בתוך calculateOrderProfit עצמו (usedHairItems/
+    // usedBulkItems), אז לכלול אותן גם כהוצאה כללית כאן היה כפל-ספירה.
+    const monthlyOperationalProfit = (monthKey_: string) => {
+      const monthProfit = orders
+        .filter((o) => monthKey(o.createdAt) === monthKey_ && o.status !== CANCELLED_STATUS)
+        .reduce((sum, o) => sum + calculateOrderProfit(o), 0);
+      const monthOperationalExpenses = expenses
+        .filter((e) => monthKey(e.date) === monthKey_ && !isInventoryExpenseCategory(e.category))
+        .reduce((sum, e) => sum + e.amount, 0);
+      return monthProfit - monthOperationalExpenses;
+    };
+    const thisMonthRevenue = monthlyOperationalProfit(thisMonth);
+    const lastMonthRevenue = monthlyOperationalProfit(lastMonth);
     const revenueTrendPct = lastMonthRevenue > 0
       ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
       : null;
@@ -210,7 +245,7 @@ export default function Dashboard() {
       recentOrders,
       lowStockItems,
     };
-  }, [orders, clients, bulkItems]);
+  }, [orders, clients, bulkItems, expenses]);
 
   const BREAKDOWN_COLORS = ["#9b69ff", "#3b82f6", "#f59e0b", "#10b981"];
 

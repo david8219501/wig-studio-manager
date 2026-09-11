@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, addDoc, doc, getDoc, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import { formatDateIL } from "../../utils/formatDate";
-import { DEFAULT_EXPENSE_CATEGORIES, LEGACY_EXPENSE_CATEGORY_LABELS } from "../../utils/businessSettings";
+import { DEFAULT_EXPENSE_CATEGORIES, LEGACY_EXPENSE_CATEGORY_LABELS, isInventoryExpenseCategory } from "../../utils/businessSettings";
 import "./Expenses.css";
 
 // ערך-סמן ל"אחר / הוסף חדש" בקטגוריה - אותו דפוס בדיוק כמו OTHER_STATUS
@@ -133,11 +133,9 @@ export default function Expenses() {
   // חישובים דינמיים בהתאם לזמן שנבחר
   const totalExpenses = timeFilteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const inventoryExpenses = timeFilteredExpenses
-    // "inventory" - מפתח אנגלי ישן (תאימות לאחור); "מלאי ושיער" - הערך
-    // החדש (ברירת המחדל של expenseCategories, אבל גם ניתן לשינוי לפי עסק -
-    // אם עסק מסוים שינה/מחק את הקטגוריה הזו, ההוצאות שלו פשוט ייכנסו
-    // ל"הוצאות תפעול ושיווק" הכלליות, לא לפילוח שגוי).
-    .filter((e) => e.category === "inventory" || e.category === "מלאי ושיער")
+    // isInventoryExpenseCategory (businessSettings.ts) - כולל תאימות
+    // לאחור למפתח האנגלי הישן ("inventory"), משותף עם Dashboard.tsx.
+    .filter((e) => isInventoryExpenseCategory(e.category))
     .reduce((sum, e) => sum + e.amount, 0);
   const operationalExpenses = totalExpenses - inventoryExpenses;
 

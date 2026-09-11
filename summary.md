@@ -1,37 +1,37 @@
-# סיכום: תיקון חישוב "בלאי בפועל" - ניכוי משקל שמוזג לקופסאות שאריות ✅ הושלמה
+# סיכום: תיקון "רווח החודש" + InfoTooltip גלובלי (2 חלקים)
 
-## הבעיה
-`closingSummary` (חישוב הבלאי ב"סגירת קוקו", `Inventory.tsx`) חיסר
-מ-`initialWeight` רק את `totalGramsUsed` (סכימת `gramsUsed` מכל
-`usedHairItems` בהזמנות) - בלי לנכות משקל שהועבר בעבר לקופסת שאריות
-דרך מיזוג (`handleMergeIntoRemnantBox`). התוצאה: כל משקל שמוזג
-נספר כ"בלאי" בטעות, למרות שהוא נשמר בפועל בשווי בקופסה - מנפח את
-הבלאי המחושב בכל מקרה שהיה מיזוג לפני סגירה (המשתמש דיווח שזה קורה
-כמעט תמיד).
+## חלק א': תיקון נוסחת "רווח החודש" ב-Dashboard.tsx ✅ הושלמה
 
-## התיקון
-נוסף חישוב `totalMergedToRemnantBoxes`: מעבר על כל `hairItems` עם
-`isRemnantBox === true`, ובכל אחת - סכימת `weightMerged` מכל רשומה
-ב-`remnantMergeLog` שלה שבה `sourceItemId` שווה למזהה הקוקו הנסגר.
+**ממצא לפני התיקון (שונה מהתיאור "כרגע" בבקשה):** הקוד **כבר** השתמש
+ב-`calculateOrderProfit` (לא `totalPrice` גולמי), אבל **בלי שום
+הפחתת הוצאות בכלל** (Dashboard.tsx לא טען `expenses` collection
+בכלל) **ובלי החרגת הזמנות "בוטלה"**. כלומר "רווח החודש" כלל בטעות
+גם הזמנות מבוטלות, ולא הפחית הוצאות תפעול בכלל - לא מה שהבקשה תיארה
+כ"מצב קיים", אבל התוצאה הסופית שהתבקשה זהה בכל מקרה.
 
-```ts
-const waste = item.initialWeight - totalGramsUsed - totalMergedToRemnantBoxes;
-```
+**התיקון:**
+- נוסף מאזין Firestore חדש ל-`expenses` (לא היה קיים ב-Dashboard.tsx).
+- `thisMonthRevenue`/`lastMonthRevenue` מחושבים כעת (`monthlyOperationalProfit`
+  משותפת לשני החודשים):
+  ```
+  Σ calculateOrderProfit(order) [לחודש, status !== "בוטלה"]
+  - Σ expenses.amount [לחודש, לא "מלאי וספקים"]
+  ```
+- **קטגוריית "מלאי וספקים" מזוהה נכון** (legacy `"inventory"` + החדש
+  `"מלאי ושיער"`) - לא שוכפל inline; נוצרה פונקציה משותפת חדשה
+  `isInventoryExpenseCategory` (`src/utils/businessSettings.ts`),
+  ו-**גם `Expenses.tsx` עודכן להשתמש בה** במקום הבדיקה inline
+  הקיימת (`inventoryExpenses` filter) - כדי שלא יהיו שני מקורות אמת
+  לאותה בדיקה.
 
-## עדכון תצוגת הסיכום
-נוספה שורה ל-`ConfirmDialog` של הסגירה: "הועבר לקופסאות שאריות: X
-גרם" - בין "סך גרמים שתועדו" ל"בלאי מחושב", כדי שיהיה ברור מאיפה כל
-מספר מגיע. מוצגת ללא תנאי (גם כ-0 גרם כשלא רלוונטי) - עקבי עם שאר
-שורות הסיכום.
-
-## ביטול סגירה - אומת שלא נדרש שינוי
-`handleConfirmUndoCloseHairItem` לא תלוי בחישוב מחדש בכלל - הוא
-פועל אך ורק לפי `wasteReconciliationLog` שנשמר בזמן הסגירה (מחסיר
-בדיוק `amountAdded` מכל `entry`), כך שהוא ממשיך לעבוד נכון אוטומטית
-גם עם הנוסחה המתוקנת, בלי שום שינוי קוד.
-
-**קבצים:** `src/pages/Inventory/Inventory.tsx` בלבד (`closingSummary`
-+ טקסט ה-`ConfirmDialog`).
+**קבצים:** `src/utils/businessSettings.ts` (פונקציה חדשה),
+`src/pages/Dashboard/Dashboard.tsx` (`expenses` state+listener,
+`CANCELLED_STATUS`, נוסחה מתוקנת), `src/pages/Expenses/Expenses.tsx`
+(שימוש בפונקציה המשותפת במקום inline).
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## חלק ב': רכיב InfoTooltip גלובלי
+
+טרם בוצע - ממשיך מיד.

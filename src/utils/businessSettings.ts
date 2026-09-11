@@ -31,3 +31,13 @@ export const LEGACY_EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   production: "ייצור הזמנות",
   other: "שונות",
 };
+
+// בדיקה משותפת - האם הוצאה מסוימת היא "מלאי וספקים" (לא הוצאה תפעולית
+// כללית) - כולל תאימות לאחור למפתח האנגלי הישן ("inventory") ולערך
+// העברי החדש ("מלאי ושיער"). משמש ב-Expenses.tsx (פילוח "הוצאות מלאי
+// וספקים" מול "תפעול ושיווק") וב-Dashboard.tsx ("רווח החודש" - מחסיר
+// רק הוצאות תפעול/שיווק, כי הוצאות מלאי כבר מגולמות בעלות הייצור של
+// כל הזמנה דרך calculateOrderProfit - כפל-ספירה אחרת אם ייכללו גם כאן).
+export function isInventoryExpenseCategory(category: string): boolean {
+  return category === "inventory" || category === "מלאי ושיער";
+}
