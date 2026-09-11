@@ -91,6 +91,57 @@ null`), התשלום שכבר נגבה לא צריך "להיעלם" רק בגל�
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
 
-## קבוצה 4: ניצול יתרת זכות ב-NewOrderWizard.tsx
+## קבוצה 4: ניצול יתרת זכות ב-NewOrderWizard.tsx ✅ הושלמה
 
-טרם בוצע.
+**`ClientOption`** (הטיפוס המשותף שהאשף משתמש בו ללקוחות) קיבל שדה
+`creditBalance?: number` חדש. עודכנו **שני מקורות הנתונים** של
+`clients` באשף כדי שהשדה יהיה מאוכלס בשני הזרימות: (א) ה-`getDocs`
+הפנימי (זרימה רגילה, לקוחה נבחרת בשלב 2), (ב) `ClientDrawer.tsx`'s
+`preselectedClient={{...}}` (זרימה שנפתחת מכרטיס לקוחה, מדלגת על
+שלב 2) - עודכן להעביר את `liveCreditBalance` (מקבוצה 3) בפועל.
+
+**באנר "יתרת זכות"** - `activeClient` (משתנה חדש: `preselectedClient
+?? clients.find(selectedClientId)`) נגזר פעם אחת, ומוצג **מעל כל
+שלבי האשף** (לא בשלב יחיד ספציפי) מהרגע שהלקוחה ידועה - כך שהוא
+תמיד תואם ל"שלב 1 או 2" שהתבקש בלי לשכפל אותו קוד בכמה מקומות: אם
+`preselectedClient` - ידוע כבר בשלב 1; אם לא - נהיה ידוע רק אחרי
+שנבחר בשלב 2, אז הבועית "מופיעה" בדיוק מאותה נקודה בזרימה הרגילה.
+כולל checkbox "נצל את יתרת הזכות בהזמנה הזו".
+
+**בשמירה (`handleFinish`):** אם מסומן - `creditToApply =
+Math.min(client.creditBalance, totalPrice)` (לא ניתן "לשלם" יותר
+מהמחיר בפועל). ה-`payment` האוטומטי (`method: "credit_balance"`,
+מקבוצה 1) נכלל **כבר בקריאה ל-`createOrder`** (`paidAmount`+`payments`
+ראשוניים של ההזמנה החדשה, לא `updateDoc` נפרד אחרי) - `createOrder`
+כבר תומך בזה טבעי (`NewOrderInput.paidAmount`/`payments`, לא נדרש
+שינוי ב-`orderCreation.ts`). אחרי היצירה (עם ה-`orderId` שהוחזר) -
+`updateDoc` אטומי על הלקוחה: `increment(-creditToApply)` +
+`arrayUnion` עם רשומה שלילית (`reason: "ניצול ביתרת הזכות בהזמנה
+חדשה"`, `relatedOrderId: <ההזמנה החדשה>`).
+
+**גבול scope (לא הורחב מעבר למבוקש):** הפיצ'ר חל רק על זרימת "פאה
+חדשה" הרגילה של האשף עצמו - **לא** על תיקון/שירות (`RepairOrderForm`)
+או מכירת פאת תצוגה (`SellShowroomStockModal`), ששני אלה מקבלים
+hand-off ומודלים נפרדים לגמרי (האשף נסגר לפני שהם נפתחים) - התבקש
+במפורש רק "NewOrderWizard.tsx", לא שני המודלים האחרים.
+
+**קבצים:** `src/components/orders/NewOrderWizard.tsx`,
+`src/components/orders/NewOrderWizard.css`,
+`src/components/clients/ClientDrawer.tsx` (שורה אחת - `creditBalance`
+ב-`preselectedClient`).
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
+
+---
+
+## סיכום כללי - כל 4 הקבוצות הושלמו
+
+מודל נתונים (`Client.creditBalance`/`creditHistory`,
+`CreditHistoryEntry`, `OrderPayment.method: 'credit_balance'`) →
+הוספה אוטומטית ביטול הזמנה ששולמה (שני הענפים, כולל פאת תצוגה) →
+תצוגה חיה + החזר + היסטוריה ב-`ClientDrawer.tsx` (כולל תיקון
+ארכיטקטוני הכרחי - מאזין חי עצמאי, כי ה-`client` prop הקיים היה
+"קפוא") → ניצול ביתרה בהזמנה חדשה (`NewOrderWizard.tsx`, בשתי
+זרימות הכניסה). כל קבוצה עם build+lint+commit+push נפרד משלה, 0
+בעיות lint חדשות באף שלב.

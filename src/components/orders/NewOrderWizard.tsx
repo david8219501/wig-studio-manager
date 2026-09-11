@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc, getDocs, increment, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
-import type { BulkItem, UsedBulkItem, UsedHairItem } from "../../types";
+import type { BulkItem, CreditHistoryEntry, UsedBulkItem, UsedHairItem } from "../../types";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, type HairCostSettings } from "../../utils/hairCost";
 import { createOrder, isUnsoldShowroomStock } from "../../utils/orderCreation";
 import type { Order } from "../../pages/Sales/Sales";
@@ -12,6 +12,7 @@ export interface ClientOption {
   id: string;
   name: string;
   phone: string;
+  creditBalance?: number; // יתרת זכות קיימת - ראו handleFinish/useCreditBalance
 }
 
 const DEFAULT_HAIR_COST_SETTINGS: HairCostSettings = { pricePerKgUsd: 4700, exchangeRate: 3.0 };
@@ -78,6 +79,9 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   const [price, setPrice] = useState<number | "">(0);
   const [dueDate, setDueDate] = useState("");
 
+  // ניצול יתרת זכות קיימת של הלקוחה בהזמנה הזו - ראו activeClient/handleFinish
+  const [useCreditBalance, setUseCreditBalance] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -105,6 +109,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     setSelectedShowroomOrderId("");
     setPrice(0);
     setDueDate("");
+    setUseCreditBalance(false);
     setSaveError(null);
 
     const businessId = auth.currentUser?.uid;
@@ -151,8 +156,8 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     getDocs(query(collection(db, "clients"), where("businessId", "==", businessId)))
       .then((snapshot) => {
         const list: ClientOption[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as { name?: string; phone?: string };
-          return { id: docSnap.id, name: data.name || "", phone: data.phone || "" };
+          const data = docSnap.data() as { name?: string; phone?: string; creditBalance?: number };
+          return { id: docSnap.id, name: data.name || "", phone: data.phone || "", creditBalance: data.creditBalance ?? 0 };
         });
         setClients(list);
       })
@@ -214,6 +219,13 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
   };
 
   if (!isOpen) return null;
+
+  // הלקוחה "הפעילה" הנוכחית, בין אם preselected או נבחרה בפועל בשלב 2 -
+  // null כל עוד אף אחד מהם לא קיים (למשל שלב 1 בזרימה הרגילה, לפני
+  // שנבחרה לקוחה). משמש להצגת בועית "יתרת זכות" (רלוונטי משלב 1 אם
+  // preselected, או מרגע הבחירה בשלב 2 אחרת - שני המקרים "שלב 1 או 2"
+  // שהתבקשו, בלי לשכפל את הבועית בכל שלב בנפרד) וגם ב-handleFinish.
+  const activeClient = preselectedClient ?? clients.find((c) => c.id === selectedClientId) ?? null;
 
   // כשהאשף נפתח עם preselectedClient (מתוך ClientDrawer של לקוחה ספציפית) -
   // הלקוחה כבר ידועה מההקשר, אז מדלגים על שלב 2 (בחירת לקוחה) לגמרי בשני
@@ -332,20 +344,46 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     // (Sales.tsx) - לא כאן.
     const usedHairItems: UsedHairItem[] = [];
 
+    // ניצול יתרת זכות - מוגבל למינימום בין היתרה הקיימת למחיר ההזמנה
+    // (לא ניתן "לשלם יותר מהמחיר" מהיתרה). נוצר payment אוטומטי (method
+    // "credit_balance") שנכלל כבר ב-paidAmount הראשוני של ההזמנה החדשה.
+    const totalPriceNum = Number(price) || 0;
+    const creditToApply = useCreditBalance ? Math.min(client.creditBalance ?? 0, totalPriceNum) : 0;
+    const nowIso = new Date().toISOString();
+
     try {
-      await createOrder({
+      const newOrderId = await createOrder({
         businessId,
         clientId: client.id,
         clientName: client.name,
         clientPhone: client.phone,
         orderType: ORDER_TYPE_LABELS[orderType] || orderType,
-        totalPrice: Number(price) || 0,
+        totalPrice: totalPriceNum,
         dueDate: dueDate || null,
         usedBulkItems,
         usedHairItems,
         hairCostEstimated,
         notes: specsSummary,
+        ...(creditToApply > 0
+          ? {
+              paidAmount: creditToApply,
+              payments: [{ amount: creditToApply, method: "credit_balance" as const, date: nowIso }],
+            }
+          : {}),
       });
+
+      if (creditToApply > 0) {
+        const creditEntry: CreditHistoryEntry = {
+          amount: -creditToApply,
+          reason: "ניצול ביתרת הזכות בהזמנה חדשה",
+          relatedOrderId: newOrderId,
+          date: nowIso,
+        };
+        await updateDoc(doc(db, "clients", client.id), {
+          creditBalance: increment(-creditToApply),
+          creditHistory: arrayUnion(creditEntry),
+        });
+      }
 
       // הורדת הכמות שנוצלה בפועל מכל פריט מלאי פשוט שצורף להזמנה - מקובצת
       // לפי itemId (usedQtyByItemId מהבדיקה למעלה), כדי שאם אותו פריט נבחר
@@ -379,6 +417,24 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         </div>
 
         <div className="wizard-body">
+          {/* יתרת זכות קיימת ללקוחה - מוצג מרגע שהלקוחה ידועה (activeClient),
+              בין אם ב-preselectedClient (שלב 1) או נבחרה בשלב 2 - ראו
+              activeClient למעלה. נשאר גלוי בכל השלבים הבאים (כולל שלב 4,
+              איפה שהתמחור בפועל נקבע). */}
+          {activeClient && (activeClient.creditBalance ?? 0) > 0 && (
+            <div className="credit-balance-banner">
+              <span>💰 ללקוחה יתרת זכות של ₪{(activeClient.creditBalance ?? 0).toLocaleString()}</span>
+              <label className="credit-balance-checkbox">
+                <input
+                  type="checkbox"
+                  checked={useCreditBalance}
+                  onChange={(e) => setUseCreditBalance(e.target.checked)}
+                />
+                נצל את יתרת הזכות בהזמנה הזו
+              </label>
+            </div>
+          )}
+
           {/* Step 1: בחירת סוג הזמנה */}
           {step === 1 && (
             <div className="wizard-step">

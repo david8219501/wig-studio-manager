@@ -496,7 +496,7 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
         onOrderCreated={() => {}}
-        preselectedClient={{ id: client.id, name: client.name, phone: client.phone }}
+        preselectedClient={{ id: client.id, name: client.name, phone: client.phone, creditBalance: liveCreditBalance }}
         onOpenRepairForm={(repairClient) => setRepairFormClient(repairClient)}
         onOpenSellShowroom={(order) => setSellingShowroomOrder(order)}
       />
