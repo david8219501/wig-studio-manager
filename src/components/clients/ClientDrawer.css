@@ -265,6 +265,96 @@
     font-size: 13px;
   }
 
+  /* יתרת זכות - כרטיס + כפתור החזר "ליד" הכרטיס, אותו .fin-card קיים
+     בתוך שורת flex, לא grid נפרד. */
+  .credit-balance-row {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .credit-balance-row .fin-card {
+    flex: 1;
+    min-width: 160px;
+  }
+
+  .btn-refund-credit {
+    background: var(--color-accent-bg);
+    color: var(--color-accent);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity var(--duration-fast) var(--easing);
+  }
+
+  .btn-refund-credit:hover {
+    opacity: 0.85;
+  }
+
+  .credit-refund-form {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .credit-refund-form input {
+    padding: 9px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    background: var(--color-surface);
+    color: var(--color-text);
+    width: 140px;
+  }
+
+  .credit-refund-form input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .credit-history-section {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .credit-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .credit-history-table th {
+    text-align: right;
+    color: var(--color-text-muted);
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--color-border);
+    white-space: nowrap;
+  }
+
+  .credit-history-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    text-align: right;
+  }
+
+  /* .mono (index.css) גלובלי וקובע display: inline-flex - אותה התנגשות
+     table-layout שכבר תוקנה כמה פעמים היום בקבצים אחרים. */
+  .credit-history-table td.mono {
+    display: table-cell;
+  }
+
   /* פירוט תשלומים לפי הזמנה - לשונית "תשלומים וחובות" */
   .payments-orders-section {
     margin-top: 24px;

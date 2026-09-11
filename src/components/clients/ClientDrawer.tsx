@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { arrayUnion, collection, doc, increment, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
 import type { Order } from "../../pages/Sales/Sales";
+import type { CreditHistoryEntry } from "../../types";
 import { formatDateIL } from "../../utils/formatDate";
 import NewOrderWizard, { type ClientOption } from "../orders/NewOrderWizard";
 import RepairOrderForm from "../orders/RepairOrderForm";
@@ -45,6 +46,36 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
 
   // הזמנות אמיתיות של הלקוחה, נטענות בזמן אמת מ-Firestore
   const [clientOrders, setClientOrders] = useState<Order[]>([]);
+
+  // יתרת זכות - מאזין חי משלה על מסמך הלקוחה עצמו (לא רק ה-client prop
+  // שמגיע מ-Clients.tsx וממשיך להיות "קפוא" מרגע הפתיחה - selectedClient
+  // שם לא מתעדכן חי מה-onSnapshot של רשימת הלקוחות). קריטי כאן כי היתרה
+  // יכולה להשתנות ממקום אחר לגמרי (ביטול הזמנה ב-OrderDetailsPanel,
+  // ניצול ביתרה באשף הזמנה חדשה) בזמן שהמגירה הזו כבר פתוחה.
+  const [isRefundFormOpen, setIsRefundFormOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState<number | "">("");
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [savingRefund, setSavingRefund] = useState(false);
+  const [liveCreditBalance, setLiveCreditBalance] = useState(0);
+  const [liveCreditHistory, setLiveCreditHistory] = useState<CreditHistoryEntry[]>([]);
+
+  useEffect(() => {
+    // אין צורך לאפס state כשclient חסר - הרכיב כבר לא מרנדר כלום במקרה
+    // הזה (return null אחרי ה-effects, ראו למטה), אז אין state "תקוע"
+    // גלוי. setLiveCreditBalance/setLiveCreditHistory קוראות רק מתוך
+    // ה-callback האסינכרוני של onSnapshot, לא סינכרונית בגוף ה-effect.
+    if (!client) return;
+    const unsubscribe = onSnapshot(
+      doc(db, "clients", client.id),
+      (snap) => {
+        const data = snap.data() as { creditBalance?: number; creditHistory?: CreditHistoryEntry[] } | undefined;
+        setLiveCreditBalance(data?.creditBalance ?? 0);
+        setLiveCreditHistory(data?.creditHistory ?? []);
+      },
+      (err) => console.error("Error loading client credit balance:", err)
+    );
+    return () => unsubscribe();
+  }, [client]);
 
   // סנכרון הנתונים בטעינת הלקוחה
   useEffect(() => {
@@ -107,6 +138,42 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
       alert("שגיאה בשמירת המפרט. נסי שוב.");
     } finally {
       setSavingSpecs(false);
+    }
+  };
+
+  // ביצוע החזר בפועל ללקוחה - מפחית מהיתרה ומוסיף רשומה שלילית ליומן,
+  // אותו updateDoc אטומי (increment+arrayUnion) כמו הוספת יתרה ב-
+  // handleCancelOrder (OrderDetailsPanel.tsx).
+  const handleConfirmRefund = async () => {
+    const amount = Number(refundAmount);
+    if (refundAmount === "" || amount <= 0) {
+      setRefundError("יש להזין סכום תקין.");
+      return;
+    }
+    if (amount > liveCreditBalance) {
+      setRefundError(`הסכום גבוה מהיתרה הקיימת (₪${liveCreditBalance.toLocaleString()}).`);
+      return;
+    }
+
+    setSavingRefund(true);
+    setRefundError(null);
+    try {
+      const creditEntry: CreditHistoryEntry = {
+        amount: -amount,
+        reason: "החזר ללקוחה",
+        date: new Date().toISOString(),
+      };
+      await updateDoc(doc(db, "clients", client.id), {
+        creditBalance: increment(-amount),
+        creditHistory: arrayUnion(creditEntry),
+      });
+      setIsRefundFormOpen(false);
+      setRefundAmount("");
+    } catch (err) {
+      console.error("Error refunding credit balance to client:", err);
+      setRefundError("שגיאה בביצוע ההחזר. נסי שוב.");
+    } finally {
+      setSavingRefund(false);
     }
   };
 
@@ -244,6 +311,80 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                   </span>
                 </div>
               </div>
+
+              {/* יתרת זכות - לא מציגה כרטיס בכלל כשאין יתרה (0/undefined),
+                  כדי לא להראות כרטיס ריק מיותר. היסטוריית creditHistory
+                  ממשיכה להיות מוצגת גם כשהיתרה כבר התאפסה - מעקב מלא. */}
+              {liveCreditBalance > 0 && (
+                <div className="credit-balance-row">
+                  <div className="fin-card text-success">
+                    <span>יתרת זכות</span>
+                    <span className="mono font-bold">₪{liveCreditBalance.toLocaleString()}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-refund-credit"
+                    onClick={() => setIsRefundFormOpen((prev) => !prev)}
+                  >
+                    💸 ביצוע החזר ללקוחה
+                  </button>
+                </div>
+              )}
+
+              {isRefundFormOpen && (
+                <div className="credit-refund-form">
+                  <input
+                    type="number"
+                    min={0}
+                    max={liveCreditBalance}
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder={`עד ₪${liveCreditBalance.toLocaleString()}`}
+                  />
+                  <button type="button" className="btn-primary" onClick={handleConfirmRefund} disabled={savingRefund}>
+                    {savingRefund ? "מבצעת..." : "אישור החזר"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      setIsRefundFormOpen(false);
+                      setRefundAmount("");
+                      setRefundError(null);
+                    }}
+                    disabled={savingRefund}
+                  >
+                    ביטול
+                  </button>
+                  {refundError && <span className="field-error">{refundError}</span>}
+                </div>
+              )}
+
+              {liveCreditHistory.length > 0 && (
+                <div className="credit-history-section">
+                  <h3>היסטוריית יתרת זכות</h3>
+                  <table className="credit-history-table" dir="rtl">
+                    <thead>
+                      <tr>
+                        <th>תאריך</th>
+                        <th>סכום</th>
+                        <th>סיבה</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...liveCreditHistory].reverse().map((entry, i) => (
+                        <tr key={i}>
+                          <td className="mono">{formatDateIL(entry.date)}</td>
+                          <td className={`mono ${entry.amount >= 0 ? "text-success" : "text-danger"}`}>
+                            {entry.amount >= 0 ? "+" : ""}₪{entry.amount.toLocaleString()}
+                          </td>
+                          <td>{entry.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               <div className="payments-orders-section">
                 <h3>פירוט לפי הזמנה</h3>
