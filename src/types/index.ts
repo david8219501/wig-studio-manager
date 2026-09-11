@@ -75,11 +75,24 @@ export interface HairItem {
   }
 
   // תשלום בודד שנגבה על חשבון הזמנה - חלק ממערך payments על ה-order עצמו
-  // (לא collection נפרד).
+  // (לא collection נפרד). 'credit_balance' - נוצר אוטומטית (לא ניתן
+  // לבחירה בטופס תשלום ידני) כשלקוחה מנצלת יתרת זכות קיימת בהזמנה
+  // חדשה (ראו CreditHistoryEntry/NewOrderWizard.tsx).
   export interface OrderPayment {
     amount: number;
-    method: 'cash' | 'credit' | 'transfer' | 'check';
+    method: 'cash' | 'credit' | 'transfer' | 'check' | 'credit_balance';
     date: string;
     note?: string;
+  }
+
+  // רשומה בודדת ביומן יתרת הזכות של לקוחה (Client.creditHistory,
+  // Clients.tsx) - amount חיובי = הוספת זכות (למשל ביטול הזמנה ששולמה),
+  // שלילי = החזר בפועל ללקוחה או ניצול בהזמנה חדשה. relatedOrderId
+  // מקשר לרשומה הרלוונטית אם יש (ההזמנה שבוטלה / ההזמנה שבה נוצל).
+  export interface CreditHistoryEntry {
+    amount: number;
+    reason: string;
+    relatedOrderId?: string;
+    date: string;
   }
 

@@ -4,6 +4,7 @@ import { db, auth } from "../../services/firebase";
 import ClientDrawer from "../../components/clients/ClientDrawer";
 import AddClientModal from "../../components/modals/AddClientModal";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import type { CreditHistoryEntry } from "../../types";
 import "./Clients.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -16,6 +17,8 @@ export interface Client {
   email: string;
   notes: string;
   measurements?: string; // מידות ראש - נערך דרך טאב "מידות ומפרט" בכרטיס הלקוחה
+  creditBalance?: number; // יתרת זכות בש"ח, נובעת מביטול הזמנות ששולמו (ברירת מחדל 0 - שדה חסר = אין יתרה)
+  creditHistory?: CreditHistoryEntry[]; // יומן מלא של כל שינוי ביתרת הזכות - ראו CreditHistoryEntry (types/index.ts)
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

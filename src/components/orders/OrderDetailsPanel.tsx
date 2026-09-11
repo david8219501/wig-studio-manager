@@ -28,6 +28,9 @@ const PAYMENT_METHOD_LABELS: Record<OrderPayment["method"], string> = {
   credit: "💳 אשראי",
   transfer: "🏦 העברה",
   check: "📜 צ'ק",
+  // נוצר אוטומטית (NewOrderWizard.tsx) כשלקוחה מנצלת יתרת זכות קיימת
+  // בהזמנה חדשה - לא ניתן לבחירה בטופס תשלום ידני (אין <option> לזה).
+  credit_balance: "💰 יתרת זכות",
 };
 
 interface OrderDetailsPanelProps {
