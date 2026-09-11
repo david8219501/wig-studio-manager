@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { addDoc, arrayUnion, collection, doc, increment, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, deleteDoc, doc, increment, onSnapshot, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
 import type { Order } from "../../pages/Sales/Sales";
@@ -11,6 +11,7 @@ import RepairOrderForm from "../orders/RepairOrderForm";
 import SellShowroomStockModal from "../../pages/Inventory/SellShowroomStockModal";
 import OrderDetailsPanel from "../orders/OrderDetailsPanel";
 import AssignHairModal from "../orders/AssignHairModal";
+import ConfirmDialog from "../common/ConfirmDialog";
 import "./ClientDrawer.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -59,6 +60,15 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
   const [savingRefund, setSavingRefund] = useState(false);
   const [liveCreditBalance, setLiveCreditBalance] = useState(0);
   const [liveCreditHistory, setLiveCreditHistory] = useState<CreditHistoryEntry[]>([]);
+
+  // ביטול רשומת שימוש בפועל ביתרת זכות (amount שלילי) - ראו
+  // handleConfirmUndoCreditEntry. שומרת את האובייקט עצמו (לא אינדקס) כי
+  // התצוגה מציגה את liveCreditHistory הפוך (חדש-ראשון) - אינדקס בתצוגה
+  // לא תואם לאינדקס במערך המקורי, וגם לא נחוץ: הרשומה המקורית לא נמחקת
+  // ולא מזוהה מחדש - רק קוראים ממנה relatedPaymentId/relatedExpenseId/amount.
+  const [undoingCreditEntry, setUndoingCreditEntry] = useState<CreditHistoryEntry | null>(null);
+  const [undoingCreditError, setUndoingCreditError] = useState<string | null>(null);
+  const [undoingCreditSaving, setUndoingCreditSaving] = useState(false);
 
   useEffect(() => {
     // אין צורך לאפס state כשclient חסר - הרכיב כבר לא מרנדר כלום במקרה
@@ -208,6 +218,65 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
       setRefundError("שגיאה בביצוע ההחזר. נסי שוב.");
     } finally {
       setSavingRefund(false);
+    }
+  };
+
+  // ביטול רשומת שימוש ביתרת זכות (amount שלילי) - הופך את הפעולה
+  // המקורית, אבל **לא מוחק אותה** מההיסטוריה (נשארת כתיעוד, בדיוק כמו
+  // wasteReconciliationLog/ביטול סגירת קוקו) - רק מוסיף רשומה חדשה
+  // חיובית + מבצע את ההפיכה בפועל (מחיקת ה-expense המתאים / הסרת
+  // התשלום המתאים מההזמנה המקושרת). relatedExpenseId מזהה "החזר
+  // ללקוחה"; relatedPaymentId מזהה "ניצול/תשלום מיתרת זכות" - שני
+  // המקרים סותרים זה את זה (לא אמורה להיות רשומה עם שניהם).
+  const handleConfirmUndoCreditEntry = async () => {
+    if (!undoingCreditEntry) return;
+    const amountToRestore = Math.abs(undoingCreditEntry.amount);
+
+    setUndoingCreditSaving(true);
+    setUndoingCreditError(null);
+    try {
+      if (undoingCreditEntry.relatedExpenseId) {
+        // deleteDoc על מסמך שכבר לא קיים מצליח בשקט (לא זורק) - אין צורך
+        // בבדיקת קיום מפורשת לפני כן, כמבוקש ("אם עדיין קיים... אם נמחק
+        // כבר ידנית, מדלג בשקט").
+        await deleteDoc(doc(db, "expenses", undoingCreditEntry.relatedExpenseId));
+      } else if (undoingCreditEntry.relatedPaymentId && undoingCreditEntry.relatedOrderId) {
+        const relatedOrder = clientOrders.find((o) => o.id === undoingCreditEntry.relatedOrderId);
+        const existingPayment = relatedOrder?.payments?.find((p) => p.id === undoingCreditEntry.relatedPaymentId);
+        if (relatedOrder && existingPayment) {
+          const newPayments = (relatedOrder.payments ?? []).filter((p) => p.id !== undoingCreditEntry.relatedPaymentId);
+          const newPaidAmount = newPayments.reduce((sum, p) => sum + p.amount, 0);
+          await updateDoc(doc(db, "orders", relatedOrder.id), {
+            payments: newPayments,
+            paidAmount: newPaidAmount,
+          });
+        }
+        // אם ההזמנה או התשלום הספציפי לא נמצאו - מדלגים בשקט על השלב
+        // הזה, וממשיכים רק עם הזיכוי ליתרה (כמבוקש במפורש).
+      }
+
+      // Firestore דוחה ערך undefined במפורש (גם בתוך אובייקט מקונן
+      // בתוך מערך, לא רק שדה top-level) - relatedOrderId לא קיים כלל
+      // ברשומת "החזר ללקוחה" (relatedExpenseId), אז נכלל רק אם יש בפועל.
+      const reason =
+        undoingCreditEntry.relatedExpenseId ? "ביטול החזר ללקוחה" : "ביטול ניצול יתרת זכות";
+      const creditEntry: CreditHistoryEntry = {
+        amount: amountToRestore,
+        reason,
+        date: new Date().toISOString(),
+        ...(undoingCreditEntry.relatedOrderId ? { relatedOrderId: undoingCreditEntry.relatedOrderId } : {}),
+      };
+      await updateDoc(doc(db, "clients", client.id), {
+        creditBalance: increment(amountToRestore),
+        creditHistory: arrayUnion(creditEntry),
+      });
+
+      setUndoingCreditEntry(null);
+    } catch (err) {
+      console.error("Error undoing credit history entry:", err);
+      setUndoingCreditError("שגיאה בביטול הפעולה. נסי שוב.");
+    } finally {
+      setUndoingCreditSaving(false);
     }
   };
 
@@ -403,6 +472,7 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                         <th>תאריך</th>
                         <th>סכום</th>
                         <th>סיבה</th>
+                        <th>פעולות</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -413,6 +483,22 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                             {entry.amount >= 0 ? "+" : ""}₪{entry.amount.toLocaleString()}
                           </td>
                           <td>{entry.reason}</td>
+                          <td>
+                            {/* רק שימוש בפועל (amount שלילי) ניתן לביטול - לא
+                                "ביטול הזמנה" (amount חיובי, שינוי גדול יותר,
+                                לא בתחום הזה). */}
+                            {entry.amount < 0 && (
+                              <button
+                                type="button"
+                                className="credit-history-undo-btn"
+                                onClick={() => setUndoingCreditEntry(entry)}
+                                aria-label="ביטול פעולה"
+                                title="ביטול פעולה"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -566,6 +652,27 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
         isOpen={assigningOrderId !== null}
         order={assigningOrder}
         onClose={() => setAssigningOrderId(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={undoingCreditEntry !== null}
+        title="ביטול פעולה ביתרת זכות"
+        message={
+          undoingCreditEntry
+            ? `${
+                undoingCreditEntry.relatedExpenseId
+                  ? `ביטול פעולה זו יחזיר ₪${Math.abs(undoingCreditEntry.amount).toLocaleString()} ליתרת הזכות, וימחק את הוצאת ה"החזר ללקוחה" המתאימה.`
+                  : `ביטול פעולה זו יחזיר ₪${Math.abs(undoingCreditEntry.amount).toLocaleString()} ליתרת הזכות, ויסיר את התשלום המתאים מההזמנה המקושרת.`
+              }${undoingCreditError ? `\n\n${undoingCreditError}` : ""}`
+            : ""
+        }
+        variant="warning"
+        confirmLabel={undoingCreditSaving ? "מבטלת..." : "כן, בטלי"}
+        onConfirm={handleConfirmUndoCreditEntry}
+        onCancel={() => {
+          setUndoingCreditEntry(null);
+          setUndoingCreditError(null);
+        }}
       />
     </>
   );

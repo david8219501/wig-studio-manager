@@ -355,6 +355,21 @@
     display: table-cell;
   }
 
+  /* כפתור ביטול "רפאים" מינימלי - מוצג רק על שורות עם amount שלילי */
+  .credit-history-undo-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 6px;
+    transition: color var(--duration-fast) var(--easing);
+  }
+
+  .credit-history-undo-btn:hover {
+    color: var(--color-danger);
+  }
+
   /* פירוט תשלומים לפי הזמנה - לשונית "תשלומים וחובות" */
   .payments-orders-section {
     margin-top: 24px;
