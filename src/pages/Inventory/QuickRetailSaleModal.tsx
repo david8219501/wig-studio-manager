@@ -96,7 +96,7 @@ export default function QuickRetailSaleModal({ isOpen, item, onClose }: QuickRet
         notes: "",
         status: "delivered",
         paidAmount: total,
-        payments: [{ amount: total, method: "cash", date: today }],
+        payments: [{ id: crypto.randomUUID(), amount: total, method: "cash", date: today }],
       });
 
       await updateDoc(doc(db, "bulkItems", item.id), {

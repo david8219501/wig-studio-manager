@@ -181,9 +181,10 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     setPaymentError(null);
 
     const note = payNote.trim();
+    const newPaymentId = crypto.randomUUID();
     const newPayment: OrderPayment = note
-      ? { amount: Number(payAmount), method: payMethod, date: payDate || todayStr, note }
-      : { amount: Number(payAmount), method: payMethod, date: payDate || todayStr };
+      ? { id: newPaymentId, amount: Number(payAmount), method: payMethod, date: payDate || todayStr, note }
+      : { id: newPaymentId, amount: Number(payAmount), method: payMethod, date: payDate || todayStr };
 
     const newPayments = [...payments, newPayment];
     const newPaidAmount = newPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -201,6 +202,7 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
           amount: -Number(payAmount),
           reason: "תשלום מיתרת זכות בהזמנה קיימת",
           relatedOrderId: order.id,
+          relatedPaymentId: newPaymentId,
           date: new Date().toISOString(),
         };
         await updateDoc(doc(db, "clients", order.clientId), {
@@ -246,10 +248,13 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
     setSavingEditPayment(true);
     setEditPaymentError(null);
 
+    // שומר את ה-id המקורי של התשלום (לא מייצר מזהה חדש) - אחרת רשומות
+    // creditHistory קיימות שמצביעות עליו (relatedPaymentId) היו "מתייתמות".
+    const originalId = payments[idx]?.id ?? crypto.randomUUID();
     const note = editPayNote.trim();
     const updatedPayment: OrderPayment = note
-      ? { amount: Number(editPayAmount), method: editPayMethod, date: editPayDate || todayStr, note }
-      : { amount: Number(editPayAmount), method: editPayMethod, date: editPayDate || todayStr };
+      ? { id: originalId, amount: Number(editPayAmount), method: editPayMethod, date: editPayDate || todayStr, note }
+      : { id: originalId, amount: Number(editPayAmount), method: editPayMethod, date: editPayDate || todayStr };
 
     const newPayments = payments.map((p, i) => (i === idx ? updatedPayment : p));
     const newPaidAmount = newPayments.reduce((sum, p) => sum + p.amount, 0);

@@ -350,6 +350,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
     const totalPriceNum = Number(price) || 0;
     const creditToApply = useCreditBalance ? Math.min(client.creditBalance ?? 0, totalPriceNum) : 0;
     const nowIso = new Date().toISOString();
+    const creditPaymentId = creditToApply > 0 ? crypto.randomUUID() : "";
 
     try {
       const newOrderId = await createOrder({
@@ -367,7 +368,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
         ...(creditToApply > 0
           ? {
               paidAmount: creditToApply,
-              payments: [{ amount: creditToApply, method: "credit_balance" as const, date: nowIso }],
+              payments: [{ id: creditPaymentId, amount: creditToApply, method: "credit_balance" as const, date: nowIso }],
             }
           : {}),
       });
@@ -377,6 +378,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
           amount: -creditToApply,
           reason: "ניצול ביתרת הזכות בהזמנה חדשה",
           relatedOrderId: newOrderId,
+          relatedPaymentId: creditPaymentId,
           date: nowIso,
         };
         await updateDoc(doc(db, "clients", client.id), {

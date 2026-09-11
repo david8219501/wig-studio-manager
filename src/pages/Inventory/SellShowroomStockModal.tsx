@@ -85,7 +85,7 @@ export default function SellShowroomStockModal({ isOpen, order, onClose, onSold,
         totalPrice: price,
         paidAmount: price,
         status: "delivered",
-        payments: [{ amount: price, method: "cash", date: today }],
+        payments: [{ id: crypto.randomUUID(), amount: price, method: "cash", date: today }],
         // createdAt נדרס לתאריך המכירה בפועל - Dashboard.tsx/Sales.tsx/
         // Reports.tsx מקבצים הכנסות לפי createdAt (כמו כל הזמנה אחרת), אז
         // בלי הדריסה הזו הכנסת המכירה הייתה "נספרת" תחת החודש/השנה שבהם

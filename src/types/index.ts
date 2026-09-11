@@ -75,10 +75,15 @@ export interface HairItem {
   }
 
   // תשלום בודד שנגבה על חשבון הזמנה - חלק ממערך payments על ה-order עצמו
-  // (לא collection נפרד). 'credit_balance' - נוצר אוטומטית (לא ניתן
-  // לבחירה בטופס תשלום ידני) כשלקוחה מנצלת יתרת זכות קיימת בהזמנה
-  // חדשה (ראו CreditHistoryEntry/NewOrderWizard.tsx).
+  // (לא collection נפרד). 'credit_balance' - ניצול יתרת זכות קיימת של
+  // הלקוחה: נוצר אוטומטית באשף הזמנה חדשה (NewOrderWizard.tsx), וגם
+  // ניתן לבחירה ידנית בטופס "הוספת תשלום" להזמנה קיימת
+  // (OrderDetailsPanel.tsx) כשיש יתרה בפועל. id - מזהה ייחודי, נוצר
+  // מעתה בכל תשלום חדש (כל method) - מאפשר קישור מדויק אליו מ-
+  // CreditHistoryEntry.relatedPaymentId, כדי ש"ביטול" ימצא בדיוק את
+  // התשלום הנכון (לא ניחוש לפי אינדקס/סכום).
   export interface OrderPayment {
+    id: string;
     amount: number;
     method: 'cash' | 'credit' | 'transfer' | 'check' | 'credit_balance';
     date: string;
@@ -89,9 +94,15 @@ export interface HairItem {
   // Clients.tsx) - amount חיובי = הוספת זכות (למשל ביטול הזמנה ששולמה),
   // שלילי = החזר בפועל ללקוחה או ניצול בהזמנה חדשה. relatedOrderId
   // מקשר לרשומה הרלוונטית אם יש (ההזמנה שבוטלה / ההזמנה שבה נוצל).
+  // relatedPaymentId/relatedExpenseId - מזהה מדויק לרשומה הקשורה
+  // (OrderPayment.id / מסמך expenses), כדי ש"ביטול" (ClientDrawer.tsx)
+  // ימצא ויסיר בדיוק את הדבר הנכון - לא רלוונטי לרשומות "ביטול הזמנה"
+  // (amount חיובי, לא ניתנות לביטול מהיומן הזה בכלל).
   export interface CreditHistoryEntry {
     amount: number;
     reason: string;
+    relatedPaymentId?: string;
+    relatedExpenseId?: string;
     relatedOrderId?: string;
     date: string;
   }

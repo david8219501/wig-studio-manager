@@ -42,4 +42,49 @@
 
 ## משימה 2: כפתור ביטול (X) בהיסטוריית יתרת זכות
 
-טרם בוצע - ממשיך מיד (חלק א': תשתית ids, חלק ב': כפתור+ביטול בפועל).
+### חלק א': תשתית ids ✅ הושלמה
+
+**`types/index.ts`:** `OrderPayment` קיבל `id: string` (חובה, לא
+אופציונלי) - נוצר מעתה בכל תשלום חדש, **כל method** (לא רק
+`credit_balance`). `CreditHistoryEntry` קיבל `relatedPaymentId?`/
+`relatedExpenseId?` חדשים.
+
+**כל 4 המקומות שיוצרים `OrderPayment` ישירות עודכנו** עם
+`crypto.randomUUID()` (זוהו ע"י שגיאות ה-build עצמן - דרך אמינה
+למצוא את כולם, לא grep ידני): `NewOrderWizard.tsx` (payment הניצול
+האוטומטי), `OrderDetailsPanel.tsx` פעמיים (`handleAddPayment` -
+תשלום ידני חדש; `handleSaveEditPayment` - **שומר את ה-id המקורי
+של התשלום הנערך, לא מייצר חדש**, כדי שרשומות creditHistory קיימות
+שמצביעות עליו לא "יתייתמו"), `QuickRetailSaleModal.tsx` ו-
+`SellShowroomStockModal.tsx` (מכירות מיידיות - לא קשור ליתרת זכות,
+אבל גם הן צריכות `id` כדי לעמוד בטיפוס המורחב).
+
+**קישור ה-id בפועל בכל מקום שיוצר creditHistory מקושר:**
+- `NewOrderWizard.tsx` - `relatedPaymentId` = ה-id של payment
+  הניצול האוטומטי.
+- `OrderDetailsPanel.tsx` (`handleAddPayment`) - `relatedPaymentId`
+  = ה-id של התשלום הידני שנוצר (מחלק 1 קודם היום).
+- `ClientDrawer.tsx` (`handleConfirmRefund`) - **סדר הפעולות הוחלף**:
+  יוצר את מסמך ה-`expense` **קודם** (לא אחרי), כדי שה-id שלו יהיה
+  זמין ל-`relatedExpenseId` ברשומת ה-creditHistory שנכתבת אחריו.
+
+**`handleCancelOrder` (`OrderDetailsPanel.tsx`) - נבדק, לא שונה
+בכוונה:** הקרדיט שם נגזר מ-`order.paidAmount` המצטבר (יכול לכלול
+כמה תשלומים), לא תשלום בודד - אין `id` יחיד רלוונטי לקשר. הרשומה
+כבר מקושרת ל-`relatedOrderId` (מספיק), וזו בדיוק אחת מרשומות
+"ביטול הזמנה" שהוחרגו במפורש מכפתור הביטול (ראו חלק ב' - amount
+חיובי, לא רלוונטי לפיצ'ר הזה).
+
+**קבצים:** `src/types/index.ts`, `src/components/orders/NewOrderWizard.tsx`,
+`src/components/orders/OrderDetailsPanel.tsx`,
+`src/components/clients/ClientDrawer.tsx`,
+`src/pages/Inventory/QuickRetailSaleModal.tsx`,
+`src/pages/Inventory/SellShowroomStockModal.tsx`.
+
+**בדיקות:** `npm run build` נקי (זיהה במדויק את כל 4 נקודות היצירה
+של `OrderPayment` שהיו חסרות `id`). `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
+
+### חלק ב': כפתור X + ביטול בפועל
+
+טרם בוצע - ממשיך מיד.

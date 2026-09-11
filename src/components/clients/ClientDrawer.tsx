@@ -167,17 +167,10 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
     setRefundError(null);
     try {
       const nowIso = new Date().toISOString();
-      const creditEntry: CreditHistoryEntry = {
-        amount: -amount,
-        reason: "החזר ללקוחה",
-        date: nowIso,
-      };
-      await updateDoc(doc(db, "clients", client.id), {
-        creditBalance: increment(-amount),
-        creditHistory: arrayUnion(creditEntry),
-      });
 
-      await addDoc(collection(db, "expenses"), {
+      // נוצרת קודם (לא אחרי) - כדי שה-id שלה יהיה זמין ל-relatedExpenseId
+      // ברשומת creditHistory, ו"ביטול" (עוד מהיום) יוכל למחוק בדיוק אותה.
+      const expenseRef = await addDoc(collection(db, "expenses"), {
         businessId,
         date: nowIso.split("T")[0],
         supplier: client.name,
@@ -186,6 +179,17 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
         amount,
         paymentMethod: "cash",
         status: "paid",
+      });
+
+      const creditEntry: CreditHistoryEntry = {
+        amount: -amount,
+        reason: "החזר ללקוחה",
+        relatedExpenseId: expenseRef.id,
+        date: nowIso,
+      };
+      await updateDoc(doc(db, "clients", client.id), {
+        creditBalance: increment(-amount),
+        creditHistory: arrayUnion(creditEntry),
       });
 
       // מוסיפה את הקטגוריה לרשימה המנוהלת בהגדרות אם היא עדיין לא שם -
