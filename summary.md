@@ -215,3 +215,26 @@ build, lint, commit או שינוי קובץ כלשהו כחלק מהבדיקה 
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## שלב 2: Sales.tsx ✅ הושלמה
+
+נוסף `isActiveOrder` לייבוא הקיים מ-`orderProfit.ts` (אותה שורה
+כמו `calculateOrderProfit`). נוצר `activeFilteredOrders =
+filteredOrders.filter(isActiveOrder)` - מערך נפרד, **רק** לחישובי
+4 כרטיסי הסיכום הפיננסיים (`totalRevenue`, `totalPaid`, `openDebt`,
+`totalProfit`), שהוחלפו מ-`filteredOrders` ל-`activeFilteredOrders`.
+
+**טבלת ההזמנות עצמה** (`filteredOrders`, ה-`.map` בטבלה) **לא
+שונתה** - ממשיכה להציג את כל ההזמנות כולל מבוטלות, עם הסטטוס שלהן,
+כמבוקש במפורש.
+
+**2 ה-InfoTooltip הקיימים** (על "יתרת חובות פתוחים" ו-"רווח בפועל
+(משוער)") עודכנו - הוסר "כולל הזמנות שבוטלו, אלא אם סיננת אותן
+במפורש" (כבר לא נכון), הוחלף ב-"הזמנות שבוטלו מוחרגות תמיד מהסכום"
+(בהתאמה). שני הכרטיסים האחרים ("סה"כ מחזור הזמנות"/"שולם בפועל")
+לא היה להם tooltip מלכתחילה - לא נוסף (מחוץ לתחום הבקשה).
+
+**קבצים:** `src/pages/Sales/Sales.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.

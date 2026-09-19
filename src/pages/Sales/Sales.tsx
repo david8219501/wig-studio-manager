@@ -5,7 +5,7 @@ import type { UsedBulkItem, UsedHairItem, OrderPayment } from "../../types";
 import { isUnsoldShowroomStock, type ShowroomBuildStatus, type ShowroomSpecs } from "../../utils/orderCreation";
 import AssignHairModal from "../../components/orders/AssignHairModal";
 import OrderDetailsPanel from "../../components/orders/OrderDetailsPanel";
-import { calculateOrderProfit } from "../../utils/orderProfit";
+import { calculateOrderProfit, isActiveOrder } from "../../utils/orderProfit";
 import DateInput from "../../components/common/DateInput";
 import CustomSelect from "../../components/common/CustomSelect";
 import { OTHER_STATUS, KNOWN_STATUSES, STATUS_SELECT_OPTIONS } from "../../utils/orderStatus";
@@ -140,10 +140,14 @@ export default function Sales() {
   // מחרוזת YYYY-MM-DD, אז השוואת מחרוזות פשוטה שומרת על סדר כרונולוגי נכון)
   filteredOrders.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
-  const totalRevenue = filteredOrders.reduce((sum, ord) => sum + (ord.totalPrice || 0), 0);
-  const totalPaid = filteredOrders.reduce((sum, ord) => sum + (ord.paidAmount || 0), 0);
+  // כרטיסי הסיכום הפיננסיים (למעלה) מחריגים הזמנות מבוטלות - "הזמנה
+  // מבוטלת לא קיימת בשום חישוב". טבלת ההזמנות עצמה (filteredOrders,
+  // למטה) ממשיכה להציג הכל כולל מבוטלות, כרגיל.
+  const activeFilteredOrders = filteredOrders.filter(isActiveOrder);
+  const totalRevenue = activeFilteredOrders.reduce((sum, ord) => sum + (ord.totalPrice || 0), 0);
+  const totalPaid = activeFilteredOrders.reduce((sum, ord) => sum + (ord.paidAmount || 0), 0);
   const openDebt = totalRevenue - totalPaid;
-  const totalProfit = filteredOrders.reduce((sum, ord) => sum + calculateOrderProfit(ord), 0);
+  const totalProfit = activeFilteredOrders.reduce((sum, ord) => sum + calculateOrderProfit(ord), 0);
   const assigningOrder = orders.find((ord) => ord.id === assigningOrderId) || null;
   const selectedOrder = orders.find((ord) => ord.id === selectedOrderId) || null;
 
@@ -168,14 +172,14 @@ export default function Sales() {
         <div className="fin-card text-danger">
           <span className="fin-title">
             יתרת חובות פתוחים
-            <InfoTooltip text="סכום totalPrice פחות paidAmount על כל ההזמנות המוצגות כרגע (לפי הסינון הפעיל בטבלה) - כולל הזמנות שבוטלו, אלא אם סיננת אותן במפורש." />
+            <InfoTooltip text="סכום totalPrice פחות paidAmount על כל ההזמנות המוצגות כרגע (לפי הסינון הפעיל בטבלה) - הזמנות שבוטלו מוחרגות תמיד מהסכום." />
           </span>
           <span className="fin-value mono">₪{openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-profit">
           <span className="fin-title">
             רווח בפועל (משוער)
-            <InfoTooltip text="סכום רווח תפעולי (מכירה פחות עלות ייצור בפועל) על כל ההזמנות המוצגות כרגע - כולל הזמנות שבוטלו, אלא אם סיננת אותן במפורש. לא מחסיר הוצאות תפעול כלליות של העסק." />
+            <InfoTooltip text="סכום רווח תפעולי (מכירה פחות עלות ייצור בפועל) על כל ההזמנות המוצגות כרגע - הזמנות שבוטלו מוחרגות תמיד. לא מחסיר הוצאות תפעול כלליות של העסק." />
           </span>
           <span className="fin-value mono">₪{totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
