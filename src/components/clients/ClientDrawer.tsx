@@ -4,6 +4,7 @@ import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
 import type { Order } from "../../pages/Sales/Sales";
 import type { CreditHistoryEntry } from "../../types";
+import { isActiveOrder } from "../../utils/orderProfit";
 import { formatDateIL } from "../../utils/formatDate";
 import { REFUND_EXPENSE_CATEGORY } from "../../utils/businessSettings";
 import NewOrderWizard, { type ClientOption } from "../orders/NewOrderWizard";
@@ -128,8 +129,12 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
 
   if (!isOpen || !client) return null;
 
-  const totalPrice = clientOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-  const totalPaid = clientOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+  // כרטיסי הסיכום בטאב "תשלומים וחובות" מחריגים הזמנות מבוטלות - "הזמנה
+  // מבוטלת לא קיימת בשום חישוב". שתי הטבלאות הגולמיות (היסטוריית הזמנות/
+  // פירוט לפי הזמנה, שתיהן נגזרות מ-clientOrders עצמו) ממשיכות להציג הכל.
+  const activeClientOrders = clientOrders.filter(isActiveOrder);
+  const totalPrice = activeClientOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+  const totalPaid = activeClientOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
 
   // נגזרים חי מ-clientOrders (לא state של האובייקט עצמו) - כדי שהפאנל/המודל
   // תמיד יראו עדכון מיידי (למשל אחרי הוספת תשלום), אותו דפוס כמו ב-Sales.tsx.

@@ -238,3 +238,34 @@ filteredOrders.filter(isActiveOrder)` - מערך נפרד, **רק** לחישוב
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## שלב 3: ClientDrawer.tsx ✅ הושלמה
+
+נוסף `isActiveOrder` (ייבוא חדש מ-`orderProfit.ts`). נוצר
+`activeClientOrders = clientOrders.filter(isActiveOrder)`, ו-
+`totalPrice`/`totalPaid` (המזינים את 3 כרטיסי הסיכום בטאב "תשלומים
+וחובות" - "סה"כ חויב"/"סה"כ שולם"/"סה"כ חוב פתוח") חושבו ממנו במקום
+מ-`clientOrders` הגולמי.
+
+**שתי הטבלאות הגולמיות לא שונו** - נשארו על `clientOrders` המקורי,
+ללא סינון: "היסטוריית הזמנות" (טאב 1) ו-"פירוט לפי הזמנה" (טבלה
+בתחתית טאב 2) ממשיכות להציג את כל ההזמנות כולל מבוטלות, כמבוקש
+במפורש. יתרת הזכות (`liveCreditBalance`/`liveCreditHistory`) לא
+מושפעת - היא כבר מקור נתונים נפרד (`onSnapshot` על מסמך הלקוח עצמו,
+לא נגזרת מ-`clientOrders`).
+
+**קבצים:** `src/components/clients/ClientDrawer.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
+
+---
+
+## סיכום: השלמת כלל "הזמנה מבוטלת לא קיימת בשום חישוב"
+
+3 השלבים הושלמו: helper משותף (`isActiveOrder`/`CANCELLED_STATUS`
+ב-`orderProfit.ts`, מחליף 3 הגדרות מקומיות כפולות) → `Sales.tsx`
+(4 כרטיסי סיכום + 2 tooltips מעודכנים) → `ClientDrawer.tsx` (3
+כרטיסי סיכום בטאב תשלומים). בשני הקבצים - הטבלאות הגולמיות (רשימת
+ההזמנות עצמה) נשארו ללא שינוי, ממשיכות להציג גם מבוטלות. כל שלב עם
+build+lint נפרד, commit+push נפרד.
