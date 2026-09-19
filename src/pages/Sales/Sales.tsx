@@ -172,7 +172,7 @@ export default function Sales() {
         <div className="fin-card text-danger">
           <span className="fin-title">
             יתרת חובות פתוחים
-            <InfoTooltip text="סכום totalPrice פחות paidAmount על כל ההזמנות המוצגות כרגע (לפי הסינון הפעיל בטבלה) - הזמנות שבוטלו מוחרגות תמיד מהסכום." />
+            <InfoTooltip text="סכום ההפרש בין המחיר הכולל למה שכבר שולם, על כל ההזמנות המוצגות כרגע (לפי הסינון הפעיל בטבלה) - הזמנות שבוטלו מוחרגות תמיד מהסכום." />
           </span>
           <span className="fin-value mono">₪{openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>

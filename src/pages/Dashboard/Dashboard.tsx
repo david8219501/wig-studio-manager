@@ -317,7 +317,7 @@ export default function Dashboard() {
           <div className="kpi-content">
             <span className="kpi-label">
               חובות פתוחים
-              <InfoTooltip text="סכום totalPrice פחות paidAmount על כל ההזמנות עם יתרה לתשלום - כולל הזמנות שבוטלו (לא מוחרגות כאן, בשונה מ'חובות פתוחים לפי ותק' בדף הדוחות)." />
+              <InfoTooltip text="סכום ההפרש בין מה שגבית למחיר הכולל, על כל ההזמנות שיש להן יתרה לתשלום - כולל הזמנות שבוטלו (לא מוחרגות כאן, בשונה מ'חובות פתוחים לפי ותק' בדף הדוחות)." />
             </span>
             <span className="kpi-value">₪{stats.openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             <span className="kpi-trend trend-neutral">{stats.debtOrders.length} הזמנות עם יתרה לתשלום</span>
@@ -431,7 +431,7 @@ export default function Dashboard() {
           <div className="dash-card">
             <h2 className="dash-card-title">
               📊 התפלגות סוגי עבודה
-              <InfoTooltip text="אחוז מתוך סך ההכנסה הגולמית (totalPrice) של כל סוגי העבודה - לפי הכנסה, לא לפי רווח, ולא מוחרג הזמנות שבוטלו." />
+              <InfoTooltip text="אחוז מתוך סך ההכנסה הגולמית של כל סוגי העבודה - לפי הכנסה, לא לפי רווח, וללא הרחקה של הזמנות שבוטלו." />
             </h2>
             {stats.servicesBreakdown.length === 0 ? (
               <p className="text-muted">אין עדיין נתונים להצגה.</p>
