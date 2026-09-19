@@ -6,7 +6,7 @@ import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/fire
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import { isUnsoldShowroomStock } from "../../utils/orderCreation";
-import { calculateOrderProfit } from "../../utils/orderProfit";
+import { calculateOrderProfit, CANCELLED_STATUS } from "../../utils/orderProfit";
 import { isInventoryExpenseCategory } from "../../utils/businessSettings";
 import type { BulkItem } from "../../types";
 import { formatDateIL, getMonthNameIL } from "../../utils/formatDate";
@@ -29,7 +29,6 @@ interface ExpenseRow {
 // הזמנות "בוטלה" (OrderDetailsPanel.tsx - ביטול הזמנה) מוחרגות מ"רווח
 // החודש" - אותו סטטוס קבוע, לא מיובא כי הוא local const לא-מיוצא שם
 // (עקבי עם המוסכמה הקיימת של קבועים מקומיים קטנים - ראו Reports.tsx).
-const CANCELLED_STATUS = "בוטלה";
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   new: "חדשה",

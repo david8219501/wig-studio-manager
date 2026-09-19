@@ -5,15 +5,11 @@ import type { BulkItem, CreditHistoryEntry, HairItem, OrderPayment, UsedBulkItem
 import type { Order } from "../../pages/Sales/Sales";
 import { formatDateIL } from "../../utils/formatDate";
 import { OTHER_STATUS, KNOWN_STATUSES, STATUS_SELECT_OPTIONS } from "../../utils/orderStatus";
+import { CANCELLED_STATUS } from "../../utils/orderProfit";
 import DateInput from "../common/DateInput";
 import CustomSelect from "../common/CustomSelect";
 import ConfirmDialog from "../common/ConfirmDialog";
 import "./OrderDetailsPanel.css";
-
-// סטטוס ייעודי לביטול הזמנה - לא נמחקת, נשארת בהיסטוריה מסומנת ככה.
-// לא ב-KNOWN_STATUSES של Sales.tsx בכוונה - אין לזה select ידני, רק
-// דרך כפתור "ביטול הזמנה" הייעודי כאן.
-const CANCELLED_STATUS = "בוטלה";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
   new: "חדשה",

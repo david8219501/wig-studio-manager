@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Order } from "../Sales/Sales";
 import { isUnsoldShowroomStock } from "../../utils/orderCreation";
-import { calculateOrderProfit } from "../../utils/orderProfit";
+import { calculateOrderProfit, CANCELLED_STATUS } from "../../utils/orderProfit";
 import type { BulkItem, HairItem } from "../../types";
 import { getMonthNameIL } from "../../utils/formatDate";
 import InfoTooltip from "../../components/common/InfoTooltip";
@@ -20,7 +20,6 @@ const PROFIT_TYPE_COLORS = ["#9b69ff", "#3b82f6", "#f59e0b", "#10b981"];
 // הזמנות "בוטלה" (OrderDetailsPanel.tsx - ביטול הזמנה) מוחרגות מכל
 // חישובי הרווח/החוב בדף הזה - אותו סטטוס קבוע, לא מיובא כי הוא local
 // const לא-מיוצא שם (עקבי עם המוסכמה הקיימת של קבועים מקומיים קטנים).
-const CANCELLED_STATUS = "בוטלה";
 
 // קבוצה 2: סף "מלאי מת" בימים - קבוע בקוד לפי דרישה מפורשת, לא נשלף
 // מ-businessSettings.

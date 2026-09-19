@@ -32,3 +32,15 @@ export function calculateOrderProductionCost(order: ProductionCostOrder): number
 export function calculateOrderProfit(order: ProfitableOrder): number {
   return order.totalPrice - calculateOrderProductionCost(order);
 }
+
+// סטטוס הזמנה מבוטלת - קבוע יחיד, מיוצא כדי שכל חישוב פיננסי
+// (חובות, רווח, סה"כ הכנסות וכו') יחריג הזמנות מבוטלות באופן עקבי.
+export const CANCELLED_STATUS = "בוטלה";
+
+export interface StatusOrder {
+  status: string;
+}
+
+export function isActiveOrder(order: StatusOrder): boolean {
+  return order.status !== CANCELLED_STATUS;
+}

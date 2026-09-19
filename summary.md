@@ -142,3 +142,76 @@ spread מותנה (`...(x ? {relatedOrderId: x} : {})`), אותו דפוס בד�
 עם הגנת undefined קריטית שנתפסה לפני שהגיעה לפרודקשן. כל חלק עם
 build+lint נפרד (Task 1: commit משותף לשני חלקיו - הדוקים מדי
 לפצל; Task 2: commit נפרד לכל חלק).
+
+---
+
+# בדיקת מצב מקיפה - כל 16 הפריטים (בדיקה בלבד, ללא שינויי קוד)
+
+**תאריך הבדיקה:** 2026-09-14. בוצעה לפי דרישה מפורשת של המשתמש
+"לא לתקן שום דבר, רק לבדוק בקוד הנוכחי (grep/read בפועל, לא
+זיכרון/summary.md)". כל הממצאים למטה מגיעים מ-`grep`/`Read` בפועל
+על הקוד החי בזמן הבדיקה - לא משוחזרים מ-summary.md הקיים. לא בוצע
+build, lint, commit או שינוי קובץ כלשהו כחלק מהבדיקה הזו.
+
+## מערכת יתרת זכות ללקוחה - כל השלבים
+
+| # | פריט | סטטוס | פירוט |
+|---|------|-------|-------|
+| 1 | `Client.creditBalance`/`creditHistory` + `CreditHistoryEntry` | ✅ קיים ועובד | `Clients.tsx`: `creditBalance?: number`, `creditHistory?: CreditHistoryEntry[]`. הטיפוס `CreditHistoryEntry` ב-`types/index.ts` עם `amount`, `reason`, `relatedPaymentId?`, `relatedExpenseId?`, `relatedOrderId?`, `date` |
+| 2 | `handleCancelOrder` יוצר קרדיט אוטומטי (כולל שוברוקה) | ✅ קיים ועובד | `OrderDetailsPanel.tsx`: `order.paidAmount > 0 && order.clientId` → `increment`+`arrayUnion`, גם בענף מלאי-שוברוקה |
+| 3 | `ClientDrawer.tsx` - מאזין חי + כרטיס קרדיט + כפתור החזר | ✅ קיים ועובד | `onSnapshot` עצמאי (`liveCreditBalance`/`liveCreditHistory`), `handleConfirmRefund`, כפתור "💸 ביצוע החזר ללקוחה", `max={liveCreditBalance}` |
+| 4 | `NewOrderWizard.tsx` - באנר/צ'קבוקס/ניצול | ✅ קיים ועובד | `useCreditBalance` state, `creditToApply = Math.min(...)`, `increment(-creditToApply)`, באנר עם צ'קבוקס |
+| 5 | החזר יוצר הוצאה בקטגוריית "החזרים ללקוחות" | ✅ קיים ועובד | `REFUND_EXPENSE_CATEGORY = "החזרים ללקוחות"` ב-`businessSettings.ts`, `addDoc` ל-`expenses` ב-`ClientDrawer.tsx`, כלול ב-`DEFAULT_EXPENSE_CATEGORIES` ומחריג מ-`isInventoryExpenseCategory` |
+| 6 | תשלום `credit_balance` ידני בהזמנה קיימת + וולידציה | ✅ קיים ועובד | `OrderDetailsPanel.tsx`: מאזין `clientCreditBalance`, `<option value="credit_balance">` מוגן ב-`order.clientId && clientCreditBalance > 0`, וולידציה מול היתרה החיה |
+| 7 | מחיקת תשלום `credit_balance` משחזרת את היתרה | ✅ קיים ועובד | `handleConfirmDeletePayment`: בדיקה `removedPayment?.method === "credit_balance"` → `increment(+amount)` + `arrayUnion` חיובי; תשלומים רגילים ללא שינוי |
+| 8 | `OrderPayment.id` קיים ומיוצר לכל תשלום חדש | ✅ קיים ועובד | `id: string` (חובה) בטיפוס; מיוצר ב-4 נקודות היצירה (`NewOrderWizard`, `OrderDetailsPanel` פעמיים, `QuickRetailSaleModal`, `SellShowroomStockModal`) |
+| 9 | `relatedPaymentId`/`relatedExpenseId` קיימים ומאוכלסים | ✅ קיים ועובד | קיימים בטיפוס, מקושרים בפועל ב-`NewOrderWizard`, `OrderDetailsPanel.handleAddPayment`, `ClientDrawer.handleConfirmRefund` |
+| 10 | כפתור X + `ConfirmDialog` + ביטול אמיתי בהיסטוריה | ✅ קיים ועובד | `handleConfirmUndoCreditEntry` ב-`ClientDrawer.tsx`: מוחק expense (`relatedExpenseId`) או מסיר תשלום מההזמנה (`relatedPaymentId`+`relatedOrderId` מ-`clientOrders` החי), מוסיף רשומה חיובית חדשה. תיקון ה-`undefined` (spread מותנה `...(x ? {relatedOrderId: x} : {})`) מאושר בקוד החי |
+
+## כלל "הזמנה מבוטלת לא קיימת בשום חישוב"
+
+| # | פריט | סטטוס | פירוט |
+|---|------|-------|-------|
+| 11 | כלל אחיד `isActiveOrder`/`CANCELLED_STATUS` | ⚠️ חלקי | **אין helper משותף** - `CANCELLED_STATUS = "בוטלה"` מוגדר מקומית ונפרד ב-3 קבצים (`Dashboard.tsx`, `OrderDetailsPanel.tsx`, `Reports.tsx`) ומשמש שם באופן עקבי. אבל **`Sales.tsx` ו-`ClientDrawer.tsx` - אין אף אזכור של "בוטלה"/CANCELLED** - החישובים הפיננסיים שם (למשל "יתרת חובות פתוחים"/"רווח בפועל" ב-Sales) **לא מחריגים הזמנות מבוטלות בכלל**. מאושר במפורש בתוכן ה-tooltips עצמם (Sales.tsx: "כולל הזמנות שבוטלו, אלא אם סיננת אותן במפורש") |
+
+## נוסחת בלאי + סגירת קוקו
+
+| # | פריט | סטטוס | פירוט |
+|---|------|-------|-------|
+| 12 | נוסחת `netGrams / 0.7` ב-`hairCost.ts` | ✅ קיים ועובד | `purchasedGrams = netGrams / 0.7; waste = purchasedGrams - netGrams;` |
+| 13 | כפתורי "סגירת קוקו"/"ביטול סגירה" ב-`HairItemDetailsPanel.tsx` | ✅ קיים ועובד | שני מצבים סותרים לפי `item.wasteReconciledAt`: "🔒 סגירת קוקו" / "↩ ביטול סגירה" |
+| 14 | קיזוז מיזוג לקופסאות שאריות בחישוב הבלאי | ✅ קיים ועובד | `Inventory.tsx` `closingSummary`: `totalMergedToRemnantBoxes` מחושב מ-`remnantMergeLog` על כל `isRemnantBox`, מקוזז: `waste = initialWeight - totalGramsUsed - totalMergedToRemnantBoxes` |
+
+## InfoTooltip + נוסחת רווח דשבורד
+
+| # | פריט | סטטוס | פירוט |
+|---|------|-------|-------|
+| 15 | `InfoTooltip` קיים ומשמש ב-5+ מקומות | ✅ קיים ועובד | `InfoTooltip.tsx`/`.css` קיימים, בשימוש ב-8 מקומות: Dashboard.tsx (×3), Reports.tsx (×3), Sales.tsx (×2) |
+| 16 | נוסחת "רווח החודש" מתוקנת בדשבורד | ✅ קיים ועובד | `monthlyOperationalProfit`: `calculateOrderProfit` על הזמנות עם `o.status !== CANCELLED_STATUS`, מינוס הוצאות מסוננות ב-`!isInventoryExpenseCategory(e.category)` |
+
+**סיכום:** 15/16 ✅ מלא, 1/16 ⚠️ חלקי (סעיף 11). לא בוצע שום שינוי
+קוד, build או commit כחלק מהבדיקה הזו.
+
+---
+
+# השלמת הכלל "הזמנה מבוטלת לא קיימת בשום חישוב" (המשך לסעיף 11 בבדיקה)
+
+## שלב 1: helper משותף ✅ הושלמה
+
+נוסף ל-`src/utils/orderProfit.ts` (כבר מיובא ורלוונטי - "מקור אמת
+יחיד" לחישובי רווח): `export const CANCELLED_STATUS = "בוטלה";`
+ו-`export function isActiveOrder(order: StatusOrder): boolean` (כולל
+`interface StatusOrder { status: string }` מינימלי - לא תלוי בטיפוס
+הזמנה ספציפי של אף קובץ קורא).
+
+**3 ההגדרות המקומיות הוסרו** והוחלפו בייבוא מהמקור המשותף:
+`Dashboard.tsx`, `Reports.tsx` (שניהם כבר ייבאו `calculateOrderProfit`
+מאותו קובץ - נוסף `CANCELLED_STATUS` לאותה שורת import קיימת),
+`OrderDetailsPanel.tsx` (נוסף import חדש; גם הוסרה ההערה שהסבירה
+את הקבוע - כבר לא רלוונטית, ההגדרה המרכזית באחריות `orderProfit.ts`).
+
+**קבצים:** `src/utils/orderProfit.ts`, `src/pages/Dashboard/Dashboard.tsx`,
+`src/pages/Reports/Reports.tsx`, `src/components/orders/OrderDetailsPanel.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
