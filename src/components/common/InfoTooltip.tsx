@@ -5,6 +5,7 @@
 // אלה נדרשו למיקום פופ-אפ מורכב מול תפריטי דפדפן/OS; זו רק בועית טקסט
 // סטטית שממוקמת יחסית לאייקון עצמו, בלי בעיית מיקום דומה.
 import { useState } from "react";
+import { Info } from "lucide-react";
 import "./InfoTooltip.css";
 
 interface InfoTooltipProps {
@@ -29,7 +30,7 @@ export default function InfoTooltip({ text }: InfoTooltipProps) {
         }}
         aria-label="הסבר"
       >
-        ⓘ
+        <Info size={16} strokeWidth={2} />
       </button>
       {isOpen && <span className="info-tooltip-bubble" role="tooltip">{text}</span>}
     </span>

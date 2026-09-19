@@ -298,3 +298,29 @@ build+lint נפרד, commit+push נפרד.
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## חלק ג': שיפור עיצובי לאייקון InfoTooltip ✅ הושלמה
+
+**אייקון:** תו היוניקוד `ⓘ` הוחלף ב-`<Info size={16} strokeWidth={2} />`
+מ-`lucide-react` (כבר תלות קיימת בפרויקט, בשימוש בקבצים אחרים כמו
+`CustomSelect.tsx` - לא נוסף import חדש לחבילה, רק import סמל נוסף
+ממנה). כפתור העטיפה גדל מ-16px ל-20px (padding 2px סביב ה-SVG בן
+16px) לאזור לחיצה נוח יותר.
+
+**צבעים:** ללא שינוי בפועל - `--color-text-muted` (ברירת מחדל) →
+`--color-accent` בהובר כבר היה קיים ב-CSS, ועובד אוטומטית גם על ה-
+SVG (lucide יורש `currentColor`).
+
+**הבועית:** רקע הוחלף מ-`var(--color-primary)` (כהה) ל-
+`var(--color-surface)` (לבן), טקסט מ-`var(--color-on-primary)` ל-
+`var(--color-text)` (כהה על לבן), נוסף `border: 1px solid
+var(--color-border)` (הפרדה עדינה מהרקע, נחוץ עכשיו כשהרקע לבן ולא
+בולט מאליו), `box-shadow`/`border-radius` נשארו (`--shadow-elevated`/
+`--radius-md` - כבר תואמים את הדרישה). ריווח פנימי הוגדל מ-`8px 12px`
+ל-`12px 14px`, `line-height` מ-1.5 ל-1.6, לקריאות נוחה יותר.
+
+**קבצים:** `src/components/common/InfoTooltip.tsx`,
+`src/components/common/InfoTooltip.css`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.

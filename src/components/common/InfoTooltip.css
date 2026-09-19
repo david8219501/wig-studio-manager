@@ -16,14 +16,13 @@
   border: none;
   cursor: pointer;
   color: var(--color-text-muted);
-  font-size: 13px;
   line-height: 1;
-  padding: 0;
+  padding: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   transition: color var(--duration-fast) var(--easing), background var(--duration-fast) var(--easing);
 }
@@ -41,12 +40,13 @@
   top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
   font-size: 12px;
   font-weight: 500;
-  line-height: 1.5;
-  padding: 8px 12px;
+  line-height: 1.6;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-elevated);
   width: 220px;
