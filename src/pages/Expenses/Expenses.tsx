@@ -148,6 +148,10 @@ export default function Expenses() {
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSupplier || !newAmount) return;
+    if (Number(newAmount) <= 0) {
+      setSaveError("יש להזין סכום גדול מאפס.");
+      return;
+    }
 
     const businessId = auth.currentUser?.uid;
     if (!businessId) return;
@@ -193,6 +197,10 @@ export default function Expenses() {
       return;
     }
     const value = Number(editingAmountValue);
+    if (value <= 0) {
+      alert("יש להזין סכום גדול מאפס.");
+      return;
+    }
     setEditingAmountId(null);
     try {
       await updateDoc(doc(db, "expenses", id), { amount: value });
@@ -348,6 +356,7 @@ export default function Expenses() {
                     {editingAmountId === e.id ? (
                       <input
                         type="number"
+                        min="0.01"
                         autoFocus
                         className="amount-edit-input"
                         value={editingAmountValue}
@@ -425,6 +434,7 @@ export default function Expenses() {
                 <input
                   type="number"
                   required
+                  min="0.01"
                   placeholder="0"
                   value={newAmount}
                   onChange={(e) => setNewAmount(e.target.value === "" ? "" : Number(e.target.value))}
