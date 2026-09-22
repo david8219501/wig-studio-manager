@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { collection, addDoc, updateDoc, doc, getDoc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import type { Client } from "../../pages/Clients/Clients";
+import { isValidIsraeliPhone } from "../../utils/phoneValidation";
 import "./AddClientModal.css";
 
 interface AddClientModalProps {
@@ -83,7 +84,16 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
     const newErrors: Partial<FormData> = {};
     if (!form.firstName.trim()) newErrors.firstName = "שם פרטי הוא שדה חובה";
     if (!form.lastName.trim()) newErrors.lastName = "שם משפחה הוא שדה חובה";
-    if (!form.phone.trim()) newErrors.phone = "טלפון הוא שדה חובה";
+    if (!form.phone.trim()) {
+      newErrors.phone = "טלפון הוא שדה חובה";
+    } else if (
+      // וולידציית פורמט - רק על מספר חדש/שהשתנה. עריכת לקוחה קיימת בלי
+      // לגעת בטלפון (פורמט ישן/חריג שכבר נשמר) לא נחסמת בלי סיבה.
+      (!isEditMode || form.phone.trim() !== (editingClient?.phone || "").trim()) &&
+      !isValidIsraeliPhone(form.phone.trim())
+    ) {
+      newErrors.phone = "מספר טלפון לא תקין";
+    }
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       newErrors.email = "כתובת אימייל לא תקינה";
     }

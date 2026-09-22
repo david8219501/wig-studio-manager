@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { isValidIsraeliPhone } from "../../utils/phoneValidation";
 import "./Login.css";
 
 export interface RegisterData {
@@ -50,6 +51,11 @@ export default function Login({
 
     if (isRegistering && password !== confirmPassword) {
       setLocalError("הסיסמאות אינן תואמות");
+      return;
+    }
+
+    if (isRegistering && !isValidIsraeliPhone(phone)) {
+      setLocalError("מספר טלפון לא תקין.");
       return;
     }
 

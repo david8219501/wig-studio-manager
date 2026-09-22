@@ -285,3 +285,37 @@ type="number">` הרלוונטיים קיבלו `min="0.01"` כהגנה כפול
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## תיקון #3: וולידציית פורמט טלפון ✅ הושלמה
+
+נוצר `src/utils/phoneValidation.ts` - `isValidIsraeliPhone(phone)`
+משותף (מקור regex אחד, לא משוכפל): `/^(0\d{8,9}|\+972\d{8,9})$/`
+אחרי הסרת רווחים/מקפים (`replace(/[\s-]/g, "")`). 9-10 ספרות, מתחיל
+ב-0 (מקומי) או `+972` (בינלאומי).
+
+**`Login.tsx`** (הרשמה): נוספה בדיקה ב-`handleSubmit`, **רק כש-
+`isRegistering`** (התחברות רגילה לא דורשת טלפון בכלל): `if
+(isRegistering && !isValidIsraeliPhone(phone)) { setLocalError(...);
+return; }`.
+
+**`AddClientModal.tsx`** (הוספת/עריכת לקוחה): נוספה בדיקת פורמט
+ב-`validate()`, **רק אם** `!isEditMode || form.phone.trim() !==
+(editingClient?.phone || "").trim()` - כלומר לקוחה חדשה, או שהטלפון
+בפועל שונה מהערך המקורי שנטען. **עריכת לקוחה קיימת בלי לגעת בשדה
+הטלפון (פורמט ישן/חריג שכבר נשמר) לא נחסמת** - כמבוקש במפורש.
+
+**קבצים:** `src/utils/phoneValidation.ts` (חדש),
+`src/pages/Login/Login.tsx`, `src/components/modals/AddClientModal.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
+
+---
+
+## סיכום כללי (3 התיקונים)
+
+הוצאה בסכום שלילי חסומה (יצירה+עריכה, HTML `min` + בדיקת JS) →
+מחיר ידני שלילי בקטלוג חסום (0 מותר, שלילי לא נשמר) → וולידציית
+פורמט טלפון ישראלי משותפת (`isValidIsraeliPhone`) בהרשמה ובלקוחות,
+בלי לחסום עריכת לקוחות קיימות עם פורמט ישן. כל תיקון עם build+lint
+נפרד, commit+push נפרד.
