@@ -490,11 +490,16 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                       <td>
                         <input
                           type="number"
+                          min="0"
                           className="calc-input catalog-price-input"
                           value={price}
-                          onChange={(e) =>
-                            setManualPrices((prev) => ({ ...prev, [row.length]: Number(e.target.value) || 0 }))
-                          }
+                          onChange={(e) => {
+                            const newValue = Number(e.target.value) || 0;
+                            // 0 מותר בכוונה (למשל שורה "בחינם") - רק שלילי חסום,
+                            // לא נשמר בכלל (הערך הקודם נשאר).
+                            if (newValue < 0) return;
+                            setManualPrices((prev) => ({ ...prev, [row.length]: newValue }));
+                          }}
                         />
                       </td>
                       <td className="mono text-success">₪{profit.toLocaleString("he-IL")}</td>
