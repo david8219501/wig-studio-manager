@@ -79,6 +79,19 @@
     margin: 0;
   }
 
+  .drawer-contact-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .drawer-contact-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
   /* קישור האימייל בהדר */
   .drawer-email-link {
     color: var(--color-accent);

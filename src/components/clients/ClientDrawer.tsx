@@ -13,6 +13,7 @@ import SellShowroomStockModal from "../../pages/Inventory/SellShowroomStockModal
 import OrderDetailsPanel from "../orders/OrderDetailsPanel";
 import AssignHairModal from "../orders/AssignHairModal";
 import ConfirmDialog from "../common/ConfirmDialog";
+import CopyButton from "../common/CopyButton";
 import "./ClientDrawer.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -306,10 +307,13 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
             </div>
             <div className="client-details">
               <h2>{client.name}</h2>
-              <p className="mono" dir="ltr">
-                {client.phone}{" "}
+              <p className="mono drawer-contact-row" dir="ltr">
+                <span className="drawer-contact-item">
+                  {client.phone}
+                  <CopyButton text={client.phone} title="העתקת טלפון" />
+                </span>
                 {client.email && (
-                  <>
+                  <span className="drawer-contact-item">
                     •{" "}
                     <a
                       href={`mailto:${client.email}`}
@@ -318,7 +322,8 @@ export default function ClientDrawer({ client, isOpen, onClose, onUpdateClient }
                     >
                       {client.email}
                     </a>
-                  </>
+                    <CopyButton text={client.email} title="העתקת אימייל" />
+                  </span>
                 )}
               </p>
             </div>
