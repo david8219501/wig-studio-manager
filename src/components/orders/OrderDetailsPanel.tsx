@@ -9,6 +9,7 @@ import { CANCELLED_STATUS } from "../../utils/orderProfit";
 import DateInput from "../common/DateInput";
 import CustomSelect from "../common/CustomSelect";
 import ConfirmDialog from "../common/ConfirmDialog";
+import CopyButton from "../common/CopyButton";
 import "./OrderDetailsPanel.css";
 
 const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
@@ -18,6 +19,22 @@ const ORDER_STATUS_LABELS: Record<Order["status"], string> = {
   ready: "מוכנה",
   delivered: "נמסרה",
 };
+
+// טקסט מוכן להעתקה - סיכום קצר של ההזמנה + מצב התשלום. שורת "יתרה
+// לתשלום" מוצגת רק כשיש בפועל חוב פתוח, אחרת רק "שולם במלואה".
+function buildOrderSummaryText(order: Order): string {
+  const totalPrice = order.totalPrice || 0;
+  const paidAmount = order.paidAmount || 0;
+  const debt = totalPrice - paidAmount;
+  const lines = [`${order.clientName} - ${order.orderType || "פאה חדשה"} - ₪${totalPrice.toLocaleString()}`];
+  if (debt > 0) {
+    lines.push(`שולם: ₪${paidAmount.toLocaleString()}`);
+    lines.push(`יתרה לתשלום: ₪${debt.toLocaleString()}`);
+  } else {
+    lines.push("שולם במלואה");
+  }
+  return lines.join("\n");
+}
 
 const PAYMENT_METHOD_LABELS: Record<OrderPayment["method"], string> = {
   cash: "💵 מזומן",
@@ -555,7 +572,10 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
 
         <div className="order-details-body">
           <div className="order-details-section">
-            <h3>פרטי הזמנה</h3>
+            <div className="order-details-section-title-row">
+              <h3>פרטי הזמנה</h3>
+              <CopyButton text={buildOrderSummaryText(order)} label="העתק סיכום" />
+            </div>
             <div className="order-details-grid">
               <div className="order-detail-box">
                 <label>סוג עבודה</label>
