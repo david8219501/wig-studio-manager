@@ -188,3 +188,34 @@ where("clientId","==",client.id)))` (אותו דפוס שאילתה בדיוק �
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## תיקון #17: מחיר הזמנה לא יכול להיות 0 או שלילי ✅ הושלמה
+
+**שדה "מחיר ללקוחה" (שלב 4, `NewOrderWizard.tsx`)** קיבל `min="0.01"`
+(HTML). **בדיקת JS מפורשת** נוספה בתחילת `handleFinish`: `if (!price
+|| Number(price) <= 0) { setSaveError("יש להזין מחיר גדול מאפס.");
+return; }` - לפני כל יצירה בפועל, לא רק ה-HTML.
+
+**נבדק שזה לא שובר פאת תצוגה/מוצר קמעונאי:** `handleFinish` (וכל
+הבדיקה החדשה בתוכו) **לא מגיע לפועל בכלל** להזמנת "פאת תצוגה" -
+זו יוצאת מהאשף כבר בשלב 2 (`handleNext`, `effectiveOrderType ===
+"showroom"`) אל `SellShowroomStockModal` (`onOpenSellShowroom` +
+`onClose`), עם לוגיקת מחיר עצמאית משלה - לא עוברת בכלל בשדה "מחיר
+ללקוחה"/`handleFinish` של האשף. "מוצר קמעונאי" נוצר דרך
+`QuickRetailSaleModal.tsx` הנפרד לגמרי - גם הוא לא תלוי ב-`NewOrderWizard.tsx`
+בכלל. שני הקבצים האלה לא נגעו.
+
+**קבצים:** `src/components/orders/NewOrderWizard.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
+
+---
+
+## סיכום כללי (3 התיקונים)
+
+תשלום רגיל שעולה על החוב בפועל נחסם (`debt`, לא רק `credit_balance`)
+→ מחיקת לקוחה עם הזמנות קיימות מציגה אזהרה שנייה מפורשת לפני מחיקה
+→ מחיר הזמנה 0/שלילי חסום ב-`NewOrderWizard` (HTML `min` + בדיקת JS),
+בלי לפגוע בזרימות showroom/retail הנפרדות. כל תיקון עם build+lint
+נפרד, commit+push נפרד.

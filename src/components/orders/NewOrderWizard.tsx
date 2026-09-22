@@ -302,6 +302,14 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
       setSaveError("יש לבחור לקוחה לפני יצירת ההזמנה.");
       return;
     }
+    // הזמנת "פאת תצוגה" (orderType "showroom") לא מגיעה לכאן בכלל - היא
+    // יוצאת מהאשף כבר בשלב 2 (ראו handleNext) אל SellShowroomStockModal,
+    // עם לוגיקת מחיר נפרדת משלה. הבדיקה הזו רלוונטית רק לטופס הרגיל
+    // (פאה חדשה/תיקון/אחר), שבו שדה "מחיר ללקוחה" (שלב 4) הוא המקור היחיד.
+    if (!price || Number(price) <= 0) {
+      setSaveError("יש להזין מחיר גדול מאפס.");
+      return;
+    }
     setSaving(true);
     setSaveError(null);
 
@@ -718,6 +726,7 @@ export default function NewOrderWizard({ isOpen, onClose, onOrderCreated, presel
                   <label>מחיר ללקוחה (₪)</label>
                   <input
                     type="number"
+                    min="0.01"
                     placeholder="0"
                     value={price}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
