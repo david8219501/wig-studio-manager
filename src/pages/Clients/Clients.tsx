@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, deleteDoc, doc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import ClientDrawer from "../../components/clients/ClientDrawer";
 import AddClientModal from "../../components/modals/AddClientModal";
@@ -36,6 +36,10 @@ const Clients: React.FC = () => {
 
   // State עבור אישור מחיקה (ConfirmDialog במקום window.confirm)
   const [deleteConfirmClient, setDeleteConfirmClient] = useState<Client | null>(null);
+  // אישור מחיקה שני, נפרד ומחריד יותר - רק כשללקוחה יש הזמנות קיימות
+  // (ראו handleDelete) - clientId שלהן יישאר "יתום" אחרי המחיקה.
+  const [deleteWarningClient, setDeleteWarningClient] = useState<Client | null>(null);
+  const [deleteWarningOrderCount, setDeleteWarningOrderCount] = useState(0);
 
   // האזנה חיה ל-Firestore, מסוננת רק ללקוחות של העסק המחובר (businessId = uid)
   useEffect(() => {
@@ -66,10 +70,11 @@ const Clients: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // מחיקת לקוחה בפועל - נקראת רק אחרי אישור ב-ConfirmDialog (ראו handleDelete)
-  const performDelete = async () => {
-    if (!deleteConfirmClient) return;
-    const clientId = deleteConfirmClient.id;
+  // מחיקת לקוחה בפועל - נקראת רק אחרי אישור ב-ConfirmDialog (הרגיל או
+  // אזהרת ההזמנות הקיימות, ראו handleDelete) - שני הנתיבים מגיעים לכאן.
+  const performDelete = async (client: Client | null) => {
+    if (!client) return;
+    const clientId = client.id;
     try {
       await deleteDoc(doc(db, "clients", clientId));
       setClients((prev) => prev.filter((c) => c.id !== clientId));
@@ -81,11 +86,27 @@ const Clients: React.FC = () => {
       alert("שגיאה במחיקת הלקוחה. נסי שוב.");
     } finally {
       setDeleteConfirmClient(null);
+      setDeleteWarningClient(null);
     }
   };
 
-  const handleDelete = (client: Client) => {
-    setDeleteConfirmClient(client);
+  // לפני הצגת אישור מחיקה - בודקת אם יש הזמנות (orders) עם clientId
+  // תואם. אם יש - מסלול אזהרה נפרד ומפורש יותר (deleteWarningClient),
+  // כי מחיקת הלקוחה תשאיר את ה-clientId שלהן "יתום". אם הבדיקה עצמה
+  // נכשלת (שגיאת רשת וכו') - נופלת בחזרה לאישור הרגיל, לא חוסמת מחיקה.
+  const handleDelete = async (client: Client) => {
+    try {
+      const ordersSnap = await getDocs(query(collection(db, "orders"), where("clientId", "==", client.id)));
+      if (ordersSnap.size > 0) {
+        setDeleteWarningOrderCount(ordersSnap.size);
+        setDeleteWarningClient(client);
+      } else {
+        setDeleteConfirmClient(client);
+      }
+    } catch (err) {
+      console.error("Error checking client orders before delete:", err);
+      setDeleteConfirmClient(client);
+    }
   };
 
   // Edit client handler
@@ -276,8 +297,17 @@ const Clients: React.FC = () => {
         title="מחיקת לקוחה"
         message={`האם את בטוחה שברצונך למחוק את ${deleteConfirmClient?.name}?`}
         variant="danger"
-        onConfirm={performDelete}
+        onConfirm={() => performDelete(deleteConfirmClient)}
         onCancel={() => setDeleteConfirmClient(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteWarningClient !== null}
+        title="ללקוחה זו יש הזמנות קיימות"
+        message={`ללקוחה זו יש ${deleteWarningOrderCount} הזמנות קיימות - מחיקתה תשאיר אותן בלי קישור ללקוחה. להמשיך במחיקה בכל זאת?`}
+        variant="warning"
+        onConfirm={() => performDelete(deleteWarningClient)}
+        onCancel={() => setDeleteWarningClient(null)}
       />
     </div>
   );

@@ -165,3 +165,26 @@ commit כחלק מהביקורת הזו** - דיווח בלבד.
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## תיקון #8: מחיקת לקוחה עם הזמנות פתוחות ✅ הושלמה
+
+`handleDelete` (`Clients.tsx`) הפכה לאסינכרונית - **לפני** הצגת כל
+`ConfirmDialog`, בודקת `getDocs(query(collection(db,"orders"),
+where("clientId","==",client.id)))` (אותו דפוס שאילתה בדיוק כמו
+`clientOrders` ב-`ClientDrawer.tsx`). אם יש הזמנות (`size > 0`) -
+מציגה `ConfirmDialog` **שני, נפרד** (`variant="warning"`,
+`deleteWarningClient`/`deleteWarningOrderCount`): "ללקוחה זו יש X
+הזמנות קיימות - מחיקתה תשאיר אותן בלי קישור ללקוחה. להמשיך במחיקה
+בכל זאת?". אם אין הזמנות - ה-`ConfirmDialog` הרגיל הקיים
+(`deleteConfirmClient`, `variant="danger"`) נשאר ללא שינוי.
+
+`performDelete` הפכה לקבל `client: Client | null` כפרמטר (במקום
+לקרוא רק מ-`deleteConfirmClient`) - כך ששני מסלולי האישור (הרגיל/
+האזהרה) קוראים לאותה פונקציית מחיקה יחידה, בלי שכפול לוגיקה.
+**אם בדיקת ה-`getDocs` עצמה נכשלת** (שגיאת רשת וכו') - נופלת בחזרה
+לאישור הרגיל, לא חוסמת את המחיקה כליל.
+
+**קבצים:** `src/pages/Clients/Clients.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
