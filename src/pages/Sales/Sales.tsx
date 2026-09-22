@@ -116,7 +116,7 @@ export default function Sales() {
 
     let matchesTime = true;
     const orderDate = new Date(ord.createdAt);
-    const today = new Date("2026-08-16");
+    const today = new Date();
 
     if (timeRange === "today") {
       matchesTime = ord.createdAt === today.toISOString().split("T")[0];

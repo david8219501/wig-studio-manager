@@ -319,3 +319,78 @@ return; }`.
 פורמט טלפון ישראלי משותפת (`isValidIsraeliPhone`) בהרשמה ובלקוחות,
 בלי לחסום עריכת לקוחות קיימות עם פורמט ישן. כל תיקון עם build+lint
 נפרד, commit+push נפרד.
+
+---
+
+# ביקורת מקיפה ומעמיקה: ערכים קבועים/תאריכים מקודדים/שאריות קוד
+# (בדיקה בלבד, ללא שינויי קוד)
+
+**מטרה:** חיפוש שיטתי, קובץ-קובץ, על כל 11 הקטגוריות שהוגדרו -
+בהמשך ישיר לגילוי `useState("2026-08")` הקבוע ב-Expenses.tsx
+(שכבר תוקן). **לא בוצע שום שינוי קוד, build או commit כחלק
+מהביקורת הזו** - דיווח בלבד. כל הממצאים מ-grep/Read בפועל על הקוד
+החי בזמן הביקורת.
+
+## טבלת ממצאים
+
+| קובץ | שורה | מה נמצא | קטגוריה | הערכה |
+|------|------|---------|---------|-------|
+| `src/pages/Sales/Sales.tsx` | 119 | `const today = new Date("2026-08-16");` - "היום" בפילטרי הזמן ("היום"/"השבוע"/"החודש") קבוע לתאריך מקודד, לא `new Date()` דינמי | 1 | **שארית בדיקה אמיתית** - מקביל בדיוק לבאג שכבר תוקן ב-`Expenses.tsx` (`useState("2026-08")`). כל שאר קבצי הפרויקט (Dashboard/Reports/Calendar/OrderDetailsPanel/QuickRetailSaleModal/SellShowroomStockModal) משתמשים ב-`new Date()` נכון |
+| `src/pages/Settings/Settings.tsx` | 201-203 | `useState(4700)`/`useState(3.0)`/`useState(100)` - ברירות מחדל לפני טעינת Firestore, זהות ל-`DEFAULT_SETTINGS` | 8 | **קבוע כפול לא-מאוחד** - אותם 3 מספרים בדיוק מוגדרים בנפרד גם ב-`Calculators.tsx`/`RepairOrderForm.tsx` |
+| `src/pages/Calculators/Calculators.tsx` | 9-13 | `const DEFAULT_SETTINGS = { pricePerKgUsd: 4700, exchangeRate: 3.0, profitMargin: 100 }` | 8 | **קבוע כפול לא-מאוחד** |
+| `src/components/orders/RepairOrderForm.tsx` | 16 | `const DEFAULT_SETTINGS: RepairSettings = { pricePerKgUsd: 4700, exchangeRate: 3.0, profitMargin: 100 }` | 8 | **קבוע כפול לא-מאוחד** - זהה מילה-במילה לזה שב-`Calculators.tsx` |
+| `src/components/orders/NewOrderWizard.tsx` | 18 | `const DEFAULT_HAIR_COST_SETTINGS: HairCostSettings = { pricePerKgUsd: 4700, exchangeRate: 3.0 }` | 8 | **קבוע כפול לא-מאוחד** - זהה מילה-במילה לזה שב-`ShowroomStockFormModal.tsx` |
+| `src/pages/Inventory/ShowroomStockFormModal.tsx` | 15 | `const DEFAULT_HAIR_COST_SETTINGS: HairCostSettings = { pricePerKgUsd: 4700, exchangeRate: 3.0 }` | 8 | **קבוע כפול לא-מאוחד** - **סה"כ 5 עותקים נפרדים** של אותם ערכים בדיוק (4700/3.0/100) בפרויקט, בלי מקור משותף אחד |
+| `src/components/clients/ClientDrawer.tsx` | 19-24 | `const ORDER_STATUS_LABELS: Record<Order["status"], string> = {...}` (5 שורות, זהה) | 8 | **קבוע כפול לא-מאוחד** - אותה מפה בדיוק מוגדרת גם ב-`OrderDetailsPanel.tsx` וגם ב-`Dashboard.tsx` |
+| `src/components/orders/OrderDetailsPanel.tsx` | 15-20 | `const ORDER_STATUS_LABELS: Record<Order["status"], string> = {...}` - זהה ל-2 האחרים | 8 | **קבוע כפול לא-מאוחד** |
+| `src/pages/Dashboard/Dashboard.tsx` | 33-38 | `const ORDER_STATUS_LABELS: Record<string, string> = {...}` - זהה ל-2 האחרים (רק הטיפוס שונה) | 8 | **קבוע כפול לא-מאוחד** - 3 עותקים זהים, אין אף אחד שמייבא מהאחר |
+| `src/components/orders/OrderDetailsPanel.tsx` | 755-758, 818-821 | `<option value="cash">💵 מזומן</option>` וכו' - מוקלד ידנית 3 פעמים **באותו קובץ**, במקום להיגזר מ-`PAYMENT_METHOD_LABELS` המוגדר בשורה 39-46 של אותו קובץ עצמו | 8 | **קבוע כפול לא-מאוחד, בתוך קובץ יחיד** - 4 התוויות (מזומן/אשראי/העברה/צ'ק) מוקלדות פדנית 3 פעמים נוספות, על אף שיש מקור אחד קיים ומוכן ממש למעלה בקובץ |
+| `src/pages/Expenses/Expenses.tsx` | 377-380, 450-453 | תוויות שיטת תשלום (💵 מזומן/💳 אשראי/🏦 העברה/📜 צ'ק) מוקלדות ישירות, דומות (לא זהות טכנית - שדה `paymentMethod` על הוצאה, לא `OrderPayment.method`) ל-`PAYMENT_METHOD_LABELS` | 8 | **לא ברור, דורש בירור** - דומיין נתונים שונה מהותית (הוצאה מול תשלום הזמנה), אז אולי לא צריך לאחד בכלל - לא בהכרח באג |
+
+## כל שאר הקטגוריות - נבדקו במלואן, ללא ממצאים
+
+- **קטגוריה 2 (`useState` עם ברירות מחדל חשודות) / 5 (ברירות מחדל
+  בטפסים):** כל הטפסים המבוקשים נבדקו (NewOrderWizard,
+  RepairOrderForm, AddClientModal, QuickRetailSaleModal,
+  AddBulkItemModal, ShowroomStockFormModal, AddHairModal,
+  CreateRemnantBoxModal, MergeRemnantModal, Settings.tsx, Login.tsx).
+  כל הערכים שנמצאו (`size="M"`, `texture="גלי"`, `quantity=1`,
+  `activePage='dashboard'`, `startTime="10:00"` וכו') הן בחירות UX
+  סבירות ומוצדקות (ברירת מחדל הגיונית לשדה בחירה), לא שאריות נתון
+  אמיתי מבדיקה.
+- **קטגוריה 3 (הערות שאריות בדיקה):** אין אף הערת
+  TODO/FIXME/XXX/HACK/"זמני"/"בדיקה" בקוד בכלל.
+- **קטגוריה 4 (console.log/debug/info שיוריים):** אין אף
+  `console.log`/`console.debug`/`console.info` בכל הפרויקט - רק
+  `console.error` בתוך `catch`, כמו שצריך.
+- **קטגוריה 6 (UID/businessId מקודד):** לא נמצא אף מופע.
+- **קטגוריה 7 (URL-ים מקודדים):** לא נמצא אף URL חשוד - `wa.me`,
+  Google OAuth (`accounts.google.com`), וה-Cloud Function האמיתי
+  (`esti-wigs-system.cloudfunctions.net`) - כולם לגיטימיים.
+- **קטגוריה 9 (קוד מבוטל/מוער):** אין אף בלוק קוד מבוטל בפרויקט.
+- **קטגוריה 10 (`as any`):** אין אף מופע בכל הפרויקט.
+- **קטגוריה 11 (exports לא בשימוש):** כל 17 ה-exports ב-
+  `src/utils/*.ts` נבדקו ואומתו בשימוש בפועל. `WigOrder`/`Payment`/
+  `ClientDocument` (שתועדו כ"מתים" ב-CLAUDE.md) **כבר לא קיימים
+  בכלל** ב-`types/index.ts` - הוסרו במלואם בעבר, לא נותרו כקוד מת.
+
+**סיכום:** 10 ממצאים אמיתיים (סה"כ 1 שארית בדיקה מוצקה + 9 מופעי
+קבועים כפולים), 1 ממצא "לא ברור/דורש בירור", ו-9 קטגוריות נקיות
+לגמרי. לא בוצע שום שינוי קוד, build או commit כחלק מהביקורת הזו.
+
+---
+
+# תיקון דחוף: תאריך מקודד ב-Sales.tsx ✅ הושלמה
+
+`const today = new Date("2026-08-16");` (שורה 119) הוחלף ב-`const
+today = new Date();` - אותו דפוס בדיוק כמו כל שאר הקבצים בפרויקט
+(`Dashboard.tsx`, `Reports.tsx`, `Calendar.tsx`, `OrderDetailsPanel.tsx`,
+`QuickRetailSaleModal.tsx`, `SellShowroomStockModal.tsx`) - עקביות
+עם מה שכבר נכון בכל מקום אחר, לא נוסחה חדשה. משפיע על פילטרי הזמן
+"היום"/"השבוע"/"החודש" בדף מכירות (Sales.tsx), שהיו מחושבים יחסית
+ל-16.8.2026 קבוע במקום התאריך הנוכחי בפועל.
+
+**קבצים:** `src/pages/Sales/Sales.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
