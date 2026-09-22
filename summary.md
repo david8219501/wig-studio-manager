@@ -52,3 +52,19 @@ paidAmount > 0`) - שתי שורות "שולם: ₪X"/"יתרה לתשלום: �
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+## חלק ג': מזהי פריטים (HairItemDetailsPanel/ShowroomStockDetailsPanel) ✅ הושלמה
+
+בשני הפאנלים - `<CopyButton>` (אייקון-בלבד, `title="העתקת מזהה"`)
+נוסף בתוך ה-`<h2>` שבכותרת, ליד המזהה המוצג (`item.hairCode ||
+item.id` / `order.showroomCode || order.id`) - מעתיק את המזהה
+המוצג עצמו, לא שדה נפרד. שני ה-`h2` הפכו ל-`display: flex;
+align-items: center; gap: 4px` כדי שהאייקון יתיישר נכון לצד הטקסט
+(במקום ליפול לשורה חדשה/להיצמד לא-מיושר, כמו שהיה קורה עם h2 רגיל
++ תוכן inline).
+
+**קבצים:** `src/pages/Inventory/HairItemDetailsPanel.tsx`/`.css`,
+`src/pages/Inventory/ShowroomStockDetailsPanel.tsx`/`.css`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.

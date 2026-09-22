@@ -14,6 +14,7 @@
 // אף מקום בקוד לא מגדיר סטטוס כזה בפועל על hairItems רגילים היום (0
 // מופעים אמיתיים) - אין תרחיש שבו "מכירה" רלוונטית לפריט הזה כרגע.
 import type { HairItem } from "../../types";
+import CopyButton from "../../components/common/CopyButton";
 import "./HairItemDetailsPanel.css";
 
 const STATUS_LABELS: Record<HairItem["status"], string> = {
@@ -57,7 +58,10 @@ export default function HairItemDetailsPanel({
       <div className="hair-details-panel">
         <div className="hair-details-header">
           <div className="hair-details-header-right">
-            <h2>{item.hairCode || item.id}</h2>
+            <h2>
+              {item.hairCode || item.id}
+              <CopyButton text={item.hairCode || item.id} title="העתקת מזהה" />
+            </h2>
             <p>{isRemnant ? "קופסת שאריות" : "מלאי שיער ייחודי"}</p>
           </div>
           <div className="hair-details-header-left">

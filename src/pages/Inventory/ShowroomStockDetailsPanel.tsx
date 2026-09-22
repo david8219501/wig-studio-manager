@@ -16,6 +16,7 @@ import { db, auth } from "../../services/firebase";
 import type { BulkItem, UsedBulkItem } from "../../types";
 import type { Order } from "../Sales/Sales";
 import CustomSelect from "../../components/common/CustomSelect";
+import CopyButton from "../../components/common/CopyButton";
 import "./ShowroomStockDetailsPanel.css";
 
 interface ShowroomStockDetailsPanelProps {
@@ -143,7 +144,10 @@ export default function ShowroomStockDetailsPanel({
       <div className="showroom-details-panel">
         <div className="showroom-details-header">
           <div className="showroom-details-header-right">
-            <h2>{order.showroomCode || order.id}</h2>
+            <h2>
+              {order.showroomCode || order.id}
+              <CopyButton text={order.showroomCode || order.id} title="העתקת מזהה" />
+            </h2>
             <p>פאת תצוגה</p>
           </div>
           <div className="showroom-details-header-left">
