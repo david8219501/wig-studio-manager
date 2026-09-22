@@ -13,7 +13,6 @@
 }
 
 .info-tooltip {
-  position: relative;
   display: inline-flex;
   align-items: center;
   margin-inline-start: 4px;
@@ -42,12 +41,14 @@
 }
 
 /* נפתחת למטה (לא מעלה) בכוונה - אחד ממקומות השימוש הוא כותרת עמודה
-   בטבלה עם overflow-x:auto על ה-wrapper (Reports.tsx) - פתיחה מעלה
-   הייתה בסיכון להיחתך ע"י ה-overflow החי בשורה הראשונה של הטבלה. */
+   בטבלה עם overflow-x:auto על ה-wrapper (Reports.tsx). מרונדרת
+   ב-createPortal ל-body (ראו InfoTooltip.tsx) - position: fixed
+   ו-top/left מחושבים דינמית (inline style) מ-getBoundingClientRect()
+   של האייקון, לא יחסית להורה - כך שהיא לא נחתכת ע"י overflow של
+   קונטיינר הטבלה, ומתעדכנת חי בזמן גלילה. transform כאן ממרכז אותה
+   אופקית מתחת לאייקון (left שמחושב הוא מרכז האייקון, לא הקצה שלו). */
 .info-tooltip-bubble {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
+  position: fixed;
   transform: translateX(-50%);
   background: var(--color-surface);
   color: var(--color-text);
