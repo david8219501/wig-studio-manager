@@ -298,10 +298,12 @@ export default function Dashboard() {
         <div className="kpi-card">
           <div className="kpi-icon icon-purple">💰</div>
           <div className="kpi-content">
-            <span className="kpi-label">
-              רווח החודש
-              <InfoTooltip text="רווח תפעולי מכל ההזמנות (מכירה פחות עלות שיער/חומרים) פחות הוצאות תפעול ושיווק כלליות. לא כולל הוצאות רכישת מלאי (אלה כבר מגולמות בעלות הייצור של כל הזמנה) ולא כולל הזמנות שבוטלו." />
-            </span>
+            <InfoTooltip
+              as="span"
+              className="kpi-label"
+              label="רווח החודש"
+              text="רווח תפעולי מכל ההזמנות (מכירה פחות עלות שיער/חומרים) פחות הוצאות תפעול ושיווק כלליות. לא כולל הוצאות רכישת מלאי (אלה כבר מגולמות בעלות הייצור של כל הזמנה) ולא כולל הזמנות שבוטלו."
+            />
             <span className="kpi-value">₪{stats.thisMonthRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             {stats.revenueTrendPct !== null ? (
               <span className={`kpi-trend ${stats.revenueTrendPct >= 0 ? "trend-up" : "trend-down"}`}>
@@ -315,10 +317,12 @@ export default function Dashboard() {
         <div className="kpi-card">
           <div className="kpi-icon icon-orange">💳</div>
           <div className="kpi-content">
-            <span className="kpi-label">
-              חובות פתוחים
-              <InfoTooltip text="סכום ההפרש בין מה שגבית למחיר הכולל, על כל ההזמנות שיש להן יתרה לתשלום - כולל הזמנות שבוטלו (לא מוחרגות כאן, בשונה מ'חובות פתוחים לפי ותק' בדף הדוחות)." />
-            </span>
+            <InfoTooltip
+              as="span"
+              className="kpi-label"
+              label="חובות פתוחים"
+              text="סכום ההפרש בין מה שגבית למחיר הכולל, על כל ההזמנות שיש להן יתרה לתשלום - כולל הזמנות שבוטלו (לא מוחרגות כאן, בשונה מ'חובות פתוחים לפי ותק' בדף הדוחות)."
+            />
             <span className="kpi-value">₪{stats.openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             <span className="kpi-trend trend-neutral">{stats.debtOrders.length} הזמנות עם יתרה לתשלום</span>
           </div>
@@ -429,10 +433,12 @@ export default function Dashboard() {
 
           {/* Services Breakdown */}
           <div className="dash-card">
-            <h2 className="dash-card-title">
-              📊 התפלגות סוגי עבודה
-              <InfoTooltip text="אחוז מתוך סך ההכנסה הגולמית של כל סוגי העבודה - לפי הכנסה, לא לפי רווח, וללא הרחקה של הזמנות שבוטלו." />
-            </h2>
+            <InfoTooltip
+              as="h2"
+              className="dash-card-title"
+              label="📊 התפלגות סוגי עבודה"
+              text="אחוז מתוך סך ההכנסה הגולמית של כל סוגי העבודה - לפי הכנסה, לא לפי רווח, וללא הרחקה של הזמנות שבוטלו."
+            />
             {stats.servicesBreakdown.length === 0 ? (
               <p className="text-muted">אין עדיין נתונים להצגה.</p>
             ) : (

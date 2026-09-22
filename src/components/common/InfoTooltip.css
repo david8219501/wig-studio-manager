@@ -3,6 +3,15 @@
    שמוגדרות מחוץ לקובץ CSS של דף ספציפי (src/components/common/),
    בדיוק כמו ConfirmDialog/DateInput/TimeInput/CustomSelect. */
 
+/* עוטף את הכותרת/הטקסט הסמוך + האייקון יחד - אזור ה-hover המורחב.
+   בכוונה בלי override ל-display/layout: התג (span/h2/th, לפי `as`
+   ב-InfoTooltip.tsx) והמחלקה שהועברה (stat-label/kpi-label/fin-title/
+   וכו') כבר קובעים את הפריסה הנכונה לכל מקום שימוש - הוספת display
+   כאן הייתה שוברת את זה (למשל th בטבלה חייב להישאר table-cell). */
+.info-tooltip-wrapper {
+  cursor: default;
+}
+
 .info-tooltip {
   position: relative;
   display: inline-flex;

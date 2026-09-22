@@ -170,17 +170,21 @@ export default function Sales() {
           <span className="fin-value mono">₪{totalPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-danger">
-          <span className="fin-title">
-            יתרת חובות פתוחים
-            <InfoTooltip text="סכום ההפרש בין המחיר הכולל למה שכבר שולם, על כל ההזמנות המוצגות כרגע (לפי הסינון הפעיל בטבלה) - הזמנות שבוטלו מוחרגות תמיד מהסכום." />
-          </span>
+          <InfoTooltip
+            as="span"
+            className="fin-title"
+            label="יתרת חובות פתוחים"
+            text="סכום ההפרש בין המחיר הכולל למה שכבר שולם, על כל ההזמנות המוצגות כרגע (לפי הסינון הפעיל בטבלה) - הזמנות שבוטלו מוחרגות תמיד מהסכום."
+          />
           <span className="fin-value mono">₪{openDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="fin-card text-profit">
-          <span className="fin-title">
-            רווח בפועל (משוער)
-            <InfoTooltip text="סכום רווח תפעולי (מכירה פחות עלות ייצור בפועל) על כל ההזמנות המוצגות כרגע - הזמנות שבוטלו מוחרגות תמיד. לא מחסיר הוצאות תפעול כלליות של העסק." />
-          </span>
+          <InfoTooltip
+            as="span"
+            className="fin-title"
+            label="רווח בפועל (משוער)"
+            text="סכום רווח תפעולי (מכירה פחות עלות ייצור בפועל) על כל ההזמנות המוצגות כרגע - הזמנות שבוטלו מוחרגות תמיד. לא מחסיר הוצאות תפעול כלליות של העסק."
+          />
           <span className="fin-value mono">₪{totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
