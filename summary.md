@@ -219,3 +219,32 @@ return; }` - לפני כל יצירה בפועל, לא רק ה-HTML.
 → מחיר הזמנה 0/שלילי חסום ב-`NewOrderWizard` (HTML `min` + בדיקת JS),
 בלי לפגוע בזרימות showroom/retail הנפרדות. כל תיקון עם build+lint
 נפרד, commit+push נפרד.
+
+---
+
+# באג: ברירת המחדל של החודש בדף "ניהול הוצאות" תקועה על אוגוסט
+
+## מה נמצא (לפני תיקון)
+
+**לא באג של `getMonth()`** (אין +1 חסר/שגוי בשום מקום ב-`Expenses.tsx`
+בכלל - לא נעשה שם שום חישוב תאריך דינמי). הבאג האמיתי: `const
+[selectedMonth, setSelectedMonth] = useState("2026-08");` - **מחרוזת
+קבועה מקודדת בקוד**, עם הערה מפורשת שנשארה מבדיקות ישנות: `// ברירת
+מחדל: אוגוסט 2026`. אף פעם לא היה שם `new Date()` בכלל - זה לא "כמעט
+נכון עם טעות קטנה", זו ברירת מחדל שנשארה קבועה מזמן שנכתבה (ולא
+עודכנה כשעבר החודש בפועל).
+
+## התיקון
+
+הוחלף ב-`useState(() => { const now = new Date(); return
+\`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2,
+"0")}\`; })` - **אותה שיטת חישוב בדיוק** כמו `thisMonth` ב-
+`Dashboard.tsx` (`getFullYear()`/`getMonth()+1`, לא `toISOString()`
+- נשאר בזמן מקומי, לא UTC, כדי לא להחליק יום/חודש קרוב לחצות
+בטעות). Lazy initializer (`useState(() => ...)`) - מחושב פעם אחת
+ב-mount, לא בכל render.
+
+**קבצים:** `src/pages/Expenses/Expenses.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.

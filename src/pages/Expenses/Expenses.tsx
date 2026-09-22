@@ -47,7 +47,13 @@ export default function Expenses() {
 
   // 🆕 מצבי סינון זמן: "monthly" או "all"
   const [viewMode, setViewMode] = useState<"monthly" | "all">("monthly");
-  const [selectedMonth, setSelectedMonth] = useState("2026-08"); // ברירת מחדל: אוגוסט 2026
+  // ברירת מחדל: החודש הקלנדרי הנוכחי בפועל (לא תאריך קבוע) - אותה שיטת
+  // חישוב בדיוק כמו thisMonth ב-Dashboard.tsx (getFullYear/getMonth+1,
+  // לא toISOString - כדי להישאר בזמן מקומי, לא UTC).
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
