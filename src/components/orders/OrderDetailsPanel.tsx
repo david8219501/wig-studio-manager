@@ -189,6 +189,12 @@ export default function OrderDetailsPanel({ isOpen, order, onClose, onOpenAssign
       setPaymentError(`הסכום גבוה מיתרת הזכות הקיימת (₪${clientCreditBalance.toLocaleString()}).`);
       return;
     }
+    // שאר אמצעי התשלום - לא ניתן "לשלם" יותר מהיתרה לתשלום בפועל (לא
+    // עודף). ==0 מותר בכוונה - תשלום מראש בדיוק על הסכום המלא בפעם אחת.
+    if (payMethod !== "credit_balance" && Number(payAmount) > debt) {
+      setPaymentError(`הסכום גבוה מהיתרה לתשלום (₪${debt.toLocaleString()}).`);
+      return;
+    }
 
     setSavingPayment(true);
     setPaymentError(null);
