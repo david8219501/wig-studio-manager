@@ -4,6 +4,7 @@ import { db, auth } from "../../services/firebase";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, calculateHairCostFromGrams } from "../../utils/hairCost";
 import { formatDateIL } from "../../utils/formatDate";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import CopyButton from "../../components/common/CopyButton";
 import './Calculators.css';
 
 const DEFAULT_SETTINGS = {
@@ -287,6 +288,16 @@ function recomputeRows(existingRows: CatalogRow[], structure: string, fullness: 
   });
 }
 
+// טקסט מוכן להעתקה/שליחה בוואטסאפ - שם הקטלוג + שורה לכל אורך.
+// עמודת רווח נכללת רק כש-showProfit דלוק (בהתאמה למה שמוצג בטבלה עצמה).
+function buildCatalogCopyText(catalog: PriceCatalog, showProfit: boolean): string {
+  const lines = catalog.rows.map((row) => {
+    const base = `${row.length} ס״מ - ${row.price.toLocaleString("he-IL")}₪`;
+    return showProfit ? `${base} (רווח: ₪${(row.price - row.cost).toLocaleString("he-IL")})` : base;
+  });
+  return `${catalog.name}\n${lines.join("\n")}`;
+}
+
 function PriceCatalogsTab({ settings }: { settings: Settings }) {
   const [catalogs, setCatalogs] = useState<PriceCatalog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -546,6 +557,7 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                 </div>
               </div>
               <div className="price-catalog-actions">
+                <CopyButton text={buildCatalogCopyText(catalog, showProfit)} label="העתק לשליחה" />
                 <button className="calc-toggle-btn" onClick={() => handleRefreshCatalog(catalog)}>
                   🔄 עדכן לפי הגדרות נוכחיות
                 </button>

@@ -1,0 +1,41 @@
+/* CopyButton.css - כפתור העתקה משותף, לשימוש חוזר בכל האתר. */
+
+.copy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color var(--duration-fast) var(--easing), background var(--duration-fast) var(--easing), border-color var(--duration-fast) var(--easing);
+}
+
+.copy-button--icon {
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.copy-button--icon:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+
+.copy-button--labeled {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.copy-button--labeled:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-bg);
+}
+
+.copy-button-success {
+  color: var(--color-success);
+}
