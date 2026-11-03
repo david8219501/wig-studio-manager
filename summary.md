@@ -474,3 +474,58 @@ HTML - ערך מתחת ל-min לא נשמר, אותו דפוס כמו שדה ה�
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע (באג `react-hooks/set-state-in-effect` חדש נתפס
 ותוקן לפני ה-build הסופי - ראו למעלה).
+
+## חלק 1ג': הדפסה ושיתוף של הקטלוג ✅ הושלמה
+
+**עיקרון מחייב שנאומת בקוד (לא רק בכוונה):** `buildCatalogShareText`
+החדשה **לא מקבלת `showProfit` כפרמטר בכלל** (לא רק לא משתמשת בו) -
+רק `row.length`/`row.price`. אזור ההדפסה (`.print-area` JSX) מרנדר
+רק `printingCatalog.name`/`structure`/`fullness`/`businessName`/
+`logoUrl` + `row.length`/`row.price` לכל שורה - `grep` אימת שאין
+אזכור `cost`/`profit` בשתיים. `buildCatalogCopyText` הקיים (העתק
+לשליחה, כן מכבד `showProfit`) **לא שונה**.
+
+**שם עסק/לוגו:** `CalculatorsPage` טוען `users/{uid}` (getDoc
+חד-פעמי, אותו דפוס כמו App.tsx) - `businessName`/`logoUrl` עוברים
+כ-props ל-`PriceCatalogsTab`, מוצגים בראש מסמך ההדפסה.
+
+**הדפסה (🖨):** `handlePrintCatalog` שומר את הקטלוג הנבחר
+(`printingCatalog`), מוסיף מחלקה `is-printing-catalog` ל-`body`,
+וקורא ל-`window.print()` בתוך `requestAnimationFrame` (נותן ל-React
+לרנדר את אזור ההדפסה לפני ההדפסה בפועל - קריאה סינכרונית מוקדמת
+יותר היתה מדפיסה דף ריק). `afterprint` (listener גלובלי) מנקה את
+המחלקה ואת ה-state בחזרה.
+
+**CSS הדפסה (`Calculators.css`):** `.print-area { display: none }`
+קבוע במסך; ב-`@media print` - הכלל "הסתר הכל/הצג רק את האזור הזה"
+חל **רק** כש-`body.is-printing-catalog` קיים (לא כלל גלובלי סמוך -
+כך שהדפסה מדף אחר באתר לא נפגעת, אף שכל ה-CSS מתאחד לקובץ בודל
+אחד). `@page { size: A4; margin: 15mm }`, `page-break-inside: avoid`
+על שורות הטבלה, תאריך הפקה דרך `formatDateIL` המשותף (dd/mm/yyyy).
+
+**שיתוף (↗):** `handleShareCatalog` - אם `navigator.share` קיים,
+פותח את חלון השיתוף של המכשיר עם הטקסט הנקי; ביטול מפורש
+(`AbortError`) **לא** מוצג כשגיאה. אם לא קיים - תפריט נפילה קטן
+(`shareMenuCatalogId`) עם "שליחה בוואטסאפ" (`wa.me/?text=...`,
+`encodeURIComponent`) ו-"העתקה" (`CopyButton` הקיים, עם משוב ✓
+מובנה) - נסגר בלחיצה מחוץ לו (אותו דפוס click-outside כמו
+`CustomSelect`).
+
+**הגנה על קטלוג ריק:** כפתורי הדפסה/שיתוף `disabled` כש-
+`catalog.rows.length === 0`.
+
+**קבצים:** `src/pages/Calculators/Calculators.tsx`,
+`src/pages/Calculators/Calculators.css`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע. `grep` אימת שאין `cost`/`profit` באזור ההדפסה
+או בטקסט השיתוף - ראו מעלה.
+
+---
+
+## סיכום משימה 1
+
+עלות נוספת per-catalog → נעילת מחיר per-row + עריכה מלאה אחרי
+יצירה → הדפסה/שיתוף נקיים ללקוחה (לעולם לא cost/profit/extraCost,
+נאומת בקוד לא רק בכוונה). כל חלק עם build+lint נפרד, commit+push
+נפרד. משימה 1 הושלמה במלואה לפני התחלת משימה 2.

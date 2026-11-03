@@ -315,6 +315,15 @@ function buildCatalogCopyText(catalog: PriceCatalog, showProfit: boolean): strin
   return `${catalog.name}\n${lines.join("\n")}`;
 }
 
+// טקסט "נקי" למסמך ללקוחה (הדפסה/שיתוף) - אורך ומחיר סופי בלבד. לעולם
+// לא מקבלת showProfit כפרמטר בכלל (לא רק שלא משתמשת בו) - כדי שלא
+// ניתן יהיה בטעות לחשוף cost/profit/extraCost מכאן, גם אם "הצג רווח"
+// דלוק באותו רגע במסך. נפרדת לגמרי מ-buildCatalogCopyText (שלא השתנה).
+function buildCatalogShareText(catalog: PriceCatalog): string {
+  const lines = catalog.rows.map((row) => `${row.length} ס״מ - ₪${row.price.toLocaleString("he-IL")}`);
+  return `${catalog.name}\n${lines.join("\n")}`;
+}
+
 // תא מחיר ניתן לעריכה inline בטבלת קטלוג שמור - state מקומי (לא state
 // של ההורה) כדי לא "לקפוץ" תוך כדי הקלדה בזמן שה-onSnapshot החי מרענן
 // את שאר הטבלה; מתאפס ל-price העדכני כשהוא משתנה מבחוץ (למשל "עדכן
@@ -358,7 +367,7 @@ function CatalogPriceCell({ price, locked, onCommit, onUnlock }: { price: number
   );
 }
 
-function PriceCatalogsTab({ settings }: { settings: Settings }) {
+function PriceCatalogsTab({ settings, businessName, logoUrl }: { settings: Settings; businessName: string; logoUrl: string | null }) {
   const [catalogs, setCatalogs] = useState<PriceCatalog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -388,6 +397,24 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
   // זו כלי עבודה פנימי (העסק ממלא מחירים, לא מציג ללקוחה), אז הרווח
   // שם תמיד מוצג כדי שהמשתמשת תדע כמה היא מרוויחה בזמן שהיא קובעת מחיר.
   const [showProfit, setShowProfit] = useState(false);
+
+  // הדפסה - קטלוג שנבחר להדפסה כרגע (ראו handlePrintCatalog/print-area
+  // למטה) + תפריט שיתוף נפילה (רק במחשב, כש-navigator.share לא קיים).
+  const [printingCatalog, setPrintingCatalog] = useState<PriceCatalog | null>(null);
+  const [shareMenuCatalogId, setShareMenuCatalogId] = useState<string | null>(null);
+
+  // סגירת תפריט השיתוף בלחיצה מחוץ לו - אותו דפוס כמו תפריטים נפילה
+  // אחרים באתר (CustomSelect).
+  useEffect(() => {
+    if (!shareMenuCatalogId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".price-catalog-share-wrapper")) {
+        setShareMenuCatalogId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [shareMenuCatalogId]);
 
   useEffect(() => {
     const businessId = auth.currentUser?.uid;
@@ -538,6 +565,46 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
     setDeletingId(null);
   };
 
+  // מדפיסה קטלוג יחיד - ראו .print-area/CSS @media print (Calculators.css):
+  // "is-printing-catalog" על ה-body הוא מה שמפעיל את ההדפסה הממוקדת (רק
+  // אזור ההדפסה, לא שאר האפליקציה) - בלי המחלקה הזו, הדפסה מדף אחר
+  // באתר לא נפגעת בכלל (הכלל חל רק כש-body נושא אותה בפועל).
+  // requestAnimationFrame - נותן ל-React לרנדר את אזור ההדפסה עם הקטלוג
+  // הנבחר לפני שקוראים בפועל ל-window.print() (קריאה סינכרונית מוקדמת
+  // מדי הייתה מדפיסה דף ריק, לפני שה-state עדיין הוחל ב-DOM).
+  const handlePrintCatalog = (catalog: PriceCatalog) => {
+    setPrintingCatalog(catalog);
+    document.body.classList.add("is-printing-catalog");
+    requestAnimationFrame(() => window.print());
+  };
+
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      document.body.classList.remove("is-printing-catalog");
+      setPrintingCatalog(null);
+    };
+    window.addEventListener("afterprint", handleAfterPrint);
+    return () => window.removeEventListener("afterprint", handleAfterPrint);
+  }, []);
+
+  // navigator.share (בעיקר נייד) - פותח את חלון השיתוף של המכשיר עם
+  // הטקסט הנקי. ביטול מפורש ע"י המשתמשת (AbortError) אינו שגיאה - לא
+  // מוצגת הודעה. אם navigator.share לא קיים (בעיקר מחשב) - תפריט נפילה
+  // קטן עם וואטסאפ/העתקה (shareMenuCatalogId, ראו JSX למטה).
+  const handleShareCatalog = async (catalog: PriceCatalog) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: buildCatalogShareText(catalog) });
+      } catch (err) {
+        if ((err as Error)?.name !== "AbortError") {
+          console.error("Error sharing catalog:", err);
+        }
+      }
+      return;
+    }
+    setShareMenuCatalogId((prev) => (prev === catalog.id ? null : catalog.id));
+  };
+
   return (
     <div className="price-catalog-tab">
       <div className="calc-card card-purple price-catalog-create-card">
@@ -680,6 +747,41 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
               </div>
               <div className="price-catalog-actions">
                 <CopyButton text={buildCatalogCopyText(catalog, showProfit)} label="העתק לשליחה" />
+                <button
+                  className="calc-toggle-btn"
+                  disabled={catalog.rows.length === 0}
+                  onClick={() => handlePrintCatalog(catalog)}
+                >
+                  🖨 הדפס
+                </button>
+                <div className="price-catalog-share-wrapper">
+                  <button
+                    className="calc-toggle-btn"
+                    disabled={catalog.rows.length === 0}
+                    onClick={() => handleShareCatalog(catalog)}
+                  >
+                    ↗ שתף
+                  </button>
+                  {shareMenuCatalogId === catalog.id && (
+                    <div className="price-catalog-share-menu">
+                      <button
+                        type="button"
+                        className="price-catalog-share-menu-item"
+                        onClick={() => {
+                          window.open(`https://wa.me/?text=${encodeURIComponent(buildCatalogShareText(catalog))}`, "_blank");
+                          setShareMenuCatalogId(null);
+                        }}
+                      >
+                        שליחה בוואטסאפ
+                      </button>
+                      <CopyButton
+                        text={buildCatalogShareText(catalog)}
+                        label="העתקה"
+                        className="price-catalog-share-menu-item"
+                      />
+                    </div>
+                  )}
+                </div>
                 <button className="calc-toggle-btn" onClick={() => handleRefreshCatalog(catalog)}>
                   🔄 עדכן לפי הגדרות נוכחיות
                 </button>
@@ -734,6 +836,40 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeletingId(null)}
       />
+
+      {/* מסמך ללקוחה - אורך ומחיר סופי בלבד, לעולם לא cost/profit/extraCost,
+          גם אם "הצג רווח" דלוק באותו רגע במסך (ראו buildCatalogShareText -
+          לא מקבלת showProfit בכלל). מוסתר בתצוגה רגילה, מוצג רק בהדפסה
+          (ראו .print-area ב-Calculators.css, @media print). */}
+      <div className="print-area">
+        {printingCatalog && (
+          <div className="print-catalog">
+            <div className="print-header">
+              {logoUrl && <img src={logoUrl} alt="" className="print-logo" />}
+              {businessName && <div className="print-business-name">{businessName}</div>}
+            </div>
+            <h2 className="print-catalog-name">{printingCatalog.name}</h2>
+            <p className="print-catalog-meta">{printingCatalog.structure} · {printingCatalog.fullness}</p>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>אורך (ס״מ)</th>
+                  <th>מחיר (₪)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printingCatalog.rows.map((row) => (
+                  <tr key={row.length}>
+                    <td>{row.length}</td>
+                    <td>₪{row.price.toLocaleString("he-IL")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="print-date">תאריך הפקה: {formatDateIL(new Date())}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -746,6 +882,10 @@ export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPag
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"calculators" | "catalogs">("calculators");
+  // שם העסק/לוגו (users/{uid}) - רק לתצוגה במסמך ההדפסה של קטלוג
+  // (ראו PriceCatalogsTab), אותו דפוס בדיוק כמו App.tsx (כותרת/סיידבר).
+  const [businessName, setBusinessName] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   // טעינת הגדרות התמחור של העסק מ-Firestore (ואם עדיין אין - שמירת ברירת
   // המחדל). העריכה עצמה עברה למסך ההגדרות (Settings.tsx, כרטיס "הגדרות
@@ -771,6 +911,14 @@ export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPag
         console.error("Error loading business settings:", err);
         setLoadError("שגיאה בטעינת הגדרות התמחור - מוצגים ערכי ברירת מחדל. בדקי את החיבור ונסי לרענן את הדף.");
       });
+
+    getDoc(doc(db, "users", businessId))
+      .then((snap) => {
+        const data = snap.data() as { businessName?: string; logoUrl?: string } | undefined;
+        setBusinessName(data?.businessName || "");
+        setLogoUrl(data?.logoUrl || null);
+      })
+      .catch((err) => console.error("Error loading business profile for catalog printing:", err));
   }, []);
 
   return (
@@ -814,7 +962,7 @@ export default function CalculatorsPage({ onNavigateToSettings }: CalculatorsPag
         </div>
       )}
 
-      {activeTab === "catalogs" && <PriceCatalogsTab settings={settings} />}
+      {activeTab === "catalogs" && <PriceCatalogsTab settings={settings} businessName={businessName} logoUrl={logoUrl} />}
     </div>
   );
 }
