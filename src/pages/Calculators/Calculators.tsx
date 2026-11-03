@@ -30,7 +30,8 @@ function PriceCalculator({ settings }: { settings: Settings }) {
 
   const [hideInternalCosts, setHideInternalCosts] = useState(false);
 
-  const missing = length === "" || !structure || !fullness;
+  const lengthOutOfRange = length !== "" && (Number(length) < 5 || Number(length) > 75);
+  const missing = length === "" || !structure || !fullness || lengthOutOfRange;
 
   const calc = useMemo(() => {
     if (missing) return null;
@@ -62,7 +63,7 @@ function PriceCalculator({ settings }: { settings: Settings }) {
 
       <div className="calc-row">
         <MiniNum label="אורך עורף (ס״מ)" value={length} onChange={setLength}
-          placeholder="5-75" min={5} max={75} integer />
+          placeholder="5-75" min={5} max={75} integer error={lengthOutOfRange} />
         <MiniSelect label="מבנה" value={structure} onChange={setStructure}
           options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
         <MiniSelect label="מלאות" value={fullness} onChange={setFullness}
@@ -75,7 +76,9 @@ function PriceCalculator({ settings }: { settings: Settings }) {
         <MiniNum label="נוספות ₪" value={extra} onChange={setExtra} />
       </div>
 
-      {missing || !calc ? (
+      {lengthOutOfRange ? (
+        <div className="calc-hint calc-hint-error">יש להזין אורך בין 5 ל-75</div>
+      ) : missing || !calc ? (
         <div className="calc-hint">יש למלא את כל הפרטים לחישוב התוצאה</div>
       ) : (
         <div className="calc-result-rows">
@@ -123,11 +126,13 @@ function LengthPlanner() {
   const [nape, setNape]       = useState<number | "">("");
   const [ear, setEar]         = useState<number | "">("");
 
+  const napeOutOfRange = nape !== "" && (Number(nape) < 5 || Number(nape) > 75);
+
   const napeRows = useMemo(() => {
-    if (!wigType || nape === "") return null;
+    if (!wigType || nape === "" || napeOutOfRange) return null;
     const cap = Number(nape) + MAX_CAPS[wigType].nape;
     return Array.from({length:21}, (_,i) => Math.min(Number(nape)+i, cap));
-  }, [wigType, nape]);
+  }, [wigType, nape, napeOutOfRange]);
 
   const earRows = useMemo(() => {
     if (!wigType || ear === "") return null;
@@ -145,11 +150,13 @@ function LengthPlanner() {
       <div className="calc-row">
         <MiniSelect label="סוג פאה" value={wigType} onChange={setWigType}
           options={["חלק","גלי","מתולתל"].map(v=>({v,l:v}))} />
-        <MiniNum label="אורך עורף" value={nape} onChange={setNape} placeholder="חובה (5-75)" min={5} max={75} integer />
+        <MiniNum label="אורך עורף" value={nape} onChange={setNape} placeholder="חובה (5-75)" min={5} max={75} integer error={napeOutOfRange} />
         <MiniNum label="אורך אוזניים" value={ear} onChange={setEar} placeholder="מומלץ" />
       </div>
 
-      {!wigType || nape === "" || !napeRows ? (
+      {napeOutOfRange ? (
+        <div className="calc-hint calc-hint-error">יש להזין אורך בין 5 ל-75</div>
+      ) : !wigType || nape === "" || !napeRows ? (
         <div className="calc-hint">יש לבחור סוג פאה ואורך עורף</div>
       ) : (
         <div className="calc-stages-wrap">
@@ -999,19 +1006,31 @@ function MiniNum({ label, value, onChange, placeholder="0", error=false, min, ma
     <div className="calc-field">
       <label className="calc-field-label">{label}</label>
       <input
-        type="number"
-        min={min}
-        max={max}
-        step={integer ? 1 : undefined}
+        // שדה integer (למשל אורך 5-75) משתמש ב-type="text" + inputMode
+        // numeric, לא type="number": עם type="number" ובדיקת min/max על
+        // כל תו בזמן ההקלדה, הספרה הראשונה של "23" היא "2" - קטנה מ-5,
+        // ונזרקת, כך שלא ניתן היה להקליד את המספר כלל. בטקסט חופשי
+        // מסננים רק תווים שאינם ספרות, בלי לבדוק טווח תוך כדי הקלדה;
+        // בדיקת min/max נעשית בקומפוננטה הקוראת על הערך המלא.
+        type={integer ? "text" : "number"}
+        inputMode={integer ? "numeric" : undefined}
+        min={integer ? undefined : min}
+        max={integer ? undefined : max}
         className={`calc-input ${error ? 'calc-input-error' : ''}`}
         value={value}
         placeholder={placeholder}
         onChange={(e) => {
+          if (integer) {
+            const digitsOnly = e.target.value.replace(/\D/g, "");
+            onChange(digitsOnly === "" ? "" : Number(digitsOnly));
+            return;
+          }
           if (e.target.value === "") { onChange(""); return; }
-          let newValue = Number(e.target.value);
-          if (integer) newValue = Math.trunc(newValue);
+          const newValue = Number(e.target.value);
           // min/max מתנהגים כמו בשדה המחיר הידני בטבלת הקטלוג: ערך מעבר
           // לטווח לא נשמר בכלל (הערך הקודם נשאר), לא רק HTML-level הגנה.
+          // זה בטוח כאן (לא שדה integer) כי min היחיד שבשימוש הוא 0 -
+          // חוסם רק סימן מינוס, ולא חוסם ספרה ראשונה של מספר חיובי תקין.
           if (min !== undefined && newValue < min) return;
           if (max !== undefined && newValue > max) return;
           onChange(newValue);

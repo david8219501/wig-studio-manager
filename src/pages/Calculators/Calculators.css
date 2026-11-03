@@ -188,6 +188,12 @@
   border: 1px dashed var(--color-border);
 }
 
+.calc-hint-error {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  border: 1px dashed var(--color-danger);
+}
+
 /* ---------- Results Section ---------- */
 .calc-result-rows {
   display: flex;
