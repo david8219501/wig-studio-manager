@@ -419,3 +419,26 @@
   font-family: var(--font-mono);
   text-align: right;
 }
+
+.catalog-price-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.catalog-price-lock-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--easing), background var(--duration-fast) var(--easing);
+}
+
+.catalog-price-lock-btn:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}

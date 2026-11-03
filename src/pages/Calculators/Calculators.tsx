@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
-import { doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, query, where } from "firebase/firestore";
+import { doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../../services/firebase";
 import { HAIR_LENGTH_OPTIONS, STRUCTURE_OPTIONS, FULLNESS_OPTIONS, calculateHairCost, calculateHairCostFromGrams } from "../../utils/hairCost";
 import { formatDateIL } from "../../utils/formatDate";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import CopyButton from "../../components/common/CopyButton";
+import { Lock } from "lucide-react";
 import './Calculators.css';
 
 const DEFAULT_SETTINGS = {
@@ -245,6 +246,7 @@ interface CatalogRow {
   length: number;
   cost: number;
   price: number;
+  priceManual?: boolean; // true = המחיר נערך ידנית (קטלוג "ידני" מלא, או עריכת תא בודד) - "עדכן לפי הגדרות נוכחיות" לא נוגע בשורה הזו
 }
 
 type CatalogMode = "auto" | "manual";
@@ -279,16 +281,28 @@ function computeAutoRows(structure: string, fullness: string, settings: Settings
 
 // עדכון שורות קטלוג קיים (כפתור "עדכן לפי הגדרות נוכחיות" + שמירת עריכה
 // של מבנה/מלאות/עלות נוספת): cost מחושב מחדש תמיד (עלות חומר גלם/עלות
-// נוספת יכולות להשתנות). במצב אוטומטי גם price מחושב מחדש; במצב ידני
-// ה-price שהמשתמשת קבעה נשאר כמו שהוא (מאותר לפי length, לא לפי
-// אינדקס - ליתר בטחון).
-function recomputeRows(existingRows: CatalogRow[], structure: string, fullness: string, mode: CatalogMode, settings: Settings, extraCost: number): CatalogRow[] {
+// נוספת יכולות להשתנות). price מחושב מחדש רק לשורות בלי priceManual -
+// שורות עם priceManual (קטלוג "ידני" מלא, או עריכת תא בודד) שומרות את
+// המחיר שלהן בדיוק, גם אם ה-cost שלהן השתנה (מאותרות לפי length, לא
+// לפי אינדקס - ליתר בטחון).
+function recomputeRows(existingRows: CatalogRow[], structure: string, fullness: string, settings: Settings, extraCost: number): CatalogRow[] {
   const autoRows = computeAutoRows(structure, fullness, settings, extraCost);
-  if (mode === "auto") return autoRows;
   return autoRows.map((row) => {
     const existing = existingRows.find((r) => r.length === row.length);
-    return { ...row, price: existing?.price ?? row.price };
+    if (existing?.priceManual) {
+      return { ...row, price: existing.price, priceManual: true };
+    }
+    return row;
   });
+}
+
+// ביטול נעילת מחיר ידני לשורה בודדת - מחזירה אותה למחיר אוטומטי לפי
+// ההגדרות הנוכחיות (לא "מקפיאה" את המחיר הידני האחרון כ-auto).
+function unlockRowPrice(rows: CatalogRow[], length: number, structure: string, fullness: string, settings: Settings, extraCost: number): CatalogRow[] {
+  const autoRows = computeAutoRows(structure, fullness, settings, extraCost);
+  const autoRow = autoRows.find((r) => r.length === length);
+  if (!autoRow) return rows;
+  return rows.map((r) => (r.length === length ? autoRow : r));
 }
 
 // טקסט מוכן להעתקה/שליחה בוואטסאפ - שם הקטלוג + שורה לכל אורך.
@@ -299,6 +313,49 @@ function buildCatalogCopyText(catalog: PriceCatalog, showProfit: boolean): strin
     return showProfit ? `${base} (רווח: ₪${(row.price - row.cost).toLocaleString("he-IL")})` : base;
   });
   return `${catalog.name}\n${lines.join("\n")}`;
+}
+
+// תא מחיר ניתן לעריכה inline בטבלת קטלוג שמור - state מקומי (לא state
+// של ההורה) כדי לא "לקפוץ" תוך כדי הקלדה בזמן שה-onSnapshot החי מרענן
+// את שאר הטבלה; מתאפס ל-price העדכני כשהוא משתנה מבחוץ (למשל "עדכן
+// לפי הגדרות נוכחיות"). שלילי לא נשמר בכלל (כמו שדה המחיר הידני
+// בתצוגה המקדימה), 0 מותר. נעילה (priceManual) מוצגת כאייקון מנעול
+// עם tooltip + כפתור שחרור קטן.
+// key={price} בקריאה (ולא useEffect) מאפס את ה-state המקומי כש-price
+// משתנה מבחוץ (onSnapshot חי) - React מרכיב instance חדש עם price
+// העדכני כ-state ראשוני, בלי setState בתוך effect (react-hooks/set-
+// state-in-effect).
+function CatalogPriceCell({ price, locked, onCommit, onUnlock }: { price: number; locked: boolean; onCommit: (newPrice: number) => void; onUnlock: () => void }) {
+  const [localValue, setLocalValue] = useState(price);
+
+  return (
+    <span className="catalog-price-cell">
+      <input
+        type="number"
+        min="0"
+        className="calc-input catalog-price-input"
+        value={localValue}
+        onChange={(e) => {
+          const newValue = Number(e.target.value) || 0;
+          if (newValue < 0) return;
+          setLocalValue(newValue);
+        }}
+        onBlur={() => {
+          if (localValue !== price) onCommit(localValue);
+        }}
+      />
+      {locked && (
+        <button
+          type="button"
+          className="catalog-price-lock-btn"
+          title="מחיר ידני - לא יתעדכן אוטומטית. לחצי לשחרור הנעילה"
+          onClick={onUnlock}
+        >
+          <Lock size={13} />
+        </button>
+      )}
+    </span>
+  );
 }
 
 function PriceCatalogsTab({ settings }: { settings: Settings }) {
@@ -318,6 +375,8 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
   const [editName, setEditName] = useState("");
   const [editStructure, setEditStructure] = useState("");
   const [editFullness, setEditFullness] = useState("");
+  const [editExtraCost, setEditExtraCost] = useState<number | "">(0);
+  const [editExtraCostLabel, setEditExtraCostLabel] = useState("");
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -350,6 +409,7 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                 length: r.length as number,
                 cost: r.cost as number,
                 price: (r.price as number) ?? (r.suggestedPrice as number) ?? 0,
+                priceManual: r.priceManual as boolean | undefined,
               }));
               return {
                 id: d.id,
@@ -393,8 +453,10 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
 
   const handleCreateCatalog = async () => {
     if (!canCreate) return;
+    // קטלוג "ידני" - כל שורותיו priceManual: true (לא רק אלו שנערכו
+    // בפועל) - "עדכן לפי הגדרות נוכחיות" לא יחליף אף מחיר בקטלוג כזה.
     const rows: CatalogRow[] = mode === "manual"
-      ? previewRows.map((row) => ({ ...row, price: manualPrices[row.length] ?? row.price }))
+      ? previewRows.map((row) => ({ ...row, price: manualPrices[row.length] ?? row.price, priceManual: true }))
       : previewRows;
     const extraCostLabelTrimmed = extraCostLabel.trim();
     await addDoc(collection(db, "priceCatalogs"), {
@@ -421,7 +483,7 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
 
   const handleRefreshCatalog = async (catalog: PriceCatalog) => {
     await updateDoc(doc(db, "priceCatalogs", catalog.id), {
-      rows: recomputeRows(catalog.rows, catalog.structure, catalog.fullness, catalog.mode, settings, catalog.extraCost),
+      rows: recomputeRows(catalog.rows, catalog.structure, catalog.fullness, settings, catalog.extraCost),
     });
   };
 
@@ -430,22 +492,44 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
     setEditName(catalog.name);
     setEditStructure(catalog.structure);
     setEditFullness(catalog.fullness);
+    setEditExtraCost(catalog.extraCost);
+    setEditExtraCostLabel(catalog.extraCostLabel ?? "");
   };
 
-  // עריכת מבנה/מלאות עשויה לשנות את עלות השיער הבסיסית - cost מחושב
-  // מחדש תמיד. price מחושב מחדש רק במצב אוטומטי; במצב ידני נשאר כמו
-  // שהמשתמשת קבעה (recomputeRows, אותה לוגיקה כמו כפתור "עדכן").
+  // עריכת מבנה/מלאות/עלות נוספת עשויה לשנות את עלות השיער הבסיסית -
+  // cost מחושב מחדש תמיד. price מחושב מחדש רק לשורות בלי priceManual
+  // (recomputeRows, אותה לוגיקה כמו כפתור "עדכן").
   const handleSaveEdit = async () => {
     if (!editingId || editName.trim() === "" || editStructure === "" || editFullness === "") return;
     const catalog = catalogs.find((c) => c.id === editingId);
     if (!catalog) return;
+    const editExtraCostNum = Number(editExtraCost) || 0;
+    const editExtraCostLabelTrimmed = editExtraCostLabel.trim();
     await updateDoc(doc(db, "priceCatalogs", editingId), {
       name: editName.trim(),
       structure: editStructure,
       fullness: editFullness,
-      rows: recomputeRows(catalog.rows, editStructure, editFullness, catalog.mode, settings, catalog.extraCost),
+      rows: recomputeRows(catalog.rows, editStructure, editFullness, settings, editExtraCostNum),
+      extraCost: editExtraCostNum,
+      // שדה מושמט כליל אם ריק - לא extraCostLabel: undefined (Firestore דוחה).
+      ...(editExtraCostLabelTrimmed ? { extraCostLabel: editExtraCostLabelTrimmed } : { extraCostLabel: deleteField() }),
     });
     setEditingId(null);
+  };
+
+  // עריכת מחיר שורה בודדת בטבלת קטלוג שמור - נועלת רק אותה (priceManual:
+  // true), לא משנה שום שורה אחרת. כתיבה ישירה ל-Firestore (לא state
+  // מקומי) - onSnapshot החי יעדכן את התצוגה.
+  const handleRowPriceChange = async (catalog: PriceCatalog, length: number, newPrice: number) => {
+    const newRows = catalog.rows.map((r) => (r.length === length ? { ...r, price: newPrice, priceManual: true } : r));
+    await updateDoc(doc(db, "priceCatalogs", catalog.id), { rows: newRows });
+  };
+
+  // "שחרור נעילה" לשורה בודדת - מחזיר אותה למחיר אוטומטי לפי ההגדרות
+  // הנוכחיות (לא מקפיא את המחיר הידני האחרון כאילו הוא "אוטומטי").
+  const handleUnlockRowPrice = async (catalog: PriceCatalog, length: number) => {
+    const newRows = unlockRowPrice(catalog.rows, length, catalog.structure, catalog.fullness, settings, catalog.extraCost);
+    await updateDoc(doc(db, "priceCatalogs", catalog.id), { rows: newRows });
   };
 
   const handleConfirmDelete = async () => {
@@ -566,15 +650,21 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
       {!loading && !loadError && catalogs.map((catalog) => (
         <div key={catalog.id} className="calc-card price-catalog-card">
           {editingId === catalog.id ? (
-            <div className="calc-row">
-              <MiniText label="שם הקטלוג" value={editName} onChange={setEditName} />
-              <MiniSelect label="מבנה" value={editStructure} onChange={setEditStructure}
-                options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
-              <MiniSelect label="מלאות" value={editFullness} onChange={setEditFullness}
-                options={FULLNESS_OPTIONS.map(v=>({v,l:v}))} />
-              <button className="calc-toggle-btn" onClick={handleSaveEdit}>💾 שמירה</button>
-              <button className="calc-toggle-btn" onClick={() => setEditingId(null)}>ביטול</button>
-            </div>
+            <>
+              <div className="calc-row">
+                <MiniText label="שם הקטלוג" value={editName} onChange={setEditName} />
+                <MiniSelect label="מבנה" value={editStructure} onChange={setEditStructure}
+                  options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
+                <MiniSelect label="מלאות" value={editFullness} onChange={setEditFullness}
+                  options={FULLNESS_OPTIONS.map(v=>({v,l:v}))} />
+              </div>
+              <div className="calc-row">
+                <MiniNum label="עלות נוספת ₪ (אופציונלי)" value={editExtraCost} onChange={setEditExtraCost} min={0} />
+                <MiniText label="תיאור העלות הנוספת (אופציונלי)" value={editExtraCostLabel} onChange={setEditExtraCostLabel} placeholder="לדוגמה: רשת ועבודה" />
+                <button className="calc-toggle-btn" onClick={handleSaveEdit}>💾 שמירה</button>
+                <button className="calc-toggle-btn" onClick={() => setEditingId(null)}>ביטול</button>
+              </div>
+            </>
           ) : (
             <div className="price-catalog-card-header">
               <div>
@@ -616,7 +706,15 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                   <tr key={row.length}>
                     <td className="font-bold">{row.length} ס״מ</td>
                     <td className="mono">₪{row.cost.toLocaleString("he-IL")}</td>
-                    <td className="mono catalog-price">₪{row.price.toLocaleString("he-IL")}</td>
+                    <td className="mono catalog-price">
+                      <CatalogPriceCell
+                        key={row.price}
+                        price={row.price}
+                        locked={!!row.priceManual}
+                        onCommit={(newPrice) => handleRowPriceChange(catalog, row.length, newPrice)}
+                        onUnlock={() => handleUnlockRowPrice(catalog, row.length)}
+                      />
+                    </td>
                     {showProfit && (
                       <td className="mono text-success">₪{(row.price - row.cost).toLocaleString("he-IL")}</td>
                     )}
