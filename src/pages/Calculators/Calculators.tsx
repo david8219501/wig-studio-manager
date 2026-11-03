@@ -257,30 +257,33 @@ interface PriceCatalog {
   mode: CatalogMode;
   createdAt: string;
   rows: CatalogRow[];
+  extraCost: number; // עלות קבועה נוספת (רשת/עבודה/וכו'), מתווספת לעלות השיער בכל שורה. ברירת מחדל 0 - קטלוגים ישנים בלי השדה נטענים בדיוק כמו קודם
+  extraCostLabel?: string; // תיאור קצר לעלות הנוספת (למשל "רשת ועבודה") - אופציונלי, לא נכתב ל-Firestore אם ריק
 }
 
 // שורות קטלוג "אוטומטיות" לכל האורכים האפשריים (HAIR_LENGTH_OPTIONS) -
-// עלות גולמית מ-calculateHairCost (בלי סקין/טופ/רשת/נוספות, בשונה
-// מ-PriceCalculator - הקטלוג מציג רק את עלות השיער עצמה) ומחיר מוצע עם
-// אחוז הרווח, אותה נוסחה בדיוק כמו suggestedPrice ב-RepairOrderForm.tsx.
-// cost תמיד מחושב כך - זו עובדה אובייקטיבית מהמחשבון, לא ניתנת לעריכה
-// ידנית באף מצב. price הוא רק ההצעה ה"אוטומטית" - במצב ידני המשתמשת
-// יכולה לשנות אותו (ראו handleCreateCatalog/recomputeRows).
-function computeAutoRows(structure: string, fullness: string, settings: Settings): CatalogRow[] {
+// עלות = עלות שיער (calculateHairCost, בלי סקין/טופ/רשת/נוספות - בשונה
+// מ-PriceCalculator) + extraCost הקבוע של הקטלוג (רשת/עבודה/וכו', אם
+// הוגדר). מחיר מוצע עם אחוז הרווח על העלות הכוללת, אותה נוסחה בדיוק כמו
+// suggestedPrice ב-RepairOrderForm.tsx. cost תמיד מחושב כך - לא ניתן
+// לעריכה ידנית באף מצב. price הוא רק ההצעה ה"אוטומטית" - במצב ידני
+// המשתמשת יכולה לשנות אותו (ראו handleCreateCatalog/recomputeRows).
+function computeAutoRows(structure: string, fullness: string, settings: Settings, extraCost: number): CatalogRow[] {
   return HAIR_LENGTH_OPTIONS.map((length) => {
     const { hairCost } = calculateHairCost({ length, structure, fullness }, settings);
-    const cost = Math.round(hairCost);
-    const price = Math.round(hairCost * (1 + settings.profitMargin / 100));
+    const cost = Math.round(hairCost + extraCost);
+    const price = Math.round(cost * (1 + settings.profitMargin / 100));
     return { length, cost, price };
   });
 }
 
 // עדכון שורות קטלוג קיים (כפתור "עדכן לפי הגדרות נוכחיות" + שמירת עריכה
-// של מבנה/מלאות): cost מחושב מחדש תמיד (עלות חומר גלם יכולה להשתנות).
-// במצב אוטומטי גם price מחושב מחדש; במצב ידני ה-price שהמשתמשת קבעה
-// נשאר כמו שהוא (מאותר לפי length, לא לפי אינדקס - ליתר בטחון).
-function recomputeRows(existingRows: CatalogRow[], structure: string, fullness: string, mode: CatalogMode, settings: Settings): CatalogRow[] {
-  const autoRows = computeAutoRows(structure, fullness, settings);
+// של מבנה/מלאות/עלות נוספת): cost מחושב מחדש תמיד (עלות חומר גלם/עלות
+// נוספת יכולות להשתנות). במצב אוטומטי גם price מחושב מחדש; במצב ידני
+// ה-price שהמשתמשת קבעה נשאר כמו שהוא (מאותר לפי length, לא לפי
+// אינדקס - ליתר בטחון).
+function recomputeRows(existingRows: CatalogRow[], structure: string, fullness: string, mode: CatalogMode, settings: Settings, extraCost: number): CatalogRow[] {
+  const autoRows = computeAutoRows(structure, fullness, settings, extraCost);
   if (mode === "auto") return autoRows;
   return autoRows.map((row) => {
     const existing = existingRows.find((r) => r.length === row.length);
@@ -308,6 +311,8 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
   const [fullness, setFullness] = useState("");
   const [mode, setMode] = useState<CatalogMode>("auto");
   const [manualPrices, setManualPrices] = useState<Record<number, number>>({});
+  const [extraCost, setExtraCost] = useState<number | "">(0);
+  const [extraCostLabel, setExtraCostLabel] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -354,6 +359,8 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                 createdAt: data.createdAt as string,
                 mode: (data.mode === "manual" ? "manual" : "auto") as CatalogMode,
                 rows,
+                extraCost: (data.extraCost as number) ?? 0,
+                extraCostLabel: data.extraCostLabel as string | undefined,
               };
             })
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -379,8 +386,8 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
 
   const previewRows = useMemo(() => {
     if (!structure || !fullness) return [];
-    return computeAutoRows(structure, fullness, settings);
-  }, [structure, fullness, settings]);
+    return computeAutoRows(structure, fullness, settings, Number(extraCost) || 0);
+  }, [structure, fullness, settings, extraCost]);
 
   const canCreate = name.trim() !== "" && structure !== "" && fullness !== "";
 
@@ -389,6 +396,7 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
     const rows: CatalogRow[] = mode === "manual"
       ? previewRows.map((row) => ({ ...row, price: manualPrices[row.length] ?? row.price }))
       : previewRows;
+    const extraCostLabelTrimmed = extraCostLabel.trim();
     await addDoc(collection(db, "priceCatalogs"), {
       businessId: auth.currentUser!.uid,
       name: name.trim(),
@@ -397,17 +405,23 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
       mode,
       createdAt: new Date().toISOString(),
       rows,
+      extraCost: Number(extraCost) || 0,
+      // Firestore דוחה כתיבת undefined - שדה מושמט כליל (לא נכתב) אם
+      // התיאור ריק, לא "extraCostLabel: undefined".
+      ...(extraCostLabelTrimmed ? { extraCostLabel: extraCostLabelTrimmed } : {}),
     });
     setName("");
     setStructure("");
     setFullness("");
     setMode("auto");
     setManualPrices({});
+    setExtraCost(0);
+    setExtraCostLabel("");
   };
 
   const handleRefreshCatalog = async (catalog: PriceCatalog) => {
     await updateDoc(doc(db, "priceCatalogs", catalog.id), {
-      rows: recomputeRows(catalog.rows, catalog.structure, catalog.fullness, catalog.mode, settings),
+      rows: recomputeRows(catalog.rows, catalog.structure, catalog.fullness, catalog.mode, settings, catalog.extraCost),
     });
   };
 
@@ -429,7 +443,7 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
       name: editName.trim(),
       structure: editStructure,
       fullness: editFullness,
-      rows: recomputeRows(catalog.rows, editStructure, editFullness, catalog.mode, settings),
+      rows: recomputeRows(catalog.rows, editStructure, editFullness, catalog.mode, settings, catalog.extraCost),
     });
     setEditingId(null);
   };
@@ -454,6 +468,14 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
             options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
           <MiniSelect label="מלאות" value={fullness} onChange={handleFullnessChange}
             options={FULLNESS_OPTIONS.map(v=>({v,l:v}))} />
+        </div>
+
+        {/* עלות נוספת - אופציונלי, מתווספת לעלות השיער בכל שורות הקטלוג
+            (למשל רשת/עבודה שקבועה לכל הקטלוג, בלי קשר לאורך). ריק = 0,
+            לא שדה חובה. */}
+        <div className="calc-row">
+          <MiniNum label="עלות נוספת ₪ (אופציונלי)" value={extraCost} onChange={setExtraCost} min={0} />
+          <MiniText label="תיאור העלות הנוספת (אופציונלי)" value={extraCostLabel} onChange={setExtraCostLabel} placeholder="לדוגמה: רשת ועבודה" />
         </div>
 
         <div className="calc-field">
@@ -560,6 +582,11 @@ function PriceCatalogsTab({ settings }: { settings: Settings }) {
                 <div className="price-catalog-meta">
                   {catalog.structure} · {catalog.fullness} · {catalog.mode === "manual" ? "תמחור ידני" : "תמחור אוטומטי"} · נוצר ב-{formatDateIL(catalog.createdAt)}
                 </div>
+                {catalog.extraCost > 0 && (
+                  <div className="price-catalog-meta">
+                    כולל עלות נוספת: ₪{catalog.extraCost.toLocaleString("he-IL")}{catalog.extraCostLabel ? ` (${catalog.extraCostLabel})` : ""}
+                  </div>
+                )}
               </div>
               <div className="price-catalog-actions">
                 <CopyButton text={buildCatalogCopyText(catalog, showProfit)} label="העתק לשליחה" />
@@ -721,16 +748,24 @@ function MiniText({ label, value, onChange, placeholder }: { label: string; valu
   );
 }
 
-function MiniNum({ label, value, onChange, placeholder="0", error=false }: { label: string; value: number | ""; onChange: (v: number | "") => void; placeholder?: string; error?: boolean }) {
+function MiniNum({ label, value, onChange, placeholder="0", error=false, min }: { label: string; value: number | ""; onChange: (v: number | "") => void; placeholder?: string; error?: boolean; min?: number }) {
   return (
     <div className="calc-field">
       <label className="calc-field-label">{label}</label>
       <input
         type="number"
+        min={min}
         className={`calc-input ${error ? 'calc-input-error' : ''}`}
         value={value}
         placeholder={placeholder}
-        onChange={e=>onChange(e.target.value === "" ? "" : Number(e.target.value))}
+        onChange={(e) => {
+          if (e.target.value === "") { onChange(""); return; }
+          const newValue = Number(e.target.value);
+          // min מתנהג כמו בשדה המחיר הידני בטבלת הקטלוג: ערך מתחת ל-min
+          // לא נשמר בכלל (הערך הקודם נשאר), לא רק HTML-level הגנה.
+          if (min !== undefined && newValue < min) return;
+          onChange(newValue);
+        }}
       />
     </div>
   );

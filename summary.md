@@ -394,3 +394,41 @@ today = new Date();` - אותו דפוס בדיוק כמו כל שאר הקבצ�
 
 **בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
 לבייסליין הקבוע.
+
+---
+
+# משימה 1: קטלוגי מחירים - עלות נוספת + עריכה אחרי יצירה + הדפסה/שיתוף
+
+## חלק 1א': עלות נוספת בקטלוג ✅ הושלמה
+
+`PriceCatalog` קיבל `extraCost: number` (ברירת מחדל 0, נגזר תמיד
+בטעינה: `(data.extraCost as number) ?? 0`, כדי שקטלוגים ישנים בלי
+השדה יטענו בדיוק כמו קודם) ו-`extraCostLabel?: string` (אופציונלי
+בפועל).
+
+`computeAutoRows`/`recomputeRows` קיבלו פרמטר `extraCost` חדש:
+`cost = Math.round(hairCost + extraCost)`, `price = Math.round(cost
+* (1 + profitMargin/100))` - העלות הנוספת נכנסת ל-cost הכולל, ואז
+הרווח/המחיר האוטומטי מחושבים עליו כמו קודם. כל הקריאות הקיימות
+(`previewRows`, `handleRefreshCatalog`, `handleSaveEdit`) עודכנו
+להעביר את ה-extraCost הרלוונטי.
+
+**טופס היצירה** קיבל שורה חדשה: "עלות נוספת ₪ (אופציונלי)"
+(`MiniNum` עם `min={0}` חדש - הורחב כדי לתמוך בהגנה הזו, לא רק
+HTML - ערך מתחת ל-min לא נשמר, אותו דפוס כמו שדה המחיר הידני
+בטבלת הקטלוג) ו-"תיאור העלות הנוספת (אופציונלי)" (`MiniText`). אין
+וולידציית חובה - ריק = 0.
+
+**שמירה ל-Firestore:** `extraCost: Number(extraCost) || 0` נכתב
+תמיד (מספר, לעולם לא `undefined`). `extraCostLabel` נכתב **רק אם
+לא ריק** (`...(trimmed ? { extraCostLabel: trimmed } : {})`) - לא
+`extraCostLabel: undefined`, ש-Firestore דוחה.
+
+**בכרטיס הקטלוג** נוספה שורת תיאור: "כולל עלות נוספת: ₪X (label)"
+- מוצגת רק כש-`extraCost > 0`, התיאור בסוגריים רק אם קיים.
+`buildCatalogCopyText` **לא שונה** - כמבוקש במפורש.
+
+**קבצים:** `src/pages/Calculators/Calculators.tsx`.
+
+**בדיקות:** `npm run build` נקי. `npm run lint` - 24 בעיות, זהה
+לבייסליין הקבוע.
