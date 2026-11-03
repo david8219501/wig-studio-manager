@@ -21,7 +21,7 @@ interface Settings {
 }
 
 function PriceCalculator({ settings }: { settings: Settings }) {
-  const [length, setLength]       = useState("");
+  const [length, setLength]       = useState<number | "">("");
   const [structure, setStructure] = useState("");
   const [fullness, setFullness]   = useState("");
   const [skinTop, setSkinTop]     = useState<number | "">(1500);
@@ -30,7 +30,7 @@ function PriceCalculator({ settings }: { settings: Settings }) {
 
   const [hideInternalCosts, setHideInternalCosts] = useState(false);
 
-  const missing = !length || !structure || !fullness;
+  const missing = length === "" || !structure || !fullness;
 
   const calc = useMemo(() => {
     if (missing) return null;
@@ -61,8 +61,8 @@ function PriceCalculator({ settings }: { settings: Settings }) {
       </div>
 
       <div className="calc-row">
-        <MiniSelect label="אורך עורף" value={length} onChange={setLength}
-          options={HAIR_LENGTH_OPTIONS.map(v=>({v: String(v), l:`${v} ס״מ`}))} />
+        <MiniNum label="אורך עורף (ס״מ)" value={length} onChange={setLength}
+          placeholder="5-75" min={5} max={75} integer />
         <MiniSelect label="מבנה" value={structure} onChange={setStructure}
           options={STRUCTURE_OPTIONS.map(v=>({v,l:v}))} />
         <MiniSelect label="מלאות" value={fullness} onChange={setFullness}
@@ -994,22 +994,26 @@ function MiniText({ label, value, onChange, placeholder }: { label: string; valu
   );
 }
 
-function MiniNum({ label, value, onChange, placeholder="0", error=false, min }: { label: string; value: number | ""; onChange: (v: number | "") => void; placeholder?: string; error?: boolean; min?: number }) {
+function MiniNum({ label, value, onChange, placeholder="0", error=false, min, max, integer }: { label: string; value: number | ""; onChange: (v: number | "") => void; placeholder?: string; error?: boolean; min?: number; max?: number; integer?: boolean }) {
   return (
     <div className="calc-field">
       <label className="calc-field-label">{label}</label>
       <input
         type="number"
         min={min}
+        max={max}
+        step={integer ? 1 : undefined}
         className={`calc-input ${error ? 'calc-input-error' : ''}`}
         value={value}
         placeholder={placeholder}
         onChange={(e) => {
           if (e.target.value === "") { onChange(""); return; }
-          const newValue = Number(e.target.value);
-          // min מתנהג כמו בשדה המחיר הידני בטבלת הקטלוג: ערך מתחת ל-min
-          // לא נשמר בכלל (הערך הקודם נשאר), לא רק HTML-level הגנה.
+          let newValue = Number(e.target.value);
+          if (integer) newValue = Math.trunc(newValue);
+          // min/max מתנהגים כמו בשדה המחיר הידני בטבלת הקטלוג: ערך מעבר
+          // לטווח לא נשמר בכלל (הערך הקודם נשאר), לא רק HTML-level הגנה.
           if (min !== undefined && newValue < min) return;
+          if (max !== undefined && newValue > max) return;
           onChange(newValue);
         }}
       />

@@ -34,14 +34,28 @@ export interface HairCostResult {
   hairCost: number;
 }
 
+// אורך בדיוק על אחד המפתחות (5, 10, 15...75) מחזיר את המשקל שלו בטבלה
+// במדויק, בלי שינוי. אורך בין שני מפתחות (למשל 23, בין 20 ל-25) מקבל
+// אינטרפולציה לינארית בין שני המשקלים הסמוכים - כדי שאורך חופשי (לא רק
+// קפיצות של 5) יחושב בלי "קיפאון" מדומה על ערך המפתח הקרוב מתחת. אורך
+// מחוץ לטווח הטבלה (מתחת ל-5 או מעל 75) נצמד לקצה הקרוב - שקול להתנהגות
+// הישנה (floor-to-nearest-key), שכבר הייתה שקולה ל"הצמדה לקצה" מחוץ לטווח.
 export function lookupBaseWeight(length: number): number {
   const keys = Object.keys(BASE_WEIGHTS).map(Number).sort((a, b) => a - b);
-  let match = keys[0];
+  const clamped = Math.min(Math.max(length, keys[0]), keys[keys.length - 1]);
+
+  let lower = keys[0];
   for (const k of keys) {
-    if (k <= length) match = k;
-    else break;
+    if (k <= clamped) lower = k;
   }
-  return BASE_WEIGHTS[match];
+  let upper = keys[keys.length - 1];
+  for (const k of keys) {
+    if (k >= clamped) { upper = k; break; }
+  }
+
+  if (lower === upper) return BASE_WEIGHTS[lower];
+  const ratio = (clamped - lower) / (upper - lower);
+  return BASE_WEIGHTS[lower] + ratio * (BASE_WEIGHTS[upper] - BASE_WEIGHTS[lower]);
 }
 
 // חלק החישוב המשותף: בלאי 30% + מחיר לק"ג -> עלות, מתוך משקל נטו נתון.
