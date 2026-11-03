@@ -145,7 +145,7 @@ function LengthPlanner() {
       <div className="calc-row">
         <MiniSelect label="סוג פאה" value={wigType} onChange={setWigType}
           options={["חלק","גלי","מתולתל"].map(v=>({v,l:v}))} />
-        <MiniNum label="אורך עורף" value={nape} onChange={setNape} placeholder="חובה" />
+        <MiniNum label="אורך עורף" value={nape} onChange={setNape} placeholder="חובה (5-75)" min={5} max={75} integer />
         <MiniNum label="אורך אוזניים" value={ear} onChange={setEar} placeholder="מומלץ" />
       </div>
 
